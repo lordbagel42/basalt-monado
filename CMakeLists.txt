@@ -253,6 +253,10 @@ include_directories(thirdparty/basalt-headers/thirdparty/cereal/include)
 include_directories(thirdparty/basalt-headers/include)
 include_directories(thirdparty/CLI11/include)
 include_directories(thirdparty/fast/include)
+include_directories(thirdparty/monado)
+# TODO@mateosss: Eigen is coming from thirdparty/ and not from the system (so we
+# are using 3.3.9 and 3.3.7 at the same time) this might bring problems in the
+# future, try to use system's eigen
 
 include_directories(include)
 
@@ -272,7 +276,8 @@ add_library(basalt SHARED
   src/vi_estimator/ba_base.cpp
   src/vi_estimator/nfr_mapper.cpp
   src/vi_estimator/landmark_database.cpp
-  src/utils/keypoints.cpp)
+  src/utils/keypoints.cpp
+  src/slam_tracker.cpp)
 
 
 target_link_libraries(basalt PUBLIC ${TBB_LIBRARIES} ${STD_CXX_FS} ${OpenCV_LIBS} PRIVATE rosbag apriltag opengv)

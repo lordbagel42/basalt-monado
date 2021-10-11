@@ -1,0 +1,12 @@
+# TODO@mateosss: Fix prefix by using a template
+# TODO@mateosss: CMake rule to install this file
+prefix=/home/mateo/Documents/apps/bsltinstall
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: Basalt
+Description: Visual-Inertial Mapping with Non-Linear Factor Recovery
+Version: 0.1
+URL: https://gitlab.freedesktop.org/mateosss/basalt
+Libs: -L${libdir} -lbasalt
+Cflags: -isystem ${includedir}
