@@ -1,0 +1,37 @@
+# Options for the Basalt SLAM Tracker
+
+# Show GUI
+show-gui=1
+
+# Ground-truth camera calibration used for simulation.
+cam-calib="/home/mateo/Documents/apps/bsltdeps/basalt/data/euroc_ds_calib.json"
+
+# Path to dataset.
+dataset-path="/home/mateo/Documents/apps/euroc/V1_01_easy/"
+
+# Dataset type <euroc, bag>.
+dataset-type="euroc"
+
+# Path to config file.
+config-path="/home/mateo/Documents/apps/bsltdeps/basalt/data/euroc_config.json"
+
+# Path to folder where marginalization data will be stored.
+marg-data=""
+
+# Poll and print for queue sizes.
+print-queue=0
+
+# Path to result file where the system will write RMSE ATE.
+result-path=""
+
+# Number of threads.
+num-threads=0
+
+# Manual playback.
+step-by-step=0
+
+# Save trajectory if not empty. Supported formats <tum, euroc, kitti>
+save-trajectory=""
+
+# Use IMU.
+use-imu=1
