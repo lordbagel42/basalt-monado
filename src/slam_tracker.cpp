@@ -10,6 +10,7 @@
 #include <string>
 #include <thread>
 
+#include <basalt/io/marg_data_io.h>
 #include <basalt/serialization/headers_serialization.h>
 #include <basalt/vi_estimator/vio_estimator.h>
 // TODO@mateosss: Reference in the readme that I'm compiling with
@@ -135,8 +136,9 @@ struct slam_tracker::implementation {
   thread state_consumer_thread;
   thread queues_printer_thread;
 
-  // UI
+  // External Queues
   slam_tracker_ui ui{};
+  MargDataSaver::Ptr marg_data_saver;
 
   implementation(string unified_config) {
     // TODO@mateosss: [x] Argument parsing
@@ -185,14 +187,10 @@ struct slam_tracker::implementation {
     };
     vio->out_state_queue = &out_state_queue;
 
-    // XXX
-    // MargDataSaver::Ptr marg_data_saver;
-
-    // XXX
-    // if (!marg_data_path.empty()) {
-    //   marg_data_saver.reset(new MargDataSaver(marg_data_path));
-    //   vio->out_marg_queue = &marg_data_saver->in_marg_queue;
-    // }
+    if (!marg_data_path.empty()) {
+      marg_data_saver.reset(new MargDataSaver(marg_data_path));
+      vio->out_marg_queue = &marg_data_saver->in_marg_queue;
+    }
   }
 
   void load_unified_config(const string &unified_config) {
