@@ -73,7 +73,9 @@ class KeypointVioEstimator : public VioEstimatorBase,
 
   void initialize(const Eigen::Vector3d& bg, const Eigen::Vector3d& ba);
 
-  virtual ~KeypointVioEstimator() { processing_thread->join(); }
+  virtual ~KeypointVioEstimator() {
+    if (processing_thread) processing_thread->join();
+  }
 
   void addIMUToQueue(const ImuData<double>::Ptr& data);
   void addVisionToQueue(const OpticalFlowResult::Ptr& data);

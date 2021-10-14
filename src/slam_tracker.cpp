@@ -1,16 +1,20 @@
+// Copyright 2021, Collabora, Ltd.
+
 #include "slam_tracker.hpp"
 
+#include <pangolin/pangolin.h>
 #include <CLI/CLI.hpp>
 
-#include <stdio.h>
+#include <cstdio>
 #include <memory>
 #include <string>
+#include <thread>
 
 #include <basalt/serialization/headers_serialization.h>
 #include <basalt/vi_estimator/vio_estimator.h>
-
 // TODO@mateosss: Reference in the readme that I'm compiling with
-// cmake . -B build -DCMAKE_INSTALL_PREFIX=$bsltinstall -DCMAKE_BUILD_TYPE=RelWithDebInfo -DCMAKE_EXPORT_COMPILE_COMMANDS=On -DEIGEN_ROOT=/usr/include/eigen3
+// cmake . -B build -DCMAKE_INSTALL_PREFIX=$bsltinstall -DCMAKE_BUILD_TYPE=RelWithDebInfo
+// -DCMAKE_EXPORT_COMPILE_COMMANDS=On -DEIGEN_ROOT=/usr/include/eigen3
 
 #define ASSERT(cond, ...)                                      \
   do {                                                         \
@@ -27,8 +31,11 @@ namespace xrt::auxiliary::tracking::slam {
 
 using std::cout;
 using std::make_shared;
+using std::shared_ptr;
 using std::string;
+using std::thread;
 using std::to_string;
+using std::vector;
 using namespace basalt;
 
 string imu2str(const imu_sample &s) {
@@ -53,6 +60,48 @@ string pose2str(const pose &p) {
   return str;
 }
 
+class slam_tracker_ui {
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+ private:
+  VioVisualizationData::Ptr xxxcurr_vis_data;
+  pangolin::DataLog xxxvio_data_log;
+  thread vis_thread;
+
+ public:
+  tbb::concurrent_bounded_queue<VioVisualizationData::Ptr> out_vis_queue{};
+
+  void initialize() { xxxvio_data_log.Clear(); }
+
+  void start_visualization_thread() {
+    vis_thread = thread([&]() {
+      while (true) {
+        out_vis_queue.pop(xxxcurr_vis_data);
+        if (xxxcurr_vis_data.get() == nullptr) break;
+      }
+      cout << "Finished vis_thread\n";
+    });
+  }
+
+  void log_vio_data(const PoseVelBiasState<double>::Ptr &data, float since_start_ns) {
+    Sophus::SE3d T_w_i = data->T_w_i;
+    Eigen::Vector3d vel_w_i = data->vel_w_i;
+    Eigen::Vector3d bg = data->bias_gyro;
+    Eigen::Vector3d ba = data->bias_accel;
+
+    vector<float> vals;
+    vals.push_back(since_start_ns * 1e-9);
+    for (int i = 0; i < 3; i++) vals.push_back(vel_w_i[i]);
+    for (int i = 0; i < 3; i++) vals.push_back(T_w_i.translation()[i]);
+    for (int i = 0; i < 3; i++) vals.push_back(bg[i]);
+    for (int i = 0; i < 3; i++) vals.push_back(ba[i]);
+
+    xxxvio_data_log.Log(vals);
+  }
+
+  void stop() { vis_thread.join(); }
+};
+
 struct slam_tracker::implementation {
   // Options parsed from unified config file
   bool show_gui = true;
@@ -75,9 +124,19 @@ struct slam_tracker::implementation {
   VioEstimatorBase::Ptr vio;
 
   // Queues
+  std::atomic<bool> running = false;
   tbb::concurrent_bounded_queue<PoseVelBiasState<double>::Ptr> out_state_queue;
+  PoseVelBiasState<double> last_out_state{};  // TODO@mateosss: put a lock when writting this
+  tbb::concurrent_bounded_queue<PoseVelBiasState<double>::Ptr> monado_out_state_queue;
   tbb::concurrent_bounded_queue<OpticalFlowInput::Ptr> *image_data_queue = nullptr;  // Invariant: not null after ctor
   tbb::concurrent_bounded_queue<ImuData<double>::Ptr> *imu_data_queue = nullptr;     // Invariant: not null after ctor
+
+  // Threads
+  thread state_consumer_thread;
+  thread queues_printer_thread;
+
+  // UI
+  slam_tracker_ui ui{};
 
   implementation(string unified_config) {
     // TODO@mateosss: [x] Argument parsing
@@ -94,6 +153,8 @@ struct slam_tracker::implementation {
     // TODO@mateosss: [ ] t5: print_queue thread
     // TODO@mateosss: [ ] gui setup
     // TODO@mateosss: [ ] joins
+    // TODO@mateosss: [ ] Check that there are no XXX comments floating around
+    // TODO@mateosss: [ ] Check that there are no xxxmembers floating around
 
     load_unified_config(unified_config);
 
@@ -110,17 +171,28 @@ struct slam_tracker::implementation {
     load_calibration_data(cam_calib_path);
 
     opt_flow_ptr = OpticalFlowFactory::getOpticalFlow(vio_config, calib);
-    vio = VioEstimatorFactory::getVioEstimator(vio_config, calib, constants::g, use_imu);
-    vio->initialize(Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
-
-    imu_data_queue = &vio->imu_data_queue;
     image_data_queue = &opt_flow_ptr->input_queue;
+    ASSERT_(image_data_queue != nullptr);
+
+    vio = VioEstimatorFactory::getVioEstimator(vio_config, calib, constants::g, use_imu);
+    imu_data_queue = &vio->imu_data_queue;
+    ASSERT_(imu_data_queue != nullptr);
+
     opt_flow_ptr->output_queue = &vio->vision_data_queue;
-    // if (show_gui) vio->out_vis_queue = &out_vis_queue; // TODO@mateosss: Use gui
+    if (show_gui) {
+      ui.initialize();
+      vio->out_vis_queue = &ui.out_vis_queue;
+    };
     vio->out_state_queue = &out_state_queue;
 
-    ASSERT_(image_data_queue != nullptr);
-    ASSERT_(imu_data_queue != nullptr);
+    // XXX
+    // MargDataSaver::Ptr marg_data_saver;
+
+    // XXX
+    // if (!marg_data_path.empty()) {
+    //   marg_data_saver.reset(new MargDataSaver(marg_data_path));
+    //   vio->out_marg_queue = &marg_data_saver->in_marg_queue;
+    // }
   }
 
   void load_unified_config(const string &unified_config) {
@@ -169,13 +241,68 @@ struct slam_tracker::implementation {
     }
   }
 
-  void start() { printf(">>> implementation.%s\n", __func__); }
+  int64_t start_t_ns = -1;
+  vector<int64_t> xxxvio_t_ns;
+  Eigen::aligned_vector<Eigen::Vector3d> xxxvio_t_w_i;
+
+  void state_consumer() {
+    PoseVelBiasState<double>::Ptr data;
+
+    while (true) {
+      out_state_queue.pop(data);
+      if (data.get() == nullptr) {
+        monado_out_state_queue.push(nullptr);
+        break;
+      }
+
+      last_out_state = *data;
+
+      int64_t t_ns = data->t_ns;
+      if (start_t_ns < 0) start_t_ns = t_ns;
+
+      xxxvio_t_ns.emplace_back(t_ns);
+      xxxvio_t_w_i.emplace_back(data->T_w_i.translation());
+
+      if (show_gui) ui.log_vio_data(data, t_ns - start_t_ns);
+
+      monado_out_state_queue.push(data);
+    }
+
+    std::cout << "Finished state_consumer" << std::endl;
+  }
+
+  void queues_printer() {
+    while (running) {
+      cout << "opt_flow_ptr->input_queue " << opt_flow_ptr->input_queue.size() << " opt_flow_ptr->output_queue "
+           << opt_flow_ptr->output_queue->size() << " out_state_queue " << out_state_queue.size() << "\n";
+      std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
+    std::cout << "Finished queues_printer" << std::endl;
+  }
+
+  void start() {
+    running = true;
+    vio->initialize(Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
+
+    if (show_gui) ui.start_visualization_thread();
+    state_consumer_thread = thread(&slam_tracker::implementation::state_consumer, this);
+    if (print_queue) queues_printer_thread = thread(&slam_tracker::implementation::queues_printer, this);
+    // TODO@mateosss: if (show_gui) do stuff
+  }
 
   void stop() {
     // Pushing nullptr signals end of stream
     // TODO@mateosss: could it be a race condition here?
+    running = false;
     image_data_queue->push(nullptr);
     imu_data_queue->push(nullptr);
+
+    if (print_queue) queues_printer_thread.join();
+    state_consumer_thread.join();
+    if (show_gui) ui.stop();
+
+    // TODO@mateosss: There is a segfault when closing monado without starting the stream
+    // happens in a lambda from keypoint_vio.cpp and ends at line calib_bias.hpp:112
   }
 
   bool is_running() {
@@ -238,8 +365,26 @@ struct slam_tracker::implementation {
   }
 
   bool try_dequeue_pose(pose &pose) {
-    basalt::PoseVelBiasState<double>::Ptr data;
-    bool dequeued = out_state_queue.try_pop(data);
+// TODO@mateosss: USE_LAST_POSE has race conditions and honestly this is kind of ugly
+// if USE_LAST_POSE is false, we will dequeue every pose produced by the VIO estimator
+#define USE_LAST_POSE true
+#if USE_LAST_POSE
+    PoseVelBiasState<double> data = last_out_state;
+    Sophus::SE3d T_w_i = data.T_w_i;
+    pose.px = T_w_i.translation().x();
+    pose.py = T_w_i.translation().y();
+    pose.pz = T_w_i.translation().z();
+    pose.rx = T_w_i.unit_quaternion().x();
+    pose.ry = T_w_i.unit_quaternion().y();
+    pose.rz = T_w_i.unit_quaternion().z();
+    pose.rw = T_w_i.unit_quaternion().w();
+    // TODO@mateosss: remove print
+    printf(">>> try_dequeue_pose %s\n", pose2str(pose).c_str());
+
+    return true;
+#else
+    PoseVelBiasState<double>::Ptr data;
+    bool dequeued = monado_out_state_queue.try_pop(data);
     if (dequeued) {
       Sophus::SE3d T_w_i = data->T_w_i;
       pose.px = T_w_i.translation().x();
@@ -253,6 +398,7 @@ struct slam_tracker::implementation {
       printf(">>> try_dequeue_pose %s\n", pose2str(pose).c_str());
     }
     return dequeued;
+#endif
   }
 };
 

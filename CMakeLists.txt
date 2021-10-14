@@ -279,8 +279,8 @@ add_library(basalt SHARED
   src/utils/keypoints.cpp
   src/slam_tracker.cpp)
 
-
-target_link_libraries(basalt PUBLIC ${TBB_LIBRARIES} ${STD_CXX_FS} ${OpenCV_LIBS} PRIVATE rosbag apriltag opengv)
+# TODO@mateosss: I had to add pangolin here, seems a bit too much for libbasalt if you dont want the visualization but it is okay for nwo I guess
+target_link_libraries(basalt PUBLIC ${TBB_LIBRARIES} ${STD_CXX_FS} ${OpenCV_LIBS} pangolin PRIVATE rosbag apriltag opengv)
 
 
 add_executable(basalt_calibrate src/calibrate.cpp src/calibration/cam_calib.cpp)
@@ -352,9 +352,10 @@ install(FILES ${CONFIG_FILES}
 macro(install)
 endmacro()
 # Include subproject (or any other CMake code) with "disabled" install().
-enable_testing()
-add_subdirectory(thirdparty/basalt-headers/test)
-add_subdirectory(test)
+# TODO@mateosss: Commented out these three lines below so that it compiles faster
+# enable_testing()
+# add_subdirectory(thirdparty/basalt-headers/test)
+# add_subdirectory(test)
 # Restore original install() behavior.
 macro(install)
   _install(${ARGN})
