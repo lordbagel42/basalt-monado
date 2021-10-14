@@ -277,7 +277,7 @@ add_library(basalt SHARED
   src/vi_estimator/nfr_mapper.cpp
   src/vi_estimator/landmark_database.cpp
   src/utils/keypoints.cpp
-  src/slam_tracker.cpp)
+  src/monado/slam_tracker.cpp)
 
 # TODO@mateosss: I had to add pangolin here, seems a bit too much for libbasalt if you dont want the visualization but it is okay for nwo I guess
 target_link_libraries(basalt PUBLIC ${TBB_LIBRARIES} ${STD_CXX_FS} ${OpenCV_LIBS} pangolin PRIVATE rosbag apriltag opengv)

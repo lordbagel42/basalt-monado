@@ -104,7 +104,7 @@ class slam_tracker_ui {
 };
 
 struct slam_tracker::implementation {
-private:
+ private:
   // Options parsed from unified config file
   bool show_gui = true;
   string cam_calib_path;
@@ -141,7 +141,7 @@ private:
   slam_tracker_ui ui{};
   MargDataSaver::Ptr marg_data_saver;
 
-public:
+ public:
   implementation(string unified_config) {
     // TODO@mateosss: [x] Argument parsing
     // TODO@mateosss: [x] tbb global control
@@ -195,7 +195,7 @@ public:
     }
   }
 
-private:
+ private:
   void load_unified_config(const string &unified_config) {
     // TODO@mateosss: Check that the app stops when a required option is not present
 
@@ -281,7 +281,7 @@ private:
     std::cout << "Finished queues_printer" << std::endl;
   }
 
-public:
+ public:
   void start() {
     running = true;
     vio->initialize(Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
@@ -328,9 +328,10 @@ public:
     imu_data_queue->push(data);
   }
 
-private:
+ private:
   OpticalFlowInput::Ptr partial_frame;
-public:
+
+ public:
   void push_frame(img_sample s) {
     // TODO@mateosss: remove print
     // printf(">>> %s\n", img2str(s).c_str());
