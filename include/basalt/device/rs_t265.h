@@ -77,8 +77,8 @@ class RsT265Device {
   static constexpr int IMU_RATE = 200;
   static constexpr int NUM_CAMS = 2;
 
-  RsT265Device(bool manual_exposure, int skip_frames, int webp_quality,
-               double exposure_value = 10.0);
+  RsT265Device(bool is_d455, bool manual_exposure, int skip_frames,
+               int webp_quality, double exposure_value = 10.0);
   ~RsT265Device();
   void start();
   void stop();
@@ -96,6 +96,9 @@ class RsT265Device {
   tbb::concurrent_bounded_queue<RsPoseData>* pose_data_queue = nullptr;
 
  private:
+  void disableLaserEmitters();
+
+  bool is_d455;  // Just a patch to void doing a proper class hierarchy
   bool manual_exposure;
   int skip_frames;
   int webp_quality;

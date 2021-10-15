@@ -123,6 +123,7 @@ int main(int argc, char** argv) {
   std::string cam_calib_path;
   std::string config_path;
   int num_threads = 0;
+  bool is_d455;
 
   CLI::App app{"RealSense T265 Live Vio"};
 
@@ -137,7 +138,8 @@ int main(int argc, char** argv) {
   app.add_option("--config-path", config_path, "Path to config file.");
   app.add_option("--num-threads", num_threads, "Number of threads.");
   app.add_option("--step-by-step", step_by_step, "Path to config file.");
-
+  app.add_flag("--is-d455", is_d455,
+               "If set will work on a D455 (probably on a D435 too)");
   try {
     app.parse(argc, argv);
   } catch (const CLI::ParseError& e) {
@@ -158,8 +160,8 @@ int main(int argc, char** argv) {
   }
 
   // realsense
-  t265_device.reset(
-      new basalt::RsT265Device(false, 1, 90, 10.0));  // TODO: add options?
+  // TODO: add options for constructor?
+  t265_device.reset(new basalt::RsT265Device(is_d455, false, 1, 90, 10.0));
 
   // startup device and load calibration
   t265_device->start();
