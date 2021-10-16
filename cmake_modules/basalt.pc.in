@@ -1,6 +1,4 @@
-# TODO@mateosss: Fix prefix by using a template
-# TODO@mateosss: CMake rule to install this file
-prefix=/home/mateo/Documents/apps/bsltinstall
+prefix=@CMAKE_INSTALL_PREFIX@
 libdir=${prefix}/lib
 includedir=${prefix}/include
 

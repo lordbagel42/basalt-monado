@@ -347,6 +347,13 @@ file(GLOB CONFIG_FILES "${CMAKE_CURRENT_SOURCE_DIR}/data/*.json")
 install(FILES ${CONFIG_FILES}
   DESTINATION ${CMAKE_INSTALL_PREFIX}/etc/basalt)
 
+configure_file(
+  ${CMAKE_CURRENT_LIST_DIR}/cmake_modules/basalt.pc.in
+  ${CMAKE_CURRENT_BINARY_DIR}/basalt.pc
+  @ONLY
+)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/basalt.pc DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/pkgconfig)
+
 
 # Replace install() to do-nothing macro.
 macro(install)
