@@ -196,7 +196,7 @@ class slam_tracker_ui {
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
       if (follow) {
-        // TODO@mateosss: There is a small race condition here over
+        // TODO: There is a small race condition here over
         // curr_vis_data that is also present in the original basalt examples
         if (curr_vis_data) {
           auto T_w_i = curr_vis_data->states.back();
@@ -432,8 +432,6 @@ struct slam_tracker::implementation {
 
  private:
   void load_unified_config(const string &unified_config) {
-    // TODO@mateosss: Check that the app stops when a required option is not present
-
     CLI::App app{"Options for the Basalt SLAM Tracker"};
 
     app.add_option("--show-gui", show_gui, "Show GUI");
@@ -515,8 +513,6 @@ struct slam_tracker::implementation {
   }
 
   void stop() {
-    // Pushing nullptr signals end of stream
-    // TODO@mateosss: could it be a race condition here?
     running = false;
     image_data_queue->push(nullptr);
     imu_data_queue->push(nullptr);
@@ -525,21 +521,13 @@ struct slam_tracker::implementation {
     state_consumer_thread.join();
     if (show_gui) ui.stop();
 
-    // TODO@mateosss: There is a segfault when closing monado without starting the stream
+    // TODO: There is a segfault when closing monado without starting the stream
     // happens in a lambda from keypoint_vio.cpp and ends at line calib_bias.hpp:112
   }
 
-  bool is_running() {
-    // TODO@mateosss: implement
-    printf(">>> implementation.%s\n", __func__);
-    // TODO@mateosss: Prefix all prints and cout<<s with [Basalt]
-    return false;
-  }
+  bool is_running() { return running; }
 
   void push_imu_sample(imu_sample s) {
-    // TODO@mateosss: remove print
-    // printf(">>> %s\n", imu2str(s).c_str());
-
     // concurrent_bounded_queue expects Erasable and Allocator named
     // requirements for the type, using a pointer because it already is. This is
     // done in the others examples as well but it is far from optimal.
@@ -556,14 +544,11 @@ struct slam_tracker::implementation {
 
  public:
   void push_frame(img_sample s) {
-    // TODO@mateosss: remove print
-    // printf(">>> %s\n", img2str(s).c_str());
-
     ASSERT(expecting_left_frame == s.is_left, "Unexpected %s frame", s.is_left ? "left" : "right");
     expecting_left_frame = !expecting_left_frame;
 
     int i = -1;
-    if (s.is_left) {  // TODO@mateosss: Support mono?
+    if (s.is_left) {
       partial_frame = make_shared<OpticalFlowInput>();
       partial_frame->img_data.resize(NUM_CAMS);
       partial_frame->t_ns = s.timestamp;
@@ -574,16 +559,14 @@ struct slam_tracker::implementation {
       i = 1;
     }
 
-    // TODO@mateosss: exposure?
-    // data->img_data[i].exposure = vf.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE) * 1e-6;
-
     int width = s.img.cols;
     int height = s.img.rows;
-    // TODO@mateosss: why is it uint16_t instead of uint8_t?
+    // Forced to use uint16_t here, in place because of cameras with 12-bit grayscale support
     auto &mimg = partial_frame->img_data[i].img;
     mimg.reset(new ManagedImage<uint16_t>(width, height));
 
-    // TODO@mateosss: We should avoid this copy. See if ManagedImage can use a cv Mat somehow
+    // TODO: We could avoid this copy. Maybe by writing a custom
+    // allocator for ManagedImage that ties the OpenCV allocator
     size_t full_size = width * height;
     for (size_t j = 0; j < full_size; j++) {
       mimg->ptr[j] = s.img.data[j] << 8;
