@@ -254,10 +254,6 @@ include_directories(thirdparty/basalt-headers/include)
 include_directories(thirdparty/CLI11/include)
 include_directories(thirdparty/fast/include)
 include_directories(thirdparty/monado)
-# TODO@mateosss: Eigen is coming from thirdparty/ and not from the system (so we
-# are using 3.3.9 and 3.3.7 at the same time) this might bring problems in the
-# future, try to use system's eigen
-
 include_directories(include)
 
 
@@ -279,7 +275,6 @@ add_library(basalt SHARED
   src/utils/keypoints.cpp
   src/monado/slam_tracker.cpp)
 
-# TODO@mateosss: I had to add pangolin here, seems a bit too much for libbasalt if you dont want the visualization but it is okay for nwo I guess
 target_link_libraries(basalt PUBLIC ${TBB_LIBRARIES} ${STD_CXX_FS} ${OpenCV_LIBS} pangolin PRIVATE rosbag apriltag opengv)
 
 
@@ -358,11 +353,12 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/basalt.pc DESTINATION ${CMAKE_INSTALL_
 # Replace install() to do-nothing macro.
 macro(install)
 endmacro()
-# Include subproject (or any other CMake code) with "disabled" install().
-# TODO@mateosss: Commented out these three lines below so that it compiles faster
-# enable_testing()
-# add_subdirectory(thirdparty/basalt-headers/test)
-# add_subdirectory(test)
+if (BUILD_TESTS)
+  # Include subproject (or any other CMake code) with "disabled" install().
+  enable_testing()
+  add_subdirectory(thirdparty/basalt-headers/test)
+  add_subdirectory(test)
+endif()
 # Restore original install() behavior.
 macro(install)
   _install(${ARGN})

@@ -20,7 +20,7 @@
 
 // TODO@mateosss: Reference in the readme that I'm compiling with
 // cmake . -B build -DCMAKE_INSTALL_PREFIX=$bsltinstall -DCMAKE_BUILD_TYPE=RelWithDebInfo
-// -DCMAKE_EXPORT_COMPILE_COMMANDS=On -DEIGEN_ROOT=/usr/include/eigen3
+// -DCMAKE_EXPORT_COMPILE_COMMANDS=On -DEIGEN_ROOT=/usr/include/eigen3 -DBUILD_TESTS=OFF
 
 #define ASSERT(cond, ...)                                      \
   do {                                                         \
@@ -195,8 +195,8 @@ class slam_tracker_ui {
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
       if (follow) {
-        // TODO@mateosss: Pretty sure we have a race condition here over
-        // curr_vis_data, but they had it in the original code as well
+        // TODO@mateosss: There is a small race condition here over
+        // curr_vis_data that is also present in the original basalt examples
         if (curr_vis_data) {
           auto T_w_i = curr_vis_data->states.back();
           T_w_i.so3() = Sophus::SO3d();
@@ -376,17 +376,25 @@ struct slam_tracker::implementation {
   string trajectory_fmt;
   bool use_imu = true;
 
+  // Basalt in its current state does not support monocular cameras, although it
+  // should be possible to adapt it to do so, see:
+  // https://gitlab.com/VladyslavUsenko/basalt/-/issues/2#note_201965760
+  // https://gitlab.com/VladyslavUsenko/basalt/-/issues/25#note_362741510
+  // https://github.com/DLR-RM/granite
+  static constexpr int NUM_CAMS = 2;
+
   // VIO members
   Calibration<double> calib;
   VioConfig vio_config;
   OpticalFlowBase::Ptr opt_flow_ptr;
   VioEstimatorBase::Ptr vio;
-  static constexpr int NUM_CAMS = 2;  // TODO@mateosss: add to config file?
+  bool expecting_left_frame = true;
 
   // Queues
   std::atomic<bool> running = false;
   tbb::concurrent_bounded_queue<PoseVelBiasState<double>::Ptr> out_state_queue;
-  PoseVelBiasState<double> last_out_state{};  // TODO@mateosss: put a lock when writting this
+  shared_ptr<PoseVelBiasState<double>> last_out_state{};
+  std::mutex last_out_state_lock{};  // atomic_shared_ptr is not standard, and atomic<shared_ptr> since c++20 only :/
   tbb::concurrent_bounded_queue<PoseVelBiasState<double>::Ptr> monado_out_state_queue;
   tbb::concurrent_bounded_queue<OpticalFlowInput::Ptr> *image_data_queue = nullptr;  // Invariant: not null after ctor
   tbb::concurrent_bounded_queue<ImuData<double>::Ptr> *imu_data_queue = nullptr;     // Invariant: not null after ctor
@@ -402,15 +410,6 @@ struct slam_tracker::implementation {
  public:
   implementation(const string &unified_config) {
     load_unified_config(unified_config);
-
-    // Asserts for the config file
-    // TODO@mateosss: not sure how tbb::global_control affects std::threads
-    ASSERT_(num_threads == 0);
-    ASSERT(!config_path.empty(), "config-path missing from %s", unified_config.c_str());
-    ASSERT_(use_imu);  // TODO@mateosss: Unsure if it works without this
-    // TODO@mateosss: See what to do with this flag, it will just skip old
-    // frames that weren't processed when a new one arrives
-    ASSERT_(!vio_config.vio_enforce_realtime)
 
     vio_config.load(config_path);
     load_calibration_data(cam_calib_path);
@@ -469,6 +468,12 @@ struct slam_tracker::implementation {
     cout << "Instantiating Basalt SLAM tracker\n";
     cout << "Using config file: " << app["--config"]->as<string>() << "\n";
     cout << app.config_to_str(true, true) << "\n";
+
+    // Asserts for the config file
+    ASSERT(num_threads == 0, "num_threads != 0 not supported");
+    ASSERT(!config_path.empty(), "config-path missing from %s", unified_config.c_str());
+    ASSERT(use_imu, "Only visual odometry unsupported");
+    ASSERT(!vio_config.vio_enforce_realtime, "vio_enforce_realtime unsupported")
   }
 
   void load_calibration_data(const string &calib_path) {
@@ -494,7 +499,11 @@ struct slam_tracker::implementation {
       }
 
       if (show_gui) ui.log_vio_data(data);
-      last_out_state = *data;
+
+      last_out_state_lock.lock();
+      last_out_state = data;
+      last_out_state_lock.unlock();
+
       monado_out_state_queue.push(data);
     }
 
@@ -565,6 +574,9 @@ struct slam_tracker::implementation {
     // TODO@mateosss: remove print
     // printf(">>> %s\n", img2str(s).c_str());
 
+    ASSERT(expecting_left_frame == s.is_left, "Unexpected %s frame", s.is_left ? "left" : "right");
+    expecting_left_frame = !expecting_left_frame;
+
     int i = -1;
     if (s.is_left) {  // TODO@mateosss: Support mono?
       partial_frame = make_shared<OpticalFlowInput>();
@@ -603,8 +615,10 @@ struct slam_tracker::implementation {
 // if USE_LAST_POSE is false, we will dequeue every pose produced by the VIO estimator
 #define USE_LAST_POSE true
 #if USE_LAST_POSE
-    PoseVelBiasState<double> data = last_out_state;
-    Sophus::SE3d T_w_i = data.T_w_i;
+    last_out_state_lock.lock();
+    Sophus::SE3d T_w_i = last_out_state->T_w_i;
+    last_out_state_lock.unlock();
+
     pose.px = T_w_i.translation().x();
     pose.py = T_w_i.translation().y();
     pose.pz = T_w_i.translation().z();
