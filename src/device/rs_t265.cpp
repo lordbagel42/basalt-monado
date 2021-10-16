@@ -34,12 +34,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include <basalt/device/rs_t265.h>
+#include "basalt/utils/assert.h"
 
 std::string get_date();
 
 namespace basalt {
 
-RsT265Device::RsT265Device(bool is_d455, bool manual_exposure, int skip_frames,
+RsT265Device::RsT265Device(bool is_d455, RsD455Config d455,
+                           bool manual_exposure, int skip_frames,
                            int webp_quality, double exposure_value)
     : is_d455(is_d455),
       manual_exposure(manual_exposure),
@@ -52,19 +54,22 @@ RsT265Device::RsT265Device(bool is_d455, bool manual_exposure, int skip_frames,
   config = rs2::config();
 
   if (is_d455) {
-    config.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F, 63);
-    config.enable_stream(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F, 200);
-    config.enable_stream(RS2_STREAM_INFRARED, 1, 640, 360, RS2_FORMAT_Y8, 30);
-    config.enable_stream(RS2_STREAM_INFRARED, 2, 640, 360, RS2_FORMAT_Y8, 30);
+    BASALT_ASSERT_MSG(d455.accel_fps < d455.gyro_fps,
+                      "Accelerometer frequency must be lower than gyroscope's "
+                      "because of how IMU interpolation is implemented");
+    config.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F,
+                         d455.accel_fps);
+    config.enable_stream(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F,
+                         d455.gyro_fps);
+    config.enable_stream(RS2_STREAM_INFRARED, 1, d455.video_width,
+                         d455.video_height, RS2_FORMAT_Y8, d455.video_fps);
+    config.enable_stream(RS2_STREAM_INFRARED, 2, d455.video_width,
+                         d455.video_height, RS2_FORMAT_Y8, d455.video_fps);
   } else {
     config.enable_stream(RS2_STREAM_ACCEL, RS2_FORMAT_MOTION_XYZ32F);
     config.enable_stream(RS2_STREAM_GYRO, RS2_FORMAT_MOTION_XYZ32F);
     config.enable_stream(RS2_STREAM_FISHEYE, 1, RS2_FORMAT_Y8);
     config.enable_stream(RS2_STREAM_FISHEYE, 2, RS2_FORMAT_Y8);
-  }
-
-  if (!manual_exposure && !is_d455) {
-    config.enable_stream(RS2_STREAM_POSE, RS2_FORMAT_6DOF);
   }
 
   if (context.query_devices().size() == 0) {
@@ -88,7 +93,15 @@ RsT265Device::RsT265Device(bool is_d455, bool manual_exposure, int skip_frames,
             << " connected" << std::endl;
   sensor = device.query_sensors()[0];
 
-  if (manual_exposure && !is_d455) {
+  if (!manual_exposure) {
+    if (is_d455) {
+      // Enable autoexposure on stereo sensor
+      sensor.set_option(rs2_option::RS2_OPTION_ENABLE_AUTO_EXPOSURE, 1);
+    } else {
+      // Not sure why this happens here, but it was here from before
+      config.enable_stream(RS2_STREAM_POSE, RS2_FORMAT_6DOF);
+    }
+  } else {
     std::cout << "Enabling manual exposure control" << std::endl;
     sensor.set_option(rs2_option::RS2_OPTION_ENABLE_AUTO_EXPOSURE, 0);
     sensor.set_option(rs2_option::RS2_OPTION_EXPOSURE, exposure_value * 1000);

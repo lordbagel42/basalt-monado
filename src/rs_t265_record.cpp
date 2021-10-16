@@ -321,13 +321,19 @@ int main(int argc, char *argv[]) {
   CLI::App app{"Record RealSense T265 Data"};
 
   std::string dataset_path;
-  bool is_d455;
+  bool is_d455 = false;
+  basalt::RsD455Config d455{};
 
   app.add_option("--dataset-path", dataset_path, "Path to dataset");
   app.add_flag("--manual-exposure", manual_exposure,
                "If set will enable manual exposure.");
   app.add_flag("--is-d455", is_d455,
                "If set will work on a D455 (probably on a D435 too)");
+  app.add_option("--d455-video-width", d455.video_width, "Frame width");
+  app.add_option("--d455-video-height", d455.video_height, "Frame height");
+  app.add_option("--d455-video-fps", d455.video_fps, "Video FPS");
+  app.add_option("--d455-accel-fps", d455.accel_fps, "Accelerometer FPS");
+  app.add_option("--d455-gyro-fps", d455.gyro_fps, "Gyroscope FPS");
 
   try {
     app.parse(argc, argv);
@@ -359,7 +365,7 @@ int main(int argc, char *argv[]) {
 
   // realsense
   t265_device.reset(new basalt::RsT265Device(
-      is_d455, manual_exposure, skip_frames, webp_quality, exposure));
+      is_d455, d455, manual_exposure, skip_frames, webp_quality, exposure));
 
   t265_device->start();
   imu_log.reset(new pangolin::DataLog);
