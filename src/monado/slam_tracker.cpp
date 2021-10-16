@@ -66,6 +66,7 @@ string pose2str(const pose &p) {
   return str;
 }
 
+// TODO@mateosss: move into its own file
 class slam_tracker_ui {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
@@ -365,16 +366,10 @@ struct slam_tracker::implementation {
   // Options parsed from unified config file
   bool show_gui = true;
   string cam_calib_path;
-  string dataset_path;
-  string dataset_type;
   string config_path;
   string marg_data_path;
   bool print_queue = false;
-  string result_path;
-  int num_threads = 0;
-  bool step_by_step = false;
-  string trajectory_fmt;
-  bool use_imu = true;
+  bool latest_pose = true;
 
   // Basalt in its current state does not support monocular cameras, although it
   // should be possible to adapt it to do so, see:
@@ -418,7 +413,7 @@ struct slam_tracker::implementation {
     image_data_queue = &opt_flow_ptr->input_queue;
     ASSERT_(image_data_queue != nullptr);
 
-    vio = VioEstimatorFactory::getVioEstimator(vio_config, calib, constants::g, use_imu);
+    vio = VioEstimatorFactory::getVioEstimator(vio_config, calib, constants::g, true);
     imu_data_queue = &vio->imu_data_queue;
     ASSERT_(imu_data_queue != nullptr);
 
@@ -443,16 +438,11 @@ struct slam_tracker::implementation {
 
     app.add_option("--show-gui", show_gui, "Show GUI");
     app.add_option("--cam-calib", cam_calib_path, "Ground-truth camera calibration used for simulation.")->required();
-    app.add_option("--dataset-path", dataset_path, "Path to dataset.")->required();
-    app.add_option("--dataset-type", dataset_type, "Dataset type <euroc, bag>.")->required();
     app.add_option("--config-path", config_path, "Path to config file.")->required();
     app.add_option("--marg-data", marg_data_path, "Path to folder where marginalization data will be stored.");
     app.add_option("--print-queue", print_queue, "Poll and print for queue sizes.");
-    app.add_option("--result-path", result_path, "Path to result file where the system will write RMSE ATE.");
-    app.add_option("--num-threads", num_threads, "Number of threads.");
-    app.add_option("--step-by-step", step_by_step, "Manual playback.");
-    app.add_option("--save-trajectory", trajectory_fmt, "Save if not empty. Supported formats <tum, euroc, kitti>");
-    app.add_option("--use-imu", use_imu, "Use IMU.");
+    app.add_option("--latest-pose", latest_pose,
+                   "0 for returning every tracked pose in order, 1 (default) for just the latest");
 
     try {
       // While --config-path sets the VIO configuration, --config sets the
@@ -463,17 +453,12 @@ struct slam_tracker::implementation {
       app.parse(unique_config);
     } catch (const CLI::ParseError &e) {
       app.exit(e);
+      ASSERT(false, "Config file error (%s)", unified_config.c_str());
     }
 
     cout << "Instantiating Basalt SLAM tracker\n";
     cout << "Using config file: " << app["--config"]->as<string>() << "\n";
     cout << app.config_to_str(true, true) << "\n";
-
-    // Asserts for the config file
-    ASSERT(num_threads == 0, "num_threads != 0 not supported");
-    ASSERT(!config_path.empty(), "config-path missing from %s", unified_config.c_str());
-    ASSERT(use_imu, "Only visual odometry unsupported");
-    ASSERT(!vio_config.vio_enforce_realtime, "vio_enforce_realtime unsupported")
   }
 
   void load_calibration_data(const string &calib_path) {
@@ -611,30 +596,10 @@ struct slam_tracker::implementation {
   }
 
   bool try_dequeue_pose(pose &pose) {
-// TODO@mateosss: USE_LAST_POSE has race conditions and honestly this is kind of ugly
-// if USE_LAST_POSE is false, we will dequeue every pose produced by the VIO estimator
-#define USE_LAST_POSE true
-#if USE_LAST_POSE
-    last_out_state_lock.lock();
-    Sophus::SE3d T_w_i = last_out_state->T_w_i;
-    last_out_state_lock.unlock();
-
-    pose.px = T_w_i.translation().x();
-    pose.py = T_w_i.translation().y();
-    pose.pz = T_w_i.translation().z();
-    pose.rx = T_w_i.unit_quaternion().x();
-    pose.ry = T_w_i.unit_quaternion().y();
-    pose.rz = T_w_i.unit_quaternion().z();
-    pose.rw = T_w_i.unit_quaternion().w();
-    // TODO@mateosss: remove print
-    printf(">>> try_dequeue_pose %s\n", pose2str(pose).c_str());
-
-    return true;
-#else
-    PoseVelBiasState<double>::Ptr data;
-    bool dequeued = monado_out_state_queue.try_pop(data);
-    if (dequeued) {
-      Sophus::SE3d T_w_i = data->T_w_i;
+    if (latest_pose) {  // Return only the last produced pose
+      last_out_state_lock.lock();
+      Sophus::SE3d T_w_i = last_out_state->T_w_i;
+      last_out_state_lock.unlock();
       pose.px = T_w_i.translation().x();
       pose.py = T_w_i.translation().y();
       pose.pz = T_w_i.translation().z();
@@ -642,11 +607,22 @@ struct slam_tracker::implementation {
       pose.ry = T_w_i.unit_quaternion().y();
       pose.rz = T_w_i.unit_quaternion().z();
       pose.rw = T_w_i.unit_quaternion().w();
-      // TODO@mateosss: remove print
-      printf(">>> try_dequeue_pose %s\n", pose2str(pose).c_str());
+      return true;
+    } else {  // Return every pose produced by the VIO estimator
+      PoseVelBiasState<double>::Ptr data;
+      bool dequeued = monado_out_state_queue.try_pop(data);
+      if (dequeued) {
+        Sophus::SE3d T_w_i = data->T_w_i;
+        pose.px = T_w_i.translation().x();
+        pose.py = T_w_i.translation().y();
+        pose.pz = T_w_i.translation().z();
+        pose.rx = T_w_i.unit_quaternion().x();
+        pose.ry = T_w_i.unit_quaternion().y();
+        pose.rz = T_w_i.unit_quaternion().z();
+        pose.rw = T_w_i.unit_quaternion().w();
+      }
+      return dequeued;
     }
-    return dequeued;
-#endif
   }
 };
 
