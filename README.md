@@ -81,6 +81,26 @@ cmake .. -DCMAKE_INSTALL_PREFIX=$bsltinstall -DCMAKE_BUILD_TYPE=RelWithDebInfo -
 make install -j12
 ```
 
+### Running Basalt
+
+This step is optional but you can try Basalt without Monado with one of the following methods:
+
+- Through an EuRoC dataset (be sure to [download
+  one](http://robotics.ethz.ch/~asl-datasets/ijrr_euroc_mav_dataset/vicon_room1/)
+  first): `basalt_vio --dataset-path /path/to/euroc/V1_01_easy --cam-calib
+  $bsltdeps/basalt/data/euroc_ds_calib.json --dataset-type euroc --config-path
+  $bsltdeps/basalt/data/euroc_config.json --marg-data ~/Desktop/euroc_marg_data
+  --show-gui 1`
+- With a RealSense T265 (you'll need to get a `t265_calib.json` yourself as
+  detailed [below](#configuring-basalt) but meanwhile you can try with [this
+  file](https://gitlab.com/VladyslavUsenko/basalt/-/issues/52) instead):
+  `basalt_rs_t265_vio --cam-calib $bsltdeps/basalt/data/t265_calib.json
+  --config-path $bsltdeps/basalt/data/euroc_config.json`
+- With a RealSense D455 (and maybe this also works for a D435):
+  `basalt_rs_t265_vio --is-d455 --cam-calib
+  $bsltdeps/basalt/data/d455_calib.json --config-path
+  $bsltdeps/basalt/data/euroc_config.json`
+
 ### Monado Specifics
 
 You'll need to compile Monado with the same Eigen as Basalt, so if you used a
@@ -224,7 +244,9 @@ utility. Issues like [this
 configuration files tried by other users. Additionally Basalt provides custom
 [calibration
 tools](https://gitlab.com/VladyslavUsenko/basalt/-/blob/master/doc/Calibration.md)
-that can work for any camera-IMU setup.
+that can work for any camera-IMU setup or tools like
+[`basalt_rs_t265_record`](https://gitlab.freedesktop.org/mateosss/basalt/-/blob/5a365bf6fb14ce5b044b76f742337e1d6865557e/src/rs_t265_record.cpp#L207)
+that can help creating an initial calibration file for RealSense devices.
 
 ## Notes on Basalt Usage
 
