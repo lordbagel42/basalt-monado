@@ -20,12 +20,6 @@
 #include <basalt/vi_estimator/vio_estimator.h>
 #include "basalt/utils/vis_utils.h"
 
-// TODO@mateosss: Reference in the readme that I'm compiling with
-// cmake . -B build -DCMAKE_INSTALL_PREFIX=$bsltinstall -DCMAKE_BUILD_TYPE=RelWithDebInfo
-// -DCMAKE_EXPORT_COMPILE_COMMANDS=On -DEIGEN_ROOT=/usr/include/eigen3 -DBUILD_TESTS=OFF
-// TODO@mateosss: Specify the need to add march=native when compiling monado with basalt
-// export CXXFLAGS=-march=native CFLAGS=-march=native
-
 namespace xrt::auxiliary::tracking::slam {
 
 using std::cout;
