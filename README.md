@@ -265,3 +265,12 @@ that can help creating an initial calibration file for RealSense devices.
   update to Basalt implemented a new marginalization method that should improve
   running speeds while maintaining accuracy. That should be easy to merge
   eventually.
+- Some things that might cause crashes:
+  - Using bad exposure values (setting *auto exposure* in the `realsense-viewer`
+    worked well for me).
+  - Shaking causes drift that can diverge if maintained for long periods of
+    time.
+  - Making sudden 90 degree rotations in which the new scene does not share
+    features with the previous scene.
+  - Moving too fast and/or making rotation only movements over extended periods
+    of time.
