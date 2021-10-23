@@ -267,7 +267,8 @@ that can help creating an initial calibration file for RealSense devices.
   eventually.
 - Some things that might cause crashes:
   - Using bad exposure values (setting *auto exposure* in the `realsense-viewer`
-    worked well for me).
+    worked well for me) or being in a room with lights off causes crashes right
+    at start.
   - Shaking causes drift that can diverge if maintained for long periods of
     time.
   - Making sudden 90 degree rotations in which the new scene does not share
