@@ -68,6 +68,8 @@ cmake .. -DCMAKE_INSTALL_PREFIX=$bsltinstall
 make install
 ```
 
+If you are using GCC 11 you might also get some issues with pangolin, see [this discord thread](https://discord.com/channels/556527313823596604/556527314670714901/904339906288050196) for more info.
+
 ### Build Basalt
 
 ```bash
@@ -144,6 +146,7 @@ might at least get something working, although not at its best.
 Set these environment variables:
 
 - `export RS_HDEV_LOG=debug`: Make our realsense device logs more verbose
+- `export RS_SOURCE_INDEX=0`: Indicate that we want to use the first RealSense device connected as data source
 - `export RS_TRACKING=2`: Only try to use "host-slam". See other options
   [here](https://gitlab.freedesktop.org/mateosss/monado/-/blob/64e70e76ad6d47e4bd1a0dfa164bff8597a50ce8/src/xrt/drivers/realsense/rs_prober.c#L33-39).
 - `export SLAM_CONFIG=$bsltdeps/basalt/data/monado/d455.toml`:
