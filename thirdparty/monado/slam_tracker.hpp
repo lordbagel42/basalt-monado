@@ -28,6 +28,7 @@ namespace xrt::auxiliary::tracking::slam {
 using std::int64_t;
 using std::shared_ptr;
 using std::string;
+using std::unique_ptr;
 using std::vector;
 
 /*!
@@ -145,8 +146,7 @@ struct slam_tracker {
 
 private:
   struct implementation;
-  // TODO@mateosss: use unique_ptr
-  implementation *impl;
+  unique_ptr<implementation> impl;
 };
 
 /*

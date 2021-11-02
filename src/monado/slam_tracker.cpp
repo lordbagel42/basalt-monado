@@ -25,6 +25,7 @@ namespace xrt::auxiliary::tracking::slam {
 
 using std::cout;
 using std::make_shared;
+using std::make_unique;
 using std::shared_ptr;
 using std::static_pointer_cast;
 using std::string;
@@ -380,9 +381,9 @@ struct slam_tracker::implementation {
   }
 };
 
-slam_tracker::slam_tracker(const string &config_file) { impl = new slam_tracker::implementation{config_file}; }
+slam_tracker::slam_tracker(const string &config_file) { impl = make_unique<slam_tracker::implementation>(config_file); }
 
-slam_tracker::~slam_tracker() { delete impl; }
+slam_tracker::~slam_tracker() = default;
 
 void slam_tracker::initialize() { impl->initialize(); }
 
