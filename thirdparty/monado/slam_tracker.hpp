@@ -6,16 +6,13 @@
  * @author Mateo de Mayo <mateo.demayo@collabora.com>
  * @ingroup aux_tracking
  *
- * This header file contains the declaration of the @ref slam_tracker class to
- * implement a SLAM system for usage in Monado.
- *
- * A copy of this file is present in both Monado and any SLAM system that
- * intends to be used by Monado. The SLAM system should provide the
- * `slam_tracker` implementation so that Monado can use it.
- *
- * This file also declares additional data types to be used between Monado and
+ * This file contains the declaration of the @ref slam_tracker class. This
+ * header is intended to appear in both Monado and an external SLAM system. The
+ * implementation of `slam_tracker` is provided by the external system.
+ * Additional data types are declared for the communication between Monado and
  * the system.
  *
+ * TODO@mateosss: maybe use const&
  * @todo The interface is preliminary and should be improved to avoid
  * unnecessary copies.
  */
@@ -91,25 +88,53 @@ struct slam_tracker {
   void stop();
   void finalize();
 
-  //! There must be a single producer thread pushing samples.
-  //! Samples must have monotonically increasing timestamps.
-  //! The implementation must be non-blocking.
-  //! A separate consumer thread should process the samples.
+  /*!
+   * @brief Push an IMU sample into the tracker.
+   *
+   * There must be a single producer thread pushing samples.
+   * Samples must have monotonically increasing timestamps.
+   * The implementation must be non-blocking.
+   * Thus, a separate consumer thread should process the samples.
+   */
   void push_imu_sample(imu_sample sample);
 
-  //! Same conditions as `push_imu_sample` apply.
-  //! When using stereo frames, they must be pushed in a left-right order.
-  //! The consecutive left-right pair must have the same timestamps.
+  /*!
+   * @brief Push an image sample into the tracker.
+   *
+   * Same conditions as @ref push_imu_sample apply.
+   * When using stereo frames, they must be pushed in a left-right order.
+   * The consecutive left-right pair must have the same timestamps.
+   */
   void push_frame(img_sample sample);
 
-  //! There must be a single thread accessing the tracked pose.
+  /*!
+   * @brief Get the latest tracked pose from the SLAM system.
+   *
+   * There must be a single thread consuming this method.
+   *
+   * @param[out] pose Dequeued pose.
+   * @return true If a new pose was dequeued into @p pose.
+   * @return false If there was no pose to dequeue.
+   */
   bool try_dequeue_pose(pose &pose);
 
-  // TODO@mateosss: document
+  //! Asks the SLAM system whether it supports a specific feature.
   bool supports_feature(int feature_id);
-  // TODO@mateosss: bool says whether feature_id is supported
+
+  /*!
+   * @brief Use a special feature of the SLAM tracker.
+   *
+   * This method uses heap allocated objects for passing parameters and
+   * obtaining the results. Use `std::static_pointer_cast` to shared pointers to
+   * the expected types.
+   *
+   * @param feature_id Id of the special feature.
+   * @param params Pointer to the parameter object for this feature.
+   * @param result Pointer to the result produced by the feature call.
+   * @return false if the feature was not supported, true otherwise.
+   */
   bool use_feature(int feature_id, std::shared_ptr<void> params,
-                   std::shared_ptr<void> &out);
+                   std::shared_ptr<void> &result);
 
 private:
   struct implementation;
@@ -117,9 +142,25 @@ private:
   implementation *impl;
 };
 
-// Features
-// TODO@mateosss: feature documentation, use before initialize
-// Feature 1: add_cam_calibration
+/*
+ * Special features
+ *
+ * A special feature is comprised of an ID, a PARAMS type and a RESULT type. It
+ * can be defined using DEFINE_FEATURE. Once defined, the definition should not
+ * suffer future changes.
+ *
+ * One of the main concerns in the features interface is the ability to add new
+ * features without being required to update the SLAM systems that are not
+ * interested in implementing the feature.
+ *
+ */
+
+#define DEFINE_FEATURE(NAME, SHORT_NAME, ID, PARAMS_TYPE, RESULT_TYPE)         \
+  using FPARAMS_##SHORT_NAME = PARAMS_TYPE;                                    \
+  using FRESULT_##SHORT_NAME = RESULT_TYPE;                                    \
+  constexpr int FID_##SHORT_NAME = ID;                                         \
+  constexpr int F_##NAME = ID;
+
 struct cam_calibration {
   enum class cam_model { pinhole, fisheye };
 
@@ -133,11 +174,12 @@ struct cam_calibration {
   cv::Matx<double, 4, 4> T_cam_imu; //!< Transformation from camera to imu space
 };
 
-// TODO@mateosss: macro? short: ACC
-
-using FPARAMS_ACC = cam_calibration;
-using FRESULT_ACC = void;
-constexpr int FID_ACC = 1;
-constexpr int F_ADD_CAMERA_CALIBRATION = 1;
+/*!
+ * Feature ADD_CAMERA_CALIBRATION
+ *
+ * Use it after constructor but before `start()` to write or overwrite camera
+ * calibration data that might come from the system-specific config file.
+ */
+DEFINE_FEATURE(ADD_CAMERA_CALIBRATION, ACC, 1, cam_calibration, void)
 
 } // namespace xrt::auxiliary::tracking::slam
