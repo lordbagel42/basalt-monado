@@ -243,7 +243,7 @@ struct slam_tracker::implementation {
 
   bool is_running() { return running; }
 
-  void push_imu_sample(imu_sample s) {
+  void push_imu_sample(const imu_sample &s) {
     // concurrent_bounded_queue expects Erasable and Allocator named
     // requirements for the type, using a pointer because it already is. This is
     // done in the others examples as well but it is far from optimal.
@@ -259,7 +259,7 @@ struct slam_tracker::implementation {
   OpticalFlowInput::Ptr partial_frame;
 
  public:
-  void push_frame(img_sample s) {
+  void push_frame(const img_sample &s) {
     ASSERT(expecting_left_frame == s.is_left, "Unexpected %s frame", s.is_left ? "left" : "right");
     expecting_left_frame = !expecting_left_frame;
 
@@ -380,7 +380,7 @@ struct slam_tracker::implementation {
   }
 };
 
-slam_tracker::slam_tracker(string config_file) { impl = new slam_tracker::implementation{config_file}; }
+slam_tracker::slam_tracker(const string &config_file) { impl = new slam_tracker::implementation{config_file}; }
 
 slam_tracker::~slam_tracker() { delete impl; }
 
@@ -394,16 +394,16 @@ void slam_tracker::finalize() { impl->finalize(); }
 
 bool slam_tracker::is_running() { return impl->is_running(); }
 
-void slam_tracker::push_imu_sample(imu_sample s) { impl->push_imu_sample(s); }
+void slam_tracker::push_imu_sample(const imu_sample &s) { impl->push_imu_sample(s); }
 
-void slam_tracker::push_frame(img_sample sample) { impl->push_frame(sample); }
+void slam_tracker::push_frame(const img_sample &sample) { impl->push_frame(sample); }
 
 bool slam_tracker::try_dequeue_pose(pose &pose) { return impl->try_dequeue_pose(pose); }
 
 bool slam_tracker::supports_feature(int feature_id) { return impl->supports_feature(feature_id); }
 
-bool slam_tracker::use_feature(int feature_id, shared_ptr<void> params, shared_ptr<void> &out) {
-  return impl->use_feature(feature_id, params, out);
+bool slam_tracker::use_feature(int feature_id, const shared_ptr<void> &params, shared_ptr<void> &result) {
+  return impl->use_feature(feature_id, params, result);
 }
 
 }  // namespace xrt::auxiliary::tracking::slam

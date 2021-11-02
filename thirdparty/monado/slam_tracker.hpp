@@ -12,9 +12,6 @@
  * Additional data types are declared for the communication between Monado and
  * the system.
  *
- * TODO@mateosss: maybe use const&
- * @todo The interface is preliminary and should be improved to avoid
- * unnecessary copies.
  */
 
 #pragma once
@@ -66,7 +63,7 @@ struct img_sample {
   cv::Mat img;
   bool is_left;
   img_sample() = default;
-  img_sample(int64_t timestamp, cv::Mat img, bool is_left)
+  img_sample(int64_t timestamp, const cv::Mat &img, bool is_left)
       : timestamp(timestamp), img(img), is_left(is_left) {}
 };
 
@@ -86,7 +83,7 @@ struct slam_tracker {
    * them up. Therefore, this constructor receives a path to a
    * implementation-specific configuration file.
    */
-  slam_tracker(string config_file);
+  slam_tracker(const string &config_file);
   ~slam_tracker();
 
   slam_tracker(const slam_tracker &) = delete;
@@ -106,7 +103,7 @@ struct slam_tracker {
    * The implementation must be non-blocking.
    * Thus, a separate consumer thread should process the samples.
    */
-  void push_imu_sample(imu_sample sample);
+  void push_imu_sample(const imu_sample &sample);
 
   /*!
    * @brief Push an image sample into the tracker.
@@ -115,18 +112,18 @@ struct slam_tracker {
    * When using stereo frames, they must be pushed in a left-right order.
    * The consecutive left-right pair must have the same timestamps.
    */
-  void push_frame(img_sample sample);
+  void push_frame(const img_sample &sample);
 
   /*!
    * @brief Get the latest tracked pose from the SLAM system.
    *
    * There must be a single thread consuming this method.
    *
-   * @param[out] pose Dequeued pose.
-   * @return true If a new pose was dequeued into @p pose.
+   * @param[out] out_pose Dequeued pose.
+   * @return true If a new pose was dequeued into @p out_pose.
    * @return false If there was no pose to dequeue.
    */
-  bool try_dequeue_pose(pose &pose);
+  bool try_dequeue_pose(pose &out_pose);
 
   //! Asks the SLAM system whether it supports a specific feature.
   bool supports_feature(int feature_id);
@@ -143,7 +140,7 @@ struct slam_tracker {
    * @param result Pointer to the result produced by the feature call.
    * @return false if the feature was not supported, true otherwise.
    */
-  bool use_feature(int feature_id, shared_ptr<void> params,
+  bool use_feature(int feature_id, const shared_ptr<void> &params,
                    shared_ptr<void> &result);
 
 private:
