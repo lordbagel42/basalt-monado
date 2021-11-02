@@ -21,7 +21,17 @@
 
 #include <opencv2/core/mat.hpp>
 
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
 namespace xrt::auxiliary::tracking::slam {
+
+using std::int64_t;
+using std::shared_ptr;
+using std::string;
+using std::vector;
 
 /*!
  * @brief Standard pose type to communicate Monado with the external SLAM system
@@ -38,11 +48,11 @@ struct pose {
  * @brief IMU Sample type to pass around between programs
  */
 struct imu_sample {
-  std::int64_t timestamp; //!< In nanoseconds
-  double ax, ay, az;      //!< Accel in meters per second squared (m / s^2)
-  double wx, wy, wz;      //!< Gyro in radians per second (rad / s)
+  int64_t timestamp; //!< In nanoseconds
+  double ax, ay, az; //!< Accel in meters per second squared (m / s^2)
+  double wx, wy, wz; //!< Gyro in radians per second (rad / s)
   imu_sample() = default;
-  imu_sample(std::int64_t timestamp, double ax, double ay, double az, double wx,
+  imu_sample(int64_t timestamp, double ax, double ay, double az, double wx,
              double wy, double wz)
       : timestamp(timestamp), ax(ax), ay(ay), az(az), wx(wx), wy(wy), wz(wz) {}
 };
@@ -52,11 +62,11 @@ struct imu_sample {
  * any SLAM system takes OpenCV matrices as input.
  */
 struct img_sample {
-  std::int64_t timestamp;
+  int64_t timestamp;
   cv::Mat img;
   bool is_left;
   img_sample() = default;
-  img_sample(std::int64_t timestamp, cv::Mat img, bool is_left)
+  img_sample(int64_t timestamp, cv::Mat img, bool is_left)
       : timestamp(timestamp), img(img), is_left(is_left) {}
 };
 
@@ -76,7 +86,7 @@ struct slam_tracker {
    * them up. Therefore, this constructor receives a path to a
    * implementation-specific configuration file.
    */
-  slam_tracker(std::string config_file);
+  slam_tracker(string config_file);
   ~slam_tracker();
 
   slam_tracker(const slam_tracker &) = delete;
@@ -133,8 +143,8 @@ struct slam_tracker {
    * @param result Pointer to the result produced by the feature call.
    * @return false if the feature was not supported, true otherwise.
    */
-  bool use_feature(int feature_id, std::shared_ptr<void> params,
-                   std::shared_ptr<void> &result);
+  bool use_feature(int feature_id, shared_ptr<void> params,
+                   shared_ptr<void> &result);
 
 private:
   struct implementation;
@@ -170,7 +180,7 @@ struct cam_calibration {
   double fx, fy;     //<! Focal point
   double cx, cy;     //<! Principal point
   cam_model model;
-  std::vector<double> model_params;
+  vector<double> model_params;
   cv::Matx<double, 4, 4> T_cam_imu; //!< Transformation from camera to imu space
 };
 

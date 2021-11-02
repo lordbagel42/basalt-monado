@@ -147,9 +147,9 @@ struct slam_tracker::implementation {
     if (os.is_open()) {
       cereal::JSONInputArchive archive(os);
       archive(calib);
-      std::cout << "Loaded camera with " << calib.intrinsics.size() << " cameras" << std::endl;
+      cout << "Loaded camera with " << calib.intrinsics.size() << " cameras\n";
     } else {
-      std::cerr << "could not load camera calibration " << calib_path << std::endl;
+      std::cerr << "could not load camera calibration " << calib_path << "\n";
       std::abort();
     }
   }
@@ -173,7 +173,7 @@ struct slam_tracker::implementation {
       monado_out_state_queue.push(data);
     }
 
-    std::cout << "Finished state_consumer" << std::endl;
+    cout << "Finished state_consumer\n";
   }
 
   void queues_printer() {
@@ -182,7 +182,7 @@ struct slam_tracker::implementation {
            << opt_flow_ptr->output_queue->size() << " out_state_queue " << out_state_queue.size() << "\n";
       std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
-    std::cout << "Finished queues_printer" << std::endl;
+    cout << "Finished queues_printer\n";
   }
 
  public:
