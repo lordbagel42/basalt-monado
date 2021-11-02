@@ -13,6 +13,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <unordered_set>
 #include "sophus/se3.hpp"
 
 #include <basalt/io/marg_data_io.h>
@@ -25,9 +26,11 @@ namespace xrt::auxiliary::tracking::slam {
 using std::cout;
 using std::make_shared;
 using std::shared_ptr;
+using std::static_pointer_cast;
 using std::string;
 using std::thread;
 using std::to_string;
+using std::unordered_set;
 using std::vector;
 using namespace basalt;
 
@@ -96,32 +99,18 @@ struct slam_tracker::implementation {
   slam_tracker_ui ui{};
   MargDataSaver::Ptr marg_data_saver;
 
+  // slam_tracker features
+  unordered_set<int> supported_features{FID_ACC};
+
+  // Additional camera calibration data
+  vector<cam_calibration> added_cam_calibs{};
+
  public:
   implementation(const string &unified_config) {
     load_unified_config(unified_config);
 
     vio_config.load(config_path);
     load_calibration_data(cam_calib_path);
-
-    opt_flow_ptr = OpticalFlowFactory::getOpticalFlow(vio_config, calib);
-    image_data_queue = &opt_flow_ptr->input_queue;
-    ASSERT_(image_data_queue != nullptr);
-
-    vio = VioEstimatorFactory::getVioEstimator(vio_config, calib, constants::g, true);
-    imu_data_queue = &vio->imu_data_queue;
-    ASSERT_(imu_data_queue != nullptr);
-
-    opt_flow_ptr->output_queue = &vio->vision_data_queue;
-    if (show_gui) {
-      ui.initialize(NUM_CAMS);
-      vio->out_vis_queue = &ui.out_vis_queue;
-    };
-    vio->out_state_queue = &out_state_queue;
-
-    if (!marg_data_path.empty()) {
-      marg_data_saver.reset(new MargDataSaver(marg_data_path));
-      vio->out_marg_queue = &marg_data_saver->in_marg_queue;
-    }
   }
 
  private:
@@ -197,6 +186,34 @@ struct slam_tracker::implementation {
   }
 
  public:
+  void initialize() {
+    // Overwrite camera calibration data
+    for (const auto &c : added_cam_calibs) {
+      apply_cam_calibration(c);
+    }
+
+    // NOTE: This factory also starts the optical flow
+    opt_flow_ptr = OpticalFlowFactory::getOpticalFlow(vio_config, calib);
+    image_data_queue = &opt_flow_ptr->input_queue;
+    ASSERT_(image_data_queue != nullptr);
+
+    vio = VioEstimatorFactory::getVioEstimator(vio_config, calib, constants::g, true);
+    imu_data_queue = &vio->imu_data_queue;
+    ASSERT_(imu_data_queue != nullptr);
+
+    opt_flow_ptr->output_queue = &vio->vision_data_queue;
+    if (show_gui) {
+      ui.initialize(NUM_CAMS);
+      vio->out_vis_queue = &ui.out_vis_queue;
+    };
+    vio->out_state_queue = &out_state_queue;
+
+    if (!marg_data_path.empty()) {
+      marg_data_saver.reset(new MargDataSaver(marg_data_path));
+      vio->out_marg_queue = &marg_data_saver->in_marg_queue;
+    }
+  }
+
   void start() {
     running = true;
     vio->initialize(Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
@@ -217,6 +234,11 @@ struct slam_tracker::implementation {
 
     // TODO: There is a segfault when closing monado without starting the stream
     // happens in a lambda from keypoint_vio.cpp and ends at line calib_bias.hpp:112
+  }
+
+  void finalize() {
+    // Only the OpticalFlow gets started by initialize, finish it with this
+    image_data_queue->push(nullptr);
   }
 
   bool is_running() { return running; }
@@ -304,15 +326,71 @@ struct slam_tracker::implementation {
       return dequeued;
     }
   }
+
+  bool supports_feature(int feature_id) { return supported_features.count(feature_id) == 1; }
+
+  bool use_feature(int feature_id, const shared_ptr<void> &params, shared_ptr<void> &result) {
+    result = nullptr;
+    if (feature_id == FID_ACC) {
+      shared_ptr<FPARAMS_ACC> casted_params = static_pointer_cast<FPARAMS_ACC>(params);
+      add_cam_calibration(*casted_params);
+    } else {
+      return false;
+    }
+    return true;
+  }
+
+  void add_cam_calibration(const cam_calibration &cam_calib) { added_cam_calibs.push_back(cam_calib); }
+
+  void apply_cam_calibration(const cam_calibration &cam_calib) {
+    using Scalar = double;
+    int i = cam_calib.cam_index;
+
+    const auto &tci = cam_calib.T_cam_imu;
+    Eigen::Matrix3d rci;
+    rci << tci(0, 0), tci(0, 1), tci(0, 2), tci(1, 0), tci(1, 1), tci(1, 2), tci(2, 0), tci(2, 1), tci(2, 2);
+    Eigen::Quaterniond q(rci);
+    Eigen::Vector3d p{tci(0, 3), tci(1, 3), tci(2, 3)};
+    calib.T_i_c[i] = Calibration<Scalar>::SE3(q, p);
+
+    // TODO@mateosss: remove prints
+    cout << ">>> calib.T_i_c.translation=" << calib.T_i_c[i].translation() << "\n";
+    cout << ">>> calib.T_i_c.rotation=" << calib.T_i_c[i].rotationMatrix() << "\n";
+
+    GenericCamera<double> model;
+    const vector<Scalar> &cmp = cam_calib.model_params;
+    if (cam_calib.model == cam_calibration::cam_model::pinhole) {
+      PinholeCamera<Scalar>::VecN mp;
+      mp << cam_calib.fx, cam_calib.fy, cam_calib.cx, cam_calib.cy;
+      PinholeCamera pinhole(mp);
+      model.variant = pinhole;
+    } else if (cam_calib.model == cam_calibration::cam_model::fisheye) {
+      KannalaBrandtCamera4<Scalar>::VecN mp;
+      mp << cam_calib.fx, cam_calib.fy, cam_calib.cx, cam_calib.cy, cmp[0], cmp[1], cmp[2], cmp[3];
+      KannalaBrandtCamera4 kannala_brandt(mp);
+      model.variant = kannala_brandt;
+    } else {
+      ASSERT(false, "Unsupported camera model (%d)", static_cast<int>(cam_calib.model));
+    }
+    calib.intrinsics[i] = model;
+
+    calib.resolution[i] = {cam_calib.width, cam_calib.height};
+
+    // NOTE: ignoring cam_calib.distortion_model and distortion_params
+  }
 };
 
 slam_tracker::slam_tracker(string config_file) { impl = new slam_tracker::implementation{config_file}; }
 
 slam_tracker::~slam_tracker() { delete impl; }
 
+void slam_tracker::initialize() { impl->initialize(); }
+
 void slam_tracker::start() { impl->start(); }
 
 void slam_tracker::stop() { impl->stop(); }
+
+void slam_tracker::finalize() { impl->finalize(); }
 
 bool slam_tracker::is_running() { return impl->is_running(); }
 
@@ -321,5 +399,11 @@ void slam_tracker::push_imu_sample(imu_sample s) { impl->push_imu_sample(s); }
 void slam_tracker::push_frame(img_sample sample) { impl->push_frame(sample); }
 
 bool slam_tracker::try_dequeue_pose(pose &pose) { return impl->try_dequeue_pose(pose); }
+
+bool slam_tracker::supports_feature(int feature_id) { return impl->supports_feature(feature_id); }
+
+bool slam_tracker::use_feature(int feature_id, shared_ptr<void> params, shared_ptr<void> &out) {
+  return impl->use_feature(feature_id, params, out);
+}
 
 }  // namespace xrt::auxiliary::tracking::slam

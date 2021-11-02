@@ -41,9 +41,9 @@ struct pose {
  * @brief IMU Sample type to pass around between programs
  */
 struct imu_sample {
-  std::int64_t timestamp; // In nanoseconds
-  double ax, ay, az; // In meters per second squared (m / s^2)
-  double wx, wy, wz; // In radians per second (rad / s)
+  std::int64_t timestamp; //!< In nanoseconds
+  double ax, ay, az;      //!< Accel in meters per second squared (m / s^2)
+  double wx, wy, wz;      //!< Gyro in radians per second (rad / s)
   imu_sample() = default;
   imu_sample(std::int64_t timestamp, double ax, double ay, double az, double wx,
              double wy, double wz)
@@ -85,9 +85,11 @@ struct slam_tracker {
   slam_tracker(const slam_tracker &) = delete;
   slam_tracker &operator=(const slam_tracker &) = delete;
 
+  void initialize();
   void start();
-  void stop();
   bool is_running();
+  void stop();
+  void finalize();
 
   //! There must be a single producer thread pushing samples.
   //! Samples must have monotonically increasing timestamps.
@@ -103,9 +105,39 @@ struct slam_tracker {
   //! There must be a single thread accessing the tracked pose.
   bool try_dequeue_pose(pose &pose);
 
- private:
+  // TODO@mateosss: document
+  bool supports_feature(int feature_id);
+  // TODO@mateosss: bool says whether feature_id is supported
+  bool use_feature(int feature_id, std::shared_ptr<void> params,
+                   std::shared_ptr<void> &out);
+
+private:
   struct implementation;
+  // TODO@mateosss: use unique_ptr
   implementation *impl;
 };
 
-}  // namespace xrt::auxiliary::tracking::slam
+// Features
+// TODO@mateosss: feature documentation, use before initialize
+// Feature 1: add_cam_calibration
+struct cam_calibration {
+  enum class cam_model { pinhole, fisheye };
+
+  int cam_index; //!< For multi-camera setups. For stereo 0 ~ left, 1 ~ right.
+  int width, height; //<! Resolution
+  int fps;           //<! Frames per second
+  double fx, fy;     //<! Focal point
+  double cx, cy;     //<! Principal point
+  cam_model model;
+  std::vector<double> model_params;
+  cv::Matx<double, 4, 4> T_cam_imu; //!< Transformation from camera to imu space
+};
+
+// TODO@mateosss: macro? short: ACC
+
+using FPARAMS_ACC = cam_calibration;
+using FRESULT_ACC = void;
+constexpr int FID_ACC = 1;
+constexpr int F_ADD_CAMERA_CALIBRATION = 1;
+
+} // namespace xrt::auxiliary::tracking::slam
