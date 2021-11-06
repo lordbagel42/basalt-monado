@@ -173,12 +173,42 @@ struct cam_calibration {
 
   int cam_index; //!< For multi-camera setups. For stereo 0 ~ left, 1 ~ right.
   int width, height; //<! Resolution
-  int fps;           //<! Frames per second
+  double frequency;  //<! Frames per second
   double fx, fy;     //<! Focal point
   double cx, cy;     //<! Principal point
   cam_model model;
   vector<double> model_params;
   cv::Matx<double, 4, 4> T_cam_imu; //!< Transformation from camera to imu space
+};
+
+struct imu_calibration {
+  enum class imu_type { accelerometer, gyroscope };
+  int imu_index;    //!< For multi-imu setups. Usually just 0.
+  double frequency; //!< Samples per second
+  imu_type type;
+
+  // Calibration intrinsics to apply to each raw measurement.
+
+  //! This transform will be applied to raw measurements. Similar to
+  //! https://vladyslavusenko.gitlab.io/basalt-headers/classbasalt_1_1CalibGyroBias.html#details
+  //! Zero values mean no changes.
+  cv::Matx<double, 3, 3> transform;
+
+  //! Offset to apply to raw measurements. Also called bias in other contexts.
+  cv::Matx<double, 3, 1> offset; //!< Offset to apply to raw measurements
+
+  // Parameters for the random processes that model this IMU. See section "2.1
+  // Gyro Noise Model" of N. Trawny and S. I. Roumeliotis, "Indirect Kalman
+  // Filter for 3D Attitude Estimation". Analogous for accelerometers.
+  // http://mars.cs.umn.edu/tr/reports/Trawny05b.pdf#page=15
+
+  //! IMU measurement noise ~ N(0, σ²); this field is σ.
+  //! [σ] = u / sqrt(sec) with u = rad if gyroscope, u = m/s if accelerometer.
+  cv::Matx<double, 3, 1> noise_std;
+
+  //! IMU internal bias ~ wiener process with steps N(0, σ²); this field is σ;
+  //! [σ] = u / sqrt(sec³) with u = rad if gyroscope, u = m/s if accelerometer.
+  cv::Matx<double, 3, 1> bias_std;
 };
 
 /*!
@@ -188,5 +218,13 @@ struct cam_calibration {
  * calibration data that might come from the system-specific config file.
  */
 DEFINE_FEATURE(ADD_CAMERA_CALIBRATION, ACC, 1, cam_calibration, void)
+
+/*!
+ * Feature ADD_IMU_CALIBRATION
+ *
+ * Use it after constructor but before `start()` to write or overwrite IMU
+ * calibration data that might come from the system-specific config file.
+ */
+DEFINE_FEATURE(ADD_IMU_CALIBRATION, AIC, 2, imu_calibration, void)
 
 } // namespace xrt::auxiliary::tracking::slam

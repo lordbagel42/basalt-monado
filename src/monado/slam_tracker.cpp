@@ -101,10 +101,11 @@ struct slam_tracker::implementation {
   MargDataSaver::Ptr marg_data_saver;
 
   // slam_tracker features
-  unordered_set<int> supported_features{FID_ACC};
+  unordered_set<int> supported_features{F_ADD_CAMERA_CALIBRATION, F_ADD_IMU_CALIBRATION};
 
-  // Additional camera calibration data
+  // Additional calibration data
   vector<cam_calibration> added_cam_calibs{};
+  vector<imu_calibration> added_imu_calibs{};
 
  public:
   implementation(const string &unified_config) {
@@ -191,6 +192,11 @@ struct slam_tracker::implementation {
     // Overwrite camera calibration data
     for (const auto &c : added_cam_calibs) {
       apply_cam_calibration(c);
+    }
+
+    // Overwrite IMU calibration data
+    for (const auto &c : added_imu_calibs) {
+      apply_imu_calibration(c);
     }
 
     // NOTE: This factory also starts the optical flow
@@ -335,6 +341,9 @@ struct slam_tracker::implementation {
     if (feature_id == FID_ACC) {
       shared_ptr<FPARAMS_ACC> casted_params = static_pointer_cast<FPARAMS_ACC>(params);
       add_cam_calibration(*casted_params);
+    } else if (feature_id == FID_AIC) {
+      shared_ptr<FPARAMS_AIC> casted_params = static_pointer_cast<FPARAMS_AIC>(params);
+      add_imu_calibration(*casted_params);
     } else {
       return false;
     }
@@ -378,6 +387,61 @@ struct slam_tracker::implementation {
     calib.resolution[i] = {cam_calib.width, cam_calib.height};
 
     // NOTE: ignoring cam_calib.distortion_model and distortion_params
+  }
+
+  void add_imu_calibration(const imu_calibration &imu_calib) { added_imu_calibs.push_back(imu_calib); }
+
+  void apply_imu_calibration(const imu_calibration &imu_calib) {
+    using Scalar = double;
+
+    int i = imu_calib.imu_index;
+    ASSERT(i == 0, "More than one IMU unsupported (%d)", i);
+
+    static double frequency = -1;
+    if (frequency == -1) {
+      frequency = imu_calib.frequency;
+      calib.imu_update_rate = frequency;
+    } else {
+      ASSERT(frequency == calib.imu_update_rate, "Unsupported mix of IMU frequencies %lf != %lf", frequency,
+             calib.imu_update_rate);
+    }
+
+    imu_calibration::imu_type imu_type = imu_calib.type;
+    if (imu_type == imu_calibration::imu_type::gyroscope) {
+      Eigen::Matrix<Scalar, 12, 1> gyro_bias_full;
+      const auto &bias = imu_calib.offset;
+      const auto &tran = imu_calib.transform;
+      // TODO@mateosss: decide if I should substract the identitiy here, or require it substracted from before
+      gyro_bias_full << bias(0), bias(1), bias(2), tran(0, 0) - 1, tran(1, 0), tran(2, 0), tran(0, 1), tran(1, 1) - 1,
+          tran(2, 1), tran(0, 2), tran(1, 2), tran(2, 2) - 1;
+      CalibGyroBias<Scalar> gyro_bias;
+      gyro_bias.getParam() = gyro_bias_full;
+      calib.calib_gyro_bias = gyro_bias;
+
+      // TODO@mateosss: decide whether to require variances or std for IMU model params (apply sqrt as appropriate)
+      calib.gyro_noise_std = {imu_calib.noise_std(0), imu_calib.noise_std(1), imu_calib.noise_std(2)};
+      calib.gyro_bias_std = {imu_calib.bias_std(0), imu_calib.bias_std(1), imu_calib.bias_std(2)};
+
+    } else if (imu_type == imu_calibration::imu_type::accelerometer) {
+      Eigen::Matrix<Scalar, 12, 1> accel_bias_full;
+      const auto &bias = imu_calib.offset;
+      const auto &tran = imu_calib.transform;
+      // TODO@mateosss: decide if I should substract the identitiy here, or require it substracted from before
+
+      // TODO: Doing the same as rs_t265.cpp but that's incorrect. We should be doing an LQ decomposition of tran and
+      // using L. See https://gitlab.com/VladyslavUsenko/basalt-headers/-/issues/8
+      accel_bias_full << bias(0), bias(1), bias(2), tran(0, 0) - 1, tran(1, 0), tran(2, 0), tran(1, 1) - 1, tran(2, 1),
+          tran(2, 2) - 1;
+      CalibAccelBias<Scalar> accel_bias;
+      accel_bias.getParam() = accel_bias_full;
+      calib.calib_accel_bias = accel_bias;
+
+      // TODO@mateosss: decide whether to require variances or std for IMU model params (apply sqrt as appropriate)
+      calib.accel_noise_std = {imu_calib.noise_std(0), imu_calib.noise_std(1), imu_calib.noise_std(2)};
+      calib.accel_bias_std = {imu_calib.bias_std(0), imu_calib.bias_std(1), imu_calib.bias_std(2)};
+    } else {
+      ASSERT(false, "Unsupported imu_type=%d", static_cast<int>(imu_type));
+    }
   }
 };
 
