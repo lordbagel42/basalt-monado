@@ -423,7 +423,7 @@ struct slam_tracker::implementation {
       calib.gyro_bias_std = {imu_calib.bias_std(0), imu_calib.bias_std(1), imu_calib.bias_std(2)};
 
     } else if (imu_type == imu_calibration::imu_type::accelerometer) {
-      Eigen::Matrix<Scalar, 12, 1> accel_bias_full;
+      Eigen::Matrix<Scalar, 9, 1> accel_bias_full;
       const auto &bias = imu_calib.offset;
       const auto &tran = imu_calib.transform;
       // TODO@mateosss: decide if I should substract the identitiy here, or require it substracted from before
