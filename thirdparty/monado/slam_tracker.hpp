@@ -181,12 +181,7 @@ struct cam_calibration {
   cv::Matx<double, 4, 4> T_cam_imu; //!< Transformation from camera to imu space
 };
 
-struct imu_calibration {
-  enum class imu_type { accelerometer, gyroscope };
-  int imu_index;    //!< For multi-imu setups. Usually just 0.
-  double frequency; //!< Samples per second
-  imu_type type;
-
+struct inertial_calibration {
   // Calibration intrinsics to apply to each raw measurement.
 
   //! This transform will be applied to raw measurements. Similar to
@@ -194,21 +189,32 @@ struct imu_calibration {
   //! Zero values mean no changes.
   cv::Matx<double, 3, 3> transform;
 
-  //! Offset to apply to raw measurements. Also called bias in other contexts.
-  cv::Matx<double, 3, 1> offset; //!< Offset to apply to raw measurements
+  //! Offset to apply to raw measurements to; called bias in other contexts.
+  cv::Matx<double, 3, 1> offset;
 
   // Parameters for the random processes that model this IMU. See section "2.1
   // Gyro Noise Model" of N. Trawny and S. I. Roumeliotis, "Indirect Kalman
   // Filter for 3D Attitude Estimation". Analogous for accelerometers.
   // http://mars.cs.umn.edu/tr/reports/Trawny05b.pdf#page=15
 
-  //! IMU measurement noise ~ N(0, σ²); this field is σ.
-  //! [σ] = u / sqrt(sec) with u = rad if gyroscope, u = m/s if accelerometer.
-  cv::Matx<double, 3, 1> noise_std;
+  // TODO@mateosss: Reconsider usage of cv::Matx over just array<array> or [][]
 
   //! IMU internal bias ~ wiener process with steps N(0, σ²); this field is σ;
   //! [σ] = u / sqrt(sec³) with u = rad if gyroscope, u = m/s if accelerometer.
   cv::Matx<double, 3, 1> bias_std;
+
+  //! IMU measurement noise ~ N(0, σ²); this field is σ.
+  //! [σ] = u / sqrt(sec) with u = rad if gyroscope, u = m/s if accelerometer.
+  cv::Matx<double, 3, 1> noise_std;
+
+  inertial_calibration() : transform(cv::Matx<double, 3, 3>::eye()) {}
+};
+
+struct imu_calibration {
+  int imu_index;    //!< For multi-imu setups. Usually just 0.
+  double frequency; //!< Samples per second
+  inertial_calibration accel;
+  inertial_calibration gyro;
 };
 
 /*!

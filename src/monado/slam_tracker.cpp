@@ -386,7 +386,7 @@ struct slam_tracker::implementation {
 
     calib.resolution[i] = {cam_calib.width, cam_calib.height};
 
-    // NOTE: ignoring cam_calib.distortion_model and distortion_params
+    // NOTE: ignoring cam_calib.distortion_model and distortion_params as basalt can't use them
   }
 
   void add_imu_calibration(const imu_calibration &imu_calib) { added_imu_calibs.push_back(imu_calib); }
@@ -406,42 +406,43 @@ struct slam_tracker::implementation {
              calib.imu_update_rate);
     }
 
-    imu_calibration::imu_type imu_type = imu_calib.type;
-    if (imu_type == imu_calibration::imu_type::gyroscope) {
-      Eigen::Matrix<Scalar, 12, 1> gyro_bias_full;
-      const auto &bias = imu_calib.offset;
-      const auto &tran = imu_calib.transform;
-      // TODO@mateosss: decide if I should substract the identitiy here, or require it substracted from before
-      gyro_bias_full << bias(0), bias(1), bias(2), tran(0, 0) - 1, tran(1, 0), tran(2, 0), tran(0, 1), tran(1, 1) - 1,
-          tran(2, 1), tran(0, 2), tran(1, 2), tran(2, 2) - 1;
-      CalibGyroBias<Scalar> gyro_bias;
-      gyro_bias.getParam() = gyro_bias_full;
-      calib.calib_gyro_bias = gyro_bias;
+    // Accelerometer calibration
 
-      // TODO@mateosss: decide whether to require variances or std for IMU model params (apply sqrt as appropriate)
-      calib.gyro_noise_std = {imu_calib.noise_std(0), imu_calib.noise_std(1), imu_calib.noise_std(2)};
-      calib.gyro_bias_std = {imu_calib.bias_std(0), imu_calib.bias_std(1), imu_calib.bias_std(2)};
+    inertial_calibration accel = imu_calib.accel;
 
-    } else if (imu_type == imu_calibration::imu_type::accelerometer) {
-      Eigen::Matrix<Scalar, 9, 1> accel_bias_full;
-      const auto &bias = imu_calib.offset;
-      const auto &tran = imu_calib.transform;
-      // TODO@mateosss: decide if I should substract the identitiy here, or require it substracted from before
+    Eigen::Matrix<Scalar, 9, 1> accel_bias_full;
+    const auto &abias = accel.offset;
+    const auto &atran = accel.transform;
 
-      // TODO: Doing the same as rs_t265.cpp but that's incorrect. We should be doing an LQ decomposition of tran and
-      // using L. See https://gitlab.com/VladyslavUsenko/basalt-headers/-/issues/8
-      accel_bias_full << bias(0), bias(1), bias(2), tran(0, 0) - 1, tran(1, 0), tran(2, 0), tran(1, 1) - 1, tran(2, 1),
-          tran(2, 2) - 1;
-      CalibAccelBias<Scalar> accel_bias;
-      accel_bias.getParam() = accel_bias_full;
-      calib.calib_accel_bias = accel_bias;
+    // TODO: Doing the same as rs_t265.cpp but that's incorrect. We should be doing an LQ decomposition of atran and
+    // using L. See https://gitlab.com/VladyslavUsenko/basalt-headers/-/issues/8
+    accel_bias_full << abias(0), abias(1), abias(2), atran(0, 0) - 1, atran(1, 0), atran(2, 0), atran(1, 1) - 1,
+        atran(2, 1), atran(2, 2) - 1;
+    CalibAccelBias<Scalar> accel_bias;
+    accel_bias.getParam() = accel_bias_full;
+    calib.calib_accel_bias = accel_bias;
 
-      // TODO@mateosss: decide whether to require variances or std for IMU model params (apply sqrt as appropriate)
-      calib.accel_noise_std = {imu_calib.noise_std(0), imu_calib.noise_std(1), imu_calib.noise_std(2)};
-      calib.accel_bias_std = {imu_calib.bias_std(0), imu_calib.bias_std(1), imu_calib.bias_std(2)};
-    } else {
-      ASSERT(false, "Unsupported imu_type=%d", static_cast<int>(imu_type));
-    }
+    // TODO@mateosss: decide whether to require variances or std for IMU model params (apply sqrt as appropriate)
+    // TODO@mateosss: specify units in schema?
+    calib.accel_noise_std = {accel.noise_std(0), accel.noise_std(1), accel.noise_std(2)};
+    calib.accel_bias_std = {accel.bias_std(0), accel.bias_std(1), accel.bias_std(2)};
+
+    // Gyroscope calibration
+
+    inertial_calibration gyro = imu_calib.accel;
+
+    Eigen::Matrix<Scalar, 12, 1> gyro_bias_full;
+    const auto &gbias = gyro.offset;
+    const auto &gtran = gyro.transform;
+    gyro_bias_full << gbias(0), gbias(1), gbias(2), gtran(0, 0) - 1, gtran(1, 0), gtran(2, 0), gtran(0, 1),
+        gtran(1, 1) - 1, gtran(2, 1), gtran(0, 2), gtran(1, 2), gtran(2, 2) - 1;
+    CalibGyroBias<Scalar> gyro_bias;
+    gyro_bias.getParam() = gyro_bias_full;
+    calib.calib_gyro_bias = gyro_bias;
+
+    // TODO@mateosss: decide whether to require variances or std for IMU model params (apply sqrt as appropriate)
+    calib.gyro_noise_std = {gyro.noise_std(0), gyro.noise_std(1), gyro.noise_std(2)};
+    calib.gyro_bias_std = {gyro.bias_std(0), gyro.bias_std(1), gyro.bias_std(2)};
   }
 };
 
