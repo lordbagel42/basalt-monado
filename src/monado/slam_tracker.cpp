@@ -363,10 +363,6 @@ struct slam_tracker::implementation {
     Eigen::Vector3d p{tci(0, 3), tci(1, 3), tci(2, 3)};
     calib.T_i_c[i] = Calibration<Scalar>::SE3(q, p);
 
-    // TODO@mateosss: remove prints
-    cout << ">>> calib.T_i_c.translation=" << calib.T_i_c[i].translation() << "\n";
-    cout << ">>> calib.T_i_c.rotation=" << calib.T_i_c[i].rotationMatrix() << "\n";
-
     GenericCamera<double> model;
     const vector<Scalar> &cmp = cam_calib.model_params;
     if (cam_calib.model == cam_calibration::cam_model::pinhole) {
@@ -422,14 +418,12 @@ struct slam_tracker::implementation {
     accel_bias.getParam() = accel_bias_full;
     calib.calib_accel_bias = accel_bias;
 
-    // TODO@mateosss: decide whether to require variances or std for IMU model params (apply sqrt as appropriate)
-    // TODO@mateosss: specify units in schema?
     calib.accel_noise_std = {accel.noise_std(0), accel.noise_std(1), accel.noise_std(2)};
     calib.accel_bias_std = {accel.bias_std(0), accel.bias_std(1), accel.bias_std(2)};
 
     // Gyroscope calibration
 
-    inertial_calibration gyro = imu_calib.accel;
+    inertial_calibration gyro = imu_calib.gyro;
 
     Eigen::Matrix<Scalar, 12, 1> gyro_bias_full;
     const auto &gbias = gyro.offset;
@@ -440,7 +434,6 @@ struct slam_tracker::implementation {
     gyro_bias.getParam() = gyro_bias_full;
     calib.calib_gyro_bias = gyro_bias;
 
-    // TODO@mateosss: decide whether to require variances or std for IMU model params (apply sqrt as appropriate)
     calib.gyro_noise_std = {gyro.noise_std(0), gyro.noise_std(1), gyro.noise_std(2)};
     calib.gyro_bias_std = {gyro.bias_std(0), gyro.bias_std(1), gyro.bias_std(2)};
   }

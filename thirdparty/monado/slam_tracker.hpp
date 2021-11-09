@@ -184,9 +184,7 @@ struct cam_calibration {
 struct inertial_calibration {
   // Calibration intrinsics to apply to each raw measurement.
 
-  //! This transform will be applied to raw measurements. Similar to
-  //! https://vladyslavusenko.gitlab.io/basalt-headers/classbasalt_1_1CalibGyroBias.html#details
-  //! Zero values mean no changes.
+  //! This transform will be applied to raw measurements.
   cv::Matx<double, 3, 3> transform;
 
   //! Offset to apply to raw measurements to; called bias in other contexts.
@@ -197,14 +195,12 @@ struct inertial_calibration {
   // Filter for 3D Attitude Estimation". Analogous for accelerometers.
   // http://mars.cs.umn.edu/tr/reports/Trawny05b.pdf#page=15
 
-  // TODO@mateosss: Reconsider usage of cv::Matx over just array<array> or [][]
-
   //! IMU internal bias ~ wiener process with steps N(0, σ²); this field is σ;
-  //! [σ] = u / sqrt(sec³) with u = rad if gyroscope, u = m/s if accelerometer.
+  //! [σ] = U / sqrt(sec³) with U = rad if gyroscope, U = m/s if accelerometer.
   cv::Matx<double, 3, 1> bias_std;
 
   //! IMU measurement noise ~ N(0, σ²); this field is σ.
-  //! [σ] = u / sqrt(sec) with u = rad if gyroscope, u = m/s if accelerometer.
+  //! [σ] = U / sqrt(sec) with U = rad if gyroscope, U = m/s if accelerometer.
   cv::Matx<double, 3, 1> noise_std;
 
   inertial_calibration() : transform(cv::Matx<double, 3, 3>::eye()) {}
