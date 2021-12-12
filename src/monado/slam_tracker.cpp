@@ -292,7 +292,7 @@ struct slam_tracker::implementation {
     // allocator for ManagedImage that ties the OpenCV allocator
     size_t full_size = width * height;
     for (size_t j = 0; j < full_size; j++) {
-      mimg->ptr[j] = s.img.data[j] << 8;
+      mimg->ptr[j] = s.img.at<uchar>(j) << 8;
     }
 
     if (!s.is_left) {
