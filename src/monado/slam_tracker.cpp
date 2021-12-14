@@ -23,6 +23,10 @@
 
 namespace xrt::auxiliary::tracking::slam {
 
+const int IMPLEMENTATION_VERSION_MAJOR = HEADER_VERSION_MAJOR;
+const int IMPLEMENTATION_VERSION_MINOR = HEADER_VERSION_MINOR;
+const int IMPLEMENTATION_VERSION_PATCH = HEADER_VERSION_PATCH;
+
 using std::cout;
 using std::make_shared;
 using std::make_unique;
@@ -310,6 +314,7 @@ struct slam_tracker::implementation {
       pose.ry = T_w_i.unit_quaternion().y();
       pose.rz = T_w_i.unit_quaternion().z();
       pose.rw = T_w_i.unit_quaternion().w();
+      pose.timestamp = data->t_ns;
     }
     return dequeued;
   }
