@@ -67,7 +67,6 @@ struct slam_tracker::implementation {
   string config_path;
   string marg_data_path;
   bool print_queue = false;
-  bool latest_pose = true;
 
   // Basalt in its current state does not support monocular cameras, although it
   // should be possible to adapt it to do so, see:
@@ -124,8 +123,6 @@ struct slam_tracker::implementation {
     app.add_option("--config-path", config_path, "Path to config file.")->required();
     app.add_option("--marg-data", marg_data_path, "Path to folder where marginalization data will be stored.");
     app.add_option("--print-queue", print_queue, "Poll and print for queue sizes.");
-    app.add_option("--latest-pose", latest_pose,
-                   "0 for returning every tracked pose in order, 1 (default) for just the latest");
 
     try {
       // While --config-path sets the VIO configuration, --config sets the
@@ -302,13 +299,10 @@ struct slam_tracker::implementation {
   }
 
   bool try_dequeue_pose(pose &pose) {
-    if (latest_pose) {  // Return only the last produced pose
-      std::unique_lock<std::mutex> lock{last_out_state_lock};
-
-      if (!last_out_state) return false;
-      Sophus::SE3d T_w_i = last_out_state->T_w_i;
-      lock.unlock();
-
+    PoseVelBiasState<double>::Ptr data;
+    bool dequeued = monado_out_state_queue.try_pop(data);
+    if (dequeued) {
+      Sophus::SE3d T_w_i = data->T_w_i;
       pose.px = T_w_i.translation().x();
       pose.py = T_w_i.translation().y();
       pose.pz = T_w_i.translation().z();
@@ -316,22 +310,8 @@ struct slam_tracker::implementation {
       pose.ry = T_w_i.unit_quaternion().y();
       pose.rz = T_w_i.unit_quaternion().z();
       pose.rw = T_w_i.unit_quaternion().w();
-      return true;
-    } else {  // Return every pose produced by the VIO estimator
-      PoseVelBiasState<double>::Ptr data;
-      bool dequeued = monado_out_state_queue.try_pop(data);
-      if (dequeued) {
-        Sophus::SE3d T_w_i = data->T_w_i;
-        pose.px = T_w_i.translation().x();
-        pose.py = T_w_i.translation().y();
-        pose.pz = T_w_i.translation().z();
-        pose.rx = T_w_i.unit_quaternion().x();
-        pose.ry = T_w_i.unit_quaternion().y();
-        pose.rz = T_w_i.unit_quaternion().z();
-        pose.rw = T_w_i.unit_quaternion().w();
-      }
-      return dequeued;
     }
+    return dequeued;
   }
 
   bool supports_feature(int feature_id) { return supported_features.count(feature_id) == 1; }
