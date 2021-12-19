@@ -4,6 +4,13 @@ This is a fork of [Basalt](https://gitlab.com/VladyslavUsenko/basalt) with some
 modifications so that it can be used from Monado for SLAM tracking. Many thanks
 to the Basalt authors.
 
+Follow this file for instructions on how to get Basalt up and running with
+Monado. This README tries to be as concise as possible, but there are many
+details that need to be addressed on it, so please do not skip any section,
+otherwise it is likely that it won't work. Having said that, this guide has
+been tested in limited setups, so please report any changes you had to make
+in order to get it working in different ones.
+
 ## Index
 
 - [Basalt for Monado](#basalt-for-monado)
@@ -54,21 +61,41 @@ export LIBRARY_PATH=$bsltinstall/lib/:$LIBRARY_PATH # for compile time gcc
 <!-- TODO@mateosss: If and when I update basalt, the required eigen version is
 3.4.0, for that is just better to require the user to always install eigen -->
 
-Most dependencies will be automatically set by basalt, however for Eigen there
-is a catch if you are using a distro which packages a version older than 3.3.7.
-This is not a problem on Ubuntu 20.04 but for 18.04 you will need to install a
-newer Eigen version as follows:
+Most dependencies will be automatically built by basalt, however there are some
+known issues you might need to deal with (click to open the ones that might
+affect you).
 
-```bash
-cd $bsltdeps
-wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip
-unzip eigen-3.4.0.zip
-cd eigen-3.4.0 && mkdir build && cd build
-cmake .. -DCMAKE_INSTALL_PREFIX=$bsltinstall
-make install
-```
+<details>
+  <summary>Issues with distros with Eigen < 3.3.7 (Ubuntu < 20.04) </summary>
 
-If you are using GCC 11 you might also get some issues with pangolin, see [this discord thread](https://discord.com/channels/556527313823596604/556527314670714901/904339906288050196) for more info.
+  If you are using a distro which packages an Eigen version older than 3.3.7 you
+  will need to install Eigen manually. This is not a problem on Ubuntu 20.04 but
+  for 18.04 it is. You can install Eigen 3.4.0 (recommended) as follows:
+
+  ```bash
+  cd $bsltdeps
+  wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip
+  unzip eigen-3.4.0.zip
+  cd eigen-3.4.0 && mkdir build && cd build
+  cmake .. -DCMAKE_INSTALL_PREFIX=$bsltinstall
+  make install
+  ```
+
+</details>
+
+<details>
+  <summary>Issues with GCC 11</summary>
+
+  If you are using GCC 11 you might also get some issues with pangolin as there is now a
+  [name clash with Pagolin `_serialize()` name](https://github.com/stevenlovegrove/Pangolin/issues/657),
+  it [should be fixed](https://gcc.gnu.org/bugzilla/show_bug.cgi?id=100438#c12)
+  in newer versions of GCC-11. For fixing it yourself, you can cherry-pick
+  [these commits](https://github.com/stevenlovegrove/Pangolin/pull/658/commits),
+  or use a different GCC version.
+  (see
+  [this discord thread](https://discord.com/channels/556527313823596604/556527314670714901/904339906288050196)
+  in the Monado server for more info).
+</details>
 
 ### Build Basalt
 
@@ -76,7 +103,7 @@ If you are using GCC 11 you might also get some issues with pangolin, see [this 
 cd $bsltdeps
 git clone --recursive git@gitlab.freedesktop.org:mateosss/basalt.git
 ./basalt/scripts/install_deps.sh
-sed -i "s#/home/mateo/Documents/apps/bsltdeps/#$bsltdeps/#" ../data/monado/*.toml
+sed -i "s#/home/mateo/Documents/apps/bsltdeps/#$bsltdeps/#" basalt/data/monado/*.toml
 cd basalt && mkdir build && cd build
 # if you didn't need to do a custom Eigen installation, set -DEIGEN_ROOT=/usr/include/eigen3 instead
 cmake .. -DCMAKE_INSTALL_PREFIX=$bsltinstall -DCMAKE_BUILD_TYPE=RelWithDebInfo -DEIGEN_ROOT=$bsltinstall/include/eigen3
