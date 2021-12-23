@@ -1,5 +1,9 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.10...3.18)
 
+add_library(nlohmann::json INTERFACE IMPORTED GLOBAL)
+set_property(TARGET nlohmann::json PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/json/)
+
+add_subdirectory(basalt-headers EXCLUDE_FROM_ALL)
 add_subdirectory(ros EXCLUDE_FROM_ALL)
 add_subdirectory(apriltag EXCLUDE_FROM_ALL)
 
@@ -47,7 +51,7 @@ set_target_properties(opengv PROPERTIES
 # fix opengv: compile options (CMAKE_CXX_FLAGS is overwritten by Opengv)
 target_compile_options(opengv PRIVATE
   -Wno-unused-private-field
-  -march=${CXX_MARCH}
+  ${BASALT_MARCH_FLAGS}
   "SHELL:${BASALT_PASSED_CXX_FLAGS}")
 
 # TODO: enable once mpark issue is fixed upstream pangolin
@@ -67,6 +71,11 @@ endif()
 # fix pangolin: macOS >= 10.14 Mojave
 if(APPLE AND CMAKE_SYSTEM_VERSION VERSION_GREATER_EQUAL 18.0.0)
   target_compile_options(pangolin PRIVATE "-Wno-deprecated-declarations")
+
+  if((CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang" OR CMAKE_CXX_COMPILER_ID STREQUAL "Clang") AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0.0)
+    target_compile_options(pangolin PRIVATE "-Wno-deprecated-copy")
+  endif()
+
 endif()
 
 # fix pangolin: clang
@@ -84,9 +93,19 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION
   target_compile_options(pangolin PRIVATE "-Wno-deprecated-copy")
 endif()
 
+# fix pangolin: clang >= 13.0
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0.0)
+  target_compile_options(pangolin PRIVATE "-Wno-unused-but-set-variable;-Wno-null-pointer-subtraction")
+endif()
+
 # fix pangolin: GCC >= 9.0
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 9.0)
   target_compile_options(pangolin PRIVATE "-Wno-stringop-truncation;-Wno-deprecated-copy")
+endif()
+
+# fix pangolin: GCC >= 10.0
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 10.0)
+  target_compile_options(pangolin PRIVATE "-Wno-parentheses")
 endif()
 
 # check here the directories for the pangolin and opengv targets, and
@@ -119,6 +138,3 @@ if (EIGEN3_INCLUDE_DIR MATCHES "^${CMAKE_SOURCE_DIR}.*")
     set_target_properties(${_target} PROPERTIES INTERFACE_INCLUDE_DIRECTORIES "${_include_dirs_new}")
   endforeach()
 endif()
-
-
-

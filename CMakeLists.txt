@@ -1,6 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
-
-include("thirdparty/basalt-headers/cmake_modules/PreProjectWorkarounds.cmake")
+cmake_minimum_required(VERSION 3.10...3.18)
 
 project(basalt)
 
@@ -75,6 +73,13 @@ if(NOT CXX_MARCH)
   set(CXX_MARCH native)
 endif()
 
+IF(NOT APPLE OR NOT CMAKE_SYSTEM_PROCESSOR STREQUAL "arm64")
+  set(BASALT_MARCH_FLAGS "-march=${CXX_MARCH}")
+ELSE()
+  message(STATUS "Running on Apple ${CMAKE_SYSTEM_PROCESSOR}. Disabled -march flag.")
+ENDIF()
+
+
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -123,6 +128,11 @@ else()
       # These are disabled to avoid lot's of warnings in Eigen code with gcc-9
       set(BASALT_CXX_FLAGS "${BASALT_CXX_FLAGS} -Wno-error=deprecated-copy")
   endif()
+  if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 10.0)
+    # These are disabled due to warnings in pangolin
+    #set(BASALT_CXX_FLAGS "${BASALT_CXX_FLAGS} -Wno-error=parentheses")
+    set(BASALT_CXX_FLAGS "${BASALT_CXX_FLAGS} -Wno-parentheses")
+  endif()
 endif()
 
 
@@ -169,9 +179,11 @@ elseif(UNIX)
   set(STD_CXX_FS stdc++fs)
 
   if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    set(LINUX_CLANG 1)
     message(STATUS "Detected Linux with clang.")
-    message(WARNING "Clang on Linux is currently not fully supported. You'll likely need to get a recent version of TBB.")
+
+    # Note: Whatever the issue was, this seems to not be an issue any more, at least with more recent clang and Ubuntu versions (tested clang-12 and Ubuntu 18.04)
+    #message(WARNING "Clang on Linux is currently not fully supported. You'll likely need to get a recent version of TBB.")
+    #set(LINUX_CLANG 1)
 
   elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     message(STATUS "Detected Linux with gcc.")
@@ -218,43 +230,63 @@ set(BASALT_CXX_FLAGS "${BASALT_CXX_FLAGS} -DEIGEN_DONT_PARALLELIZE")
 #  message(STATUS "OpenMP Disabled")
 #endif()
 
+# Make specialization for double / float optional.
+# Disabling them can be useful for better compile times during development.
+option(BASALT_INSTANTIATIONS_DOUBLE "Instatiate templates for Scalar=double." ON)
+option(BASALT_INSTANTIATIONS_FLOAT "Instatiate templates for Scalar=float." ON)
+
+if(BASALT_INSTANTIATIONS_DOUBLE)
+  list(APPEND BASALT_COMPILE_DEFINITIONS BASALT_INSTANTIATIONS_DOUBLE)
+endif()
+if(BASALT_INSTANTIATIONS_FLOAT)
+  list(APPEND BASALT_COMPILE_DEFINITIONS BASALT_INSTANTIATIONS_FLOAT)
+endif()
+
 
 # setup combined compiler flags
-set(CMAKE_CXX_FLAGS "${BASALT_CXX_FLAGS} -march=${CXX_MARCH} ${BASALT_PASSED_CXX_FLAGS}")
+set(CMAKE_CXX_FLAGS "${BASALT_CXX_FLAGS} ${BASALT_MARCH_FLAGS} ${BASALT_PASSED_CXX_FLAGS}")
 
 
 set(EIGEN_INCLUDE_DIR_HINTS ${EIGEN_ROOT})
-find_package(Eigen3 3.3.7 EXACT REQUIRED MODULE)
-include_directories(${EIGEN3_INCLUDE_DIR})
+find_package(Eigen3 3.4.0 EXACT REQUIRED MODULE)
 message(STATUS "Found Eigen headers in: ${EIGEN3_INCLUDE_DIR}")
 if(NOT EIGEN3_INCLUDE_DIR MATCHES "^${EIGEN_ROOT}")
   message(WARNING "Found Eigen headers are outside of specified EIGEN_ROOT '${EIGEN_ROOT}'")
 endif()
 
 find_package(TBB REQUIRED)
-include_directories(${TBB_INCLUDE_DIR})
-message(STATUS "TBB_INTERFACE_VERSION: ${TBB_INTERFACE_VERSION}")
+message(STATUS "Found TBB ${TBB_VERSION_MAJOR}.${TBB_VERSION_MINOR} (interface version ${TBB_INTERFACE_VERSION}) headers in: ${TBB_INCLUDE_DIRS}")
 if (TBB_INTERFACE_VERSION LESS 11004)
   # enable global_control header for earlier TBB versions (Ubuntu 16.04, 18.04)
   add_definitions(-DTBB_PREVIEW_GLOBAL_CONTROL)
 endif()
 
-find_package(OpenCV REQUIRED core imgproc calib3d highgui)
-include_directories(${OpenCV_INCLUDE_DIR})
-message(STATUS "Found OpenCV headers in: ${OpenCV_INCLUDE_DIR}")
+# NOTE: not specifying version, since 2, 3 or 4 is fine
+find_package(OpenCV REQUIRED COMPONENTS core imgproc calib3d highgui)
+message(STATUS "Found OpenCV ${OpenCV_VERSION} headers in: ${OpenCV_INCLUDE_DIRS}")
 message(STATUS "Found OpenCV_LIBS: ${OpenCV_LIBS}")
 
+# Add our own custom scoped opencv target since none is provided by OpenCV itself
+add_library(basalt::opencv INTERFACE IMPORTED)
+set_property(TARGET basalt::opencv PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${OpenCV_INCLUDE_DIRS})
+set_property(TARGET basalt::opencv PROPERTY INTERFACE_LINK_LIBRARIES ${OpenCV_LIBS})
+
+find_package(fmt REQUIRED)
+message(STATUS "Found {fmt} ${fmt_VERSION} in: ${fmt_DIR}")
 
 add_subdirectory(thirdparty)
 
+# custom scoped monado target
+add_library(basalt::monado INTERFACE IMPORTED)
+set_property(TARGET basalt::monado PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/monado)
 
-include_directories(thirdparty/basalt-headers/thirdparty/Sophus)
-include_directories(thirdparty/basalt-headers/thirdparty/cereal/include)
-include_directories(thirdparty/basalt-headers/include)
-include_directories(thirdparty/CLI11/include)
-include_directories(thirdparty/fast/include)
-include_directories(thirdparty/monado)
-include_directories(include)
+# custom scoped cli11 target
+add_library(basalt::cli11 INTERFACE IMPORTED)
+set_property(TARGET basalt::cli11 PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/CLI11/include)
+
+# custom scoped magic_enum target
+add_library(basalt::magic_enum INTERFACE IMPORTED)
+set_property(TARGET basalt::magic_enum PROPERTY INTERFACE_INCLUDE_DIRECTORIES ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/magic_enum/include)
 
 
 add_library(basalt SHARED
@@ -263,69 +295,94 @@ add_library(basalt SHARED
   src/calibration/aprilgrid.cpp
   src/calibration/calibraiton_helper.cpp
   src/calibration/vignette.cpp
-  src/utils/vio_config.cpp
   src/optical_flow/optical_flow.cpp
-  src/vi_estimator/keypoint_vio.cpp
-  src/vi_estimator/keypoint_vio_linearize.cpp
-  src/vi_estimator/keypoint_vo.cpp
+  src/linearization/landmark_block.cpp
+  src/linearization/linearization_base.cpp
+  src/linearization/linearization_abs_qr.cpp
+  src/linearization/linearization_abs_sc.cpp
+  src/linearization/linearization_rel_sc.cpp
+  src/utils/vio_config.cpp
+  src/utils/system_utils.cpp
+  src/utils/time_utils.cpp
+  src/utils/keypoints.cpp
+  src/vi_estimator/marg_helper.cpp
+  src/vi_estimator/sqrt_keypoint_vio.cpp
+  src/vi_estimator/sqrt_keypoint_vo.cpp
   src/vi_estimator/vio_estimator.cpp
   src/vi_estimator/ba_base.cpp
+  src/vi_estimator/sqrt_ba_base.cpp
+  src/vi_estimator/sc_ba_base.cpp
   src/vi_estimator/nfr_mapper.cpp
   src/vi_estimator/landmark_database.cpp
-  src/utils/keypoints.cpp
   src/monado/slam_tracker.cpp)
 
-target_link_libraries(basalt PUBLIC ${TBB_LIBRARIES} ${STD_CXX_FS} ${OpenCV_LIBS} pangolin PRIVATE rosbag apriltag opengv)
+target_link_libraries(basalt
+  PUBLIC ${STD_CXX_FS} basalt::opencv basalt::basalt-headers TBB::tbb pangolin basalt::cli11
+  PRIVATE basalt::magic_enum rosbag apriltag opengv nlohmann::json fmt::fmt basalt::monado)
+target_include_directories(basalt PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_compile_definitions(basalt PUBLIC ${BASALT_COMPILE_DEFINITIONS})
+#target_compile_definitions(basalt PUBLIC BASALT_DISABLE_ASSERTS)
 
 
 add_executable(basalt_calibrate src/calibrate.cpp src/calibration/cam_calib.cpp)
-target_link_libraries(basalt_calibrate basalt pangolin)
+target_link_libraries(basalt_calibrate basalt pangolin basalt::cli11)
 
 add_executable(basalt_calibrate_imu src/calibrate_imu.cpp src/calibration/cam_imu_calib.cpp)
-target_link_libraries(basalt_calibrate_imu basalt pangolin)
+target_link_libraries(basalt_calibrate_imu basalt pangolin basalt::cli11)
 
 
 add_executable(basalt_vio_sim src/vio_sim.cpp)
-target_link_libraries(basalt_vio_sim basalt pangolin)
+target_link_libraries(basalt_vio_sim basalt pangolin basalt::cli11)
 
 add_executable(basalt_mapper_sim src/mapper_sim.cpp)
-target_link_libraries(basalt_mapper_sim basalt pangolin)
+target_link_libraries(basalt_mapper_sim basalt pangolin basalt::cli11)
 
-add_executable(basalt_mapper_sim_naive src/mapper_sim_naive.cpp)
-target_link_libraries(basalt_mapper_sim_naive basalt pangolin)
+# mapper sim native doesn't use template free interface
+if(BASALT_INSTANTIATIONS_DOUBLE)
+  add_executable(basalt_mapper_sim_naive src/mapper_sim_naive.cpp)
+  target_link_libraries(basalt_mapper_sim_naive basalt pangolin basalt::cli11)
+endif()
 
 add_executable(basalt_mapper src/mapper.cpp)
-target_link_libraries(basalt_mapper basalt pangolin)
+target_link_libraries(basalt_mapper basalt pangolin basalt::cli11)
 
 
 add_executable(basalt_opt_flow src/opt_flow.cpp)
-target_link_libraries(basalt_opt_flow basalt pangolin)
+target_link_libraries(basalt_opt_flow basalt pangolin basalt::cli11)
 
 add_executable(basalt_vio src/vio.cpp)
-target_link_libraries(basalt_vio basalt pangolin)
+target_link_libraries(basalt_vio basalt pangolin basalt::cli11)
 
 add_executable(basalt_time_alignment src/time_alignment.cpp)
-target_link_libraries(basalt_time_alignment basalt pangolin)
+target_link_libraries(basalt_time_alignment basalt pangolin basalt::cli11)
 
 add_executable(basalt_kitti_eval src/kitti_eval.cpp)
-target_link_libraries(basalt_kitti_eval)
+target_link_libraries(basalt_kitti_eval basalt::basalt-headers basalt::cli11)
 
 find_package(realsense2 QUIET)
 if(realsense2_FOUND)
   add_executable(basalt_rs_t265_record src/rs_t265_record.cpp src/device/rs_t265.cpp)
-  target_link_libraries(basalt_rs_t265_record basalt realsense2::realsense2 ${OpenCV_LIBS} pangolin)
+  target_link_libraries(basalt_rs_t265_record basalt realsense2::realsense2 pangolin basalt::cli11)
 
   add_executable(basalt_rs_t265_vio src/rs_t265_vio.cpp src/device/rs_t265.cpp)
-  target_link_libraries(basalt_rs_t265_vio basalt realsense2::realsense2 pangolin)
+  target_link_libraries(basalt_rs_t265_vio basalt realsense2::realsense2 pangolin basalt::cli11)
 endif()
 
 
 
-install(TARGETS basalt_calibrate basalt_calibrate_imu basalt_vio_sim basalt_mapper_sim basalt_mapper_sim_naive basalt_mapper basalt_opt_flow basalt_vio basalt_kitti_eval basalt_time_alignment basalt
+install(TARGETS basalt_calibrate basalt_calibrate_imu basalt_vio_sim basalt_mapper_sim basalt_mapper basalt_opt_flow basalt_vio basalt_kitti_eval basalt_time_alignment basalt
   EXPORT BasaltTargets
   RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
   LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
   ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
+
+if(BASALT_INSTANTIATIONS_DOUBLE)
+  install(TARGETS basalt_mapper_sim_naive
+    EXPORT BasaltTargets
+    RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
+    LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
+endif()
 
 if(realsense2_FOUND)
     install(TARGETS basalt_rs_t265_record basalt_rs_t265_vio

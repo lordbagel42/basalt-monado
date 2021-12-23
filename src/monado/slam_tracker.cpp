@@ -71,6 +71,7 @@ struct slam_tracker::implementation {
   string config_path;
   string marg_data_path;
   bool print_queue = false;
+  bool use_double = true;
 
   // Basalt in its current state does not support monocular cameras, although it
   // should be possible to adapt it to do so, see:
@@ -127,6 +128,7 @@ struct slam_tracker::implementation {
     app.add_option("--config-path", config_path, "Path to config file.")->required();
     app.add_option("--marg-data", marg_data_path, "Path to folder where marginalization data will be stored.");
     app.add_option("--print-queue", print_queue, "Poll and print for queue sizes.");
+    app.add_option("--use-double", use_double, "Whether to use a double or single precision pipeline.");
 
     try {
       // While --config-path sets the VIO configuration, --config sets the
@@ -205,7 +207,7 @@ struct slam_tracker::implementation {
     image_data_queue = &opt_flow_ptr->input_queue;
     ASSERT_(image_data_queue != nullptr);
 
-    vio = VioEstimatorFactory::getVioEstimator(vio_config, calib, constants::g, true);
+    vio = VioEstimatorFactory::getVioEstimator(vio_config, calib, constants::g, true, use_double);
     imu_data_queue = &vio->imu_data_queue;
     ASSERT_(imu_data_queue != nullptr);
 

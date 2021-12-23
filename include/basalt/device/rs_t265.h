@@ -88,7 +88,7 @@ class RsT265Device {
 
   RsT265Device(bool is_d455, RsD455Config d455, bool manual_exposure,
                int skip_frames, int webp_quality, double exposure_value = 10.0);
-  ~RsT265Device();
+
   void start();
   void stop();
 

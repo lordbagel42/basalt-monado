@@ -123,6 +123,7 @@ int main(int argc, char** argv) {
   std::string cam_calib_path;
   std::string config_path;
   int num_threads = 0;
+  bool use_double = false;
 
   double exposure = 0.0;  // 0 means auto, else use something like 10.0 or  33.0
   bool is_d455 = false;
@@ -141,6 +142,7 @@ int main(int argc, char** argv) {
   app.add_option("--config-path", config_path, "Path to config file.");
   app.add_option("--num-threads", num_threads, "Number of threads.");
   app.add_option("--step-by-step", step_by_step, "Path to config file.");
+  app.add_option("--use-double", use_double, "Use double not float.");
 
   app.add_option("--exposure", exposure,
                  "Shutter time in ms, 0 by default to use auto exposure");
@@ -190,7 +192,7 @@ int main(int argc, char** argv) {
   t265_device->image_data_queue = &opt_flow_ptr->input_queue;
 
   vio = basalt::VioEstimatorFactory::getVioEstimator(
-      vio_config, calib, basalt::constants::g, true);
+      vio_config, calib, basalt::constants::g, true, use_double);
   vio->initialize(Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
   t265_device->imu_data_queue = &vio->imu_data_queue;
 
