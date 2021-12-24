@@ -53,30 +53,9 @@ export LIBRARY_PATH=$bsltinstall/lib/:$LIBRARY_PATH # for compile time gcc
 
 ### Dependencies
 
-<!-- TODO@mateosss: If and when I update basalt, the required eigen version is
-3.4.0, for that is just better to require the user to always install eigen -->
-
 Most dependencies will be automatically built by basalt, however there are some
 known issues you might need to deal with (click to open the ones that might
 affect you).
-
-<details>
-  <summary>Issues with distros with Eigen < 3.3.7 (Ubuntu < 20.04) </summary>
-
-  If you are using a distro which packages an Eigen version older than 3.3.7 you
-  will need to install Eigen manually. This is not a problem on Ubuntu 20.04 but
-  for 18.04 it is. You can install Eigen 3.4.0 (recommended) as follows:
-
-  ```bash
-  cd $bsltdeps
-  wget https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.zip
-  unzip eigen-3.4.0.zip
-  cd eigen-3.4.0 && mkdir build && cd build
-  cmake .. -DCMAKE_INSTALL_PREFIX=$bsltinstall
-  make install
-  ```
-
-</details>
 
 <details>
   <summary>Issues with GCC 11</summary>
@@ -100,8 +79,7 @@ git clone --recursive git@gitlab.freedesktop.org:mateosss/basalt.git
 ./basalt/scripts/install_deps.sh
 sed -i "s#/home/mateo/Documents/apps/bsltdeps/#$bsltdeps/#" basalt/data/monado/*.toml
 cd basalt && mkdir build && cd build
-# if you didn't need to do a custom Eigen installation, set -DEIGEN_ROOT=/usr/include/eigen3 instead
-cmake .. -DCMAKE_INSTALL_PREFIX=$bsltinstall -DCMAKE_BUILD_TYPE=RelWithDebInfo -DEIGEN_ROOT=$bsltinstall/include/eigen3
+cmake .. -DCMAKE_INSTALL_PREFIX=$bsltinstall -DCMAKE_BUILD_TYPE=RelWithDebInfo
 make install -j12
 ```
 
@@ -127,12 +105,12 @@ This step is optional but you can try Basalt without Monado with one of the foll
 
 ### Monado Specifics
 
-You'll need to compile Monado with the same Eigen as Basalt, so if you used a
-custom Eigen installation, build with
-`-DEIGEN3_INCLUDE_DIR=$bsltinstall/include/eigen3` otherwise Monado will
-automatically use your system's Eigen. Additionally, set `export CFLAGS=-march=native CXXFLAGS=-march=native` before compiling (because we've
-been building everything with `-march=native` until this point and not doing so
-might result in weird crashes related to Eigen).
+You'll need to compile Monado with the same Eigen used in Basalt, and with the
+same flags. For that, set these with CMake (or equivalent flags for meson):
+`-DEIGEN3_INCLUDE_DIR=$bsltdeps/basalt/thirdparty/basalt-headers/thirdparty/eigen
+-DCMAKE_C_FLAGS="-march=native" -DCMAKE_CXX_FLAGS="-march=native"` otherwise
+Monado will automatically use your system's Eigen, and having mismatched Eigen
+version/flags can cause a lot of headaches.
 
 Run an OpenXR app like `hello_xr` with the following environment variables set
 
