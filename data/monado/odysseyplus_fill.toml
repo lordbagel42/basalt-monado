@@ -16,4 +16,4 @@ marg-data=""
 print-queue=0
 
 # Whether to use a double or single precision pipeline.
-use-double=1
+use-double=0
