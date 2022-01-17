@@ -159,4 +159,4 @@ should see a controller being tracked with Basalt from the euroc dataset.
 Monado has a couple of drivers supporting SLAM tracking (and thus Basalt). Here is how to set them up:
 
 - [RealSense Driver](doc/monado/Realsense.md)
-- WMR Driver (Guide not made, see RealSense guide and contrast it with the `odyssey` calibration files in this repo)
+- [WMR Driver](doc/monado/WMR.md)
