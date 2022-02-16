@@ -31,8 +31,10 @@ this calibration file we just created. For that let's copy the config that is
 already present for the Odyssey+:
 
 ```bash
-cp $bsltdeps/basalt/data/monado/odysseyplus.toml $bsltdeps/basalt/data/monado/reverbg2.toml
+cp $bsltdeps/basalt/data/monado/odysseyplus_rt8.toml $bsltdeps/basalt/data/monado/reverbg2.toml
 ```
+
+And edit the `cam-calib` field in the `reverbg2.toml` file to point to your `reverbg2_calib.json` file.
 
 And that's it, now you just need to reference this `reverbg2.toml` in the
 `SLAM_CONFIG` environment variable before launching monado with `export
