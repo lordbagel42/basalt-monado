@@ -40,3 +40,7 @@ And that's it, now you just need to reference this `reverbg2.toml` in the
 `SLAM_CONFIG` environment variable before launching monado with `export
 SLAM_CONFIG=$bsltdeps/basalt/data/monado/reverbg2.toml` and Basalt will use the
 appropriate calibration for your headset.
+
+# Video Walkthrough
+
+Here is a 15 minute walkthrough with some tips for using a WMR headset with Monado and Basalt that should help complement the guide found in the [README.md](README.md) file: <https://www.youtube.com/watch?v=jyQKjyRVMS4>
