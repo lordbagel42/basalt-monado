@@ -3,22 +3,10 @@
 We'll need to make a Basalt config file for your headset, let's say it's a
 Reverb G2.
 
-First, let's get your WMR device json config block. To get that json, add the
-following printf statement to Monado:
-
-```c++
-// In wmr_config.c
-bool wmr_hmd_config_parse(...) {
-  // ...
-  cJSON *json_root = cJSON_Parse(json_string);
-  // ...
-  printf("%s\n", cJSON_Print(json_root)); // <<< Add this to print the entire JSON
-  // ...
-}
-```
-
-Compile, run it with your WMR headset, and copy the output to a file called
-`reverbg2_wmrcalib.json`.
+First, let's get your WMR device json config block. To get that json, set the 
+environment variable `WMR_LOG=debug` and run Monado with your WMR headset connected.
+The headset json is printed on start after the line `DEBUG [wmr_read_config] JSON config:`.
+Copy that to a file called `reverbg2_wmrcalib.json`.
 
 Now let's convert this WMR json to a Basalt calibration file with:
 
