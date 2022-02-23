@@ -79,7 +79,7 @@ git clone --recursive git@gitlab.freedesktop.org:mateosss/basalt.git
 ./basalt/scripts/install_deps.sh
 sed -i "s#/home/mateo/Documents/apps/bsltdeps/#$bsltdeps/#" basalt/data/monado/*.toml
 cd basalt && mkdir build && cd build
-cmake .. -DCMAKE_INSTALL_PREFIX=$bsltinstall -DCMAKE_BUILD_TYPE=RelWithDebInfo
+cmake .. -DCMAKE_INSTALL_PREFIX=$bsltinstall -DCMAKE_BUILD_TYPE=RelWithDebInfo -DBUILD_TESTS=off -DBASALT_INSTANTIATIONS_DOUBLE=off
 make install -j12
 ```
 
@@ -144,7 +144,7 @@ should see a controller being tracked with Basalt from the euroc dataset.
   running speeds while maintaining accuracy. That should be easy to merge
   eventually.
 - Some things that might cause crashes:
-  - Using bad exposure values (setting *auto exposure* in the `realsense-viewer`
+  - Using bad exposure values (setting _auto exposure_ in the `realsense-viewer`
     worked well for me) or being in a room with lights off causes crashes right
     at start.
   - Shaking causes drift that can diverge if maintained for long periods of

@@ -160,7 +160,9 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_,
     const Vec3 gyro_cov = calib.dicrete_time_gyro_noise_std().array().square();
 
     typename ImuData<Scalar>::Ptr data = popFromImuDataQueue();
-    BASALT_ASSERT_MSG(data, "first IMU measurment is nullptr");
+    if (!data) {
+      goto end;
+    }
 
     data->accel = calib.calib_accel_bias.getCalibrated(data->accel);
     data->gyro = calib.calib_gyro_bias.getCalibrated(data->gyro);
@@ -176,6 +178,7 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_,
       if (!curr_frame.get()) {
         break;
       }
+      curr_frame->input_images->addTime("vio_received");
 
       // Correct camera time offset
       // curr_frame->t_ns += calib.cam_time_offset_ns;
@@ -253,11 +256,13 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_,
           data->t_ns = tmp;
         }
       }
+      curr_frame->input_images->addTime("preintegrated");
 
       measure(curr_frame, meas);
       prev_frame = curr_frame;
     }
 
+  end:
     if (out_vis_queue) out_vis_queue->push(nullptr);
     if (out_marg_queue) out_marg_queue->push(nullptr);
     if (out_state_queue) out_state_queue->push(nullptr);
@@ -478,8 +483,10 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
       }
     }
   }
+  opt_flow_meas->input_images->addTime("lmdb_updated");
 
-  optimize_and_marg(num_points_connected, lost_landmaks);
+  optimize_and_marg(opt_flow_meas->input_images, num_points_connected,
+                    lost_landmaks);
 
   if (out_state_queue) {
     PoseVelBiasStateWithLin p = frame_states.at(last_state_t_ns);
@@ -487,6 +494,8 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
     typename PoseVelBiasState<double>::Ptr data(
         new PoseVelBiasState<double>(p.getState().template cast<double>()));
 
+    data->input_images = opt_flow_meas->input_images;
+    data->input_images->addTime("vio_produced");
     out_state_queue->push(data);
   }
 
@@ -1426,10 +1435,13 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
 
 template <class Scalar_>
 void SqrtKeypointVioEstimator<Scalar_>::optimize_and_marg(
+    const OpticalFlowInput::Ptr& input_images,
     const std::map<int64_t, int>& num_points_connected,
     const std::unordered_set<KeypointId>& lost_landmaks) {
   optimize();
+  input_images->addTime("optimized");
   marginalize(num_points_connected, lost_landmaks);
+  input_images->addTime("marginalized");
 }
 
 template <class Scalar_>

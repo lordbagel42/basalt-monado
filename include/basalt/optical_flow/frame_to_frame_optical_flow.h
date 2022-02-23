@@ -103,6 +103,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
         if (output_queue) output_queue->push(nullptr);
         break;
       }
+      input_ptr->addTime("opticalflow_received");
 
       processFrame(input_ptr->t_ns, input_ptr);
     }
@@ -172,6 +173,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     }
 
     if (output_queue && frame_counter % config.optical_flow_skip_frames == 0) {
+      transforms->input_images->addTime("opticalflow_produced");
       output_queue->push(transforms);
     }
 
