@@ -94,6 +94,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
     while (true) {
       input_queue.pop(input_ptr);
+      input_ptr->addTime("opticalflow_received");
 
       if (!input_ptr.get()) {
         if (output_queue) output_queue->push(nullptr);
@@ -168,6 +169,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     }
 
     if (output_queue && frame_counter % config.optical_flow_skip_frames == 0) {
+      new_img_vec->addTime("opticalflow_produced");
       output_queue->push(transforms);
     }
 

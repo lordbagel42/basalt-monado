@@ -8,6 +8,7 @@
 
 #include <CLI/CLI.hpp>
 
+#include <chrono>
 #include <cstdio>
 #include <memory>
 #include <mutex>
@@ -89,8 +90,6 @@ struct slam_tracker::implementation {
   // Queues
   std::atomic<bool> running = false;
   tbb::concurrent_bounded_queue<PoseVelBiasState<double>::Ptr> out_state_queue;
-  shared_ptr<PoseVelBiasState<double>> last_out_state{};
-  std::mutex last_out_state_lock{};  // atomic_shared_ptr is not standard, and atomic<shared_ptr> since c++20 only :/
   tbb::concurrent_bounded_queue<PoseVelBiasState<double>::Ptr> monado_out_state_queue;
   tbb::concurrent_bounded_queue<OpticalFlowInput::Ptr> *image_data_queue = nullptr;  // Invariant: not null after ctor
   tbb::concurrent_bounded_queue<ImuData<double>::Ptr> *imu_data_queue = nullptr;     // Invariant: not null after ctor
@@ -104,11 +103,14 @@ struct slam_tracker::implementation {
   MargDataSaver::Ptr marg_data_saver;
 
   // slam_tracker features
-  unordered_set<int> supported_features{F_ADD_CAMERA_CALIBRATION, F_ADD_IMU_CALIBRATION};
+  unordered_set<int> supported_features{F_ADD_CAMERA_CALIBRATION, F_ADD_IMU_CALIBRATION, F_ENABLE_POSE_EXT_TIMING};
 
   // Additional calibration data
   vector<cam_calibration> added_cam_calibs{};
   vector<imu_calibration> added_imu_calibs{};
+
+  // Pose timing
+  bool pose_timing_enabled = false;
 
  public:
   implementation(const string &unified_config) {
@@ -157,6 +159,28 @@ struct slam_tracker::implementation {
     }
   }
 
+  pose get_pose_from_state(const PoseVelBiasState<double>::Ptr &state) const {
+    pose p;
+    Sophus::SE3d T_w_i = state->T_w_i;
+    p.px = T_w_i.translation().x();
+    p.py = T_w_i.translation().y();
+    p.pz = T_w_i.translation().z();
+    p.rx = T_w_i.unit_quaternion().x();
+    p.ry = T_w_i.unit_quaternion().y();
+    p.rz = T_w_i.unit_quaternion().z();
+    p.rw = T_w_i.unit_quaternion().w();
+    p.timestamp = state->t_ns;
+    p.next = nullptr;
+
+    if (pose_timing_enabled) {
+      auto pose_timing = make_shared<pose_ext_timing>();
+      pose_timing->timestamps = state->input_images->tss;
+      p.next = pose_timing;
+    }
+
+    return p;
+  }
+
   void state_consumer() {
     PoseVelBiasState<double>::Ptr data;
 
@@ -166,13 +190,11 @@ struct slam_tracker::implementation {
         monado_out_state_queue.push(nullptr);
         break;
       }
+      data->input_images->addTime("tracker_consumer_received");
 
       if (show_gui) ui.log_vio_data(data);
 
-      last_out_state_lock.lock();
-      last_out_state = data;
-      last_out_state_lock.unlock();
-
+      data->input_images->addTime("tracker_consumer_pushed");
       monado_out_state_queue.push(data);
     }
 
@@ -274,6 +296,9 @@ struct slam_tracker::implementation {
     int i = -1;
     if (s.is_left) {
       partial_frame = make_shared<OpticalFlowInput>();
+      partial_frame->timing_enabled = pose_timing_enabled;
+      partial_frame->addTime("frame_ts", s.timestamp);
+      partial_frame->addTime("tracker_received");
       partial_frame->img_data.resize(NUM_CAMS);
       partial_frame->t_ns = s.timestamp;
       i = 0;
@@ -297,24 +322,18 @@ struct slam_tracker::implementation {
     }
 
     if (!s.is_left) {
+      partial_frame->addTime("tracker_pushed");
       image_data_queue->push(partial_frame);
       if (show_gui) ui.update_last_image(partial_frame);
     }
   }
 
-  bool try_dequeue_pose(pose &pose) {
-    PoseVelBiasState<double>::Ptr data;
-    bool dequeued = monado_out_state_queue.try_pop(data);
+  bool try_dequeue_pose(pose &p) {
+    PoseVelBiasState<double>::Ptr state;
+    bool dequeued = monado_out_state_queue.try_pop(state);
     if (dequeued) {
-      Sophus::SE3d T_w_i = data->T_w_i;
-      pose.px = T_w_i.translation().x();
-      pose.py = T_w_i.translation().y();
-      pose.pz = T_w_i.translation().z();
-      pose.rx = T_w_i.unit_quaternion().x();
-      pose.ry = T_w_i.unit_quaternion().y();
-      pose.rz = T_w_i.unit_quaternion().z();
-      pose.rw = T_w_i.unit_quaternion().w();
-      pose.timestamp = data->t_ns;
+      state->input_images->addTime("monado_dequeued");
+      p = get_pose_from_state(state);
     }
     return dequeued;
   }
@@ -329,6 +348,8 @@ struct slam_tracker::implementation {
     } else if (feature_id == FID_AIC) {
       shared_ptr<FPARAMS_AIC> casted_params = static_pointer_cast<FPARAMS_AIC>(params);
       add_imu_calibration(*casted_params);
+    } else if (feature_id == FID_EPET) {
+      result = enable_pose_ext_timing();
     } else {
       return false;
     }
@@ -421,6 +442,25 @@ struct slam_tracker::implementation {
 
     calib.gyro_noise_std = {gyro.noise_std(0), gyro.noise_std(1), gyro.noise_std(2)};
     calib.gyro_bias_std = {gyro.bias_std(0), gyro.bias_std(1), gyro.bias_std(2)};
+  }
+
+  shared_ptr<vector<string>> enable_pose_ext_timing() {
+    pose_timing_enabled = true;
+    vector<string> titles{"frame_ts",
+                          "tracker_received",
+                          "tracker_pushed",
+                          "opticalflow_received",
+                          "opticalflow_produced",
+                          "vio_received",
+                          "preintegrated",
+                          "lmbdbupdated",
+                          "optimized",
+                          "marginalized",
+                          "vio_produced",
+                          "tracker_consumer_received",
+                          "tracker_consumer_pushed",
+                          "monado_dequeued"};
+    return make_shared<vector<string>>(titles);
   }
 };
 

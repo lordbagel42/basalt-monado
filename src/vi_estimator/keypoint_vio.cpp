@@ -126,6 +126,7 @@ void KeypointVioEstimator::initialize(const Eigen::Vector3d& bg,
 
     while (true) {
       vision_data_queue.pop(curr_frame);
+      curr_frame->input_images->addTime("vio_received");
 
       if (config.vio_enforce_realtime) {
         // drop current frame if another frame is already in the queue.
@@ -204,7 +205,7 @@ void KeypointVioEstimator::initialize(const Eigen::Vector3d& bg,
           data->t_ns = tmp;
         }
       }
-
+      curr_frame->input_images->addTime("preintegrated");
       measure(curr_frame, meas);
       prev_frame = curr_frame;
     }
@@ -386,15 +387,19 @@ bool KeypointVioEstimator::measure(
   } else {
     frames_after_kf++;
   }
-
+  opt_flow_meas->input_images->addTime("lmbdbupdated");
   optimize();
+  opt_flow_meas->input_images->addTime("optimized");
   marginalize(num_points_connected);
+  opt_flow_meas->input_images->addTime("marginalized");
 
   if (out_state_queue) {
     PoseVelBiasStateWithLin p = frame_states.at(last_state_t_ns);
 
     PoseVelBiasState<double>::Ptr data(new PoseVelBiasState(p.getState()));
 
+    data->input_images = opt_flow_meas->input_images;
+    data->input_images->addTime("vio_produced");
     out_state_queue->push(data);
   }
 
