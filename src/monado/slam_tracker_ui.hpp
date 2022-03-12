@@ -124,7 +124,8 @@ class slam_tracker_ui {
     constexpr int UI_WIDTH = 200;
 
     calib = c;
-    pangolin::CreateWindowAndBind("Basalt SLAM Tracker for Monado", 1800, 1000);
+    string window_name = "Basalt SLAM Tracker for Monado";
+    pangolin::CreateWindowAndBind(window_name, 1800, 1000);
 
     glEnable(GL_DEPTH_TEST);
 
@@ -212,6 +213,7 @@ class slam_tracker_ui {
       pangolin::FinishFrame();
     }
 
+    pangolin::DestroyWindow(window_name);
     cout << "Finished ui_runner\n";
   }
 
