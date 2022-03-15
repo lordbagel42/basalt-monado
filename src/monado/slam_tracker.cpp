@@ -206,8 +206,11 @@ struct slam_tracker::implementation {
 
   void queues_printer() {
     while (running) {
-      cout << "opt_flow_ptr->input_queue " << opt_flow_ptr->input_queue.size() << " opt_flow_ptr->output_queue "
-           << opt_flow_ptr->output_queue->size() << " out_state_queue " << out_state_queue.size() << "\n";
+      cout << "[in] frames: " << image_data_queue->size() << "/" << image_data_queue->capacity() << " \t"
+           << "[in] imu: " << imu_data_queue->size() << "/" << imu_data_queue->capacity() << " \t"
+           << "[mid] keypoints: " << opt_flow_ptr->output_queue->size() << "/" << opt_flow_ptr->output_queue->capacity()
+           << " \t"
+           << "[out] pose: " << out_state_queue.size() << "/" << out_state_queue.capacity() << "\n";
       std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
     cout << "Finished queues_printer\n";
