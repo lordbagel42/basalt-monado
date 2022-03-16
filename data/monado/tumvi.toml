@@ -14,6 +14,3 @@ marg-data=""
 
 # Poll and print for queue sizes.
 print-queue=0
-
-# Whether to use a double or single precision pipeline.
-use-double=0
