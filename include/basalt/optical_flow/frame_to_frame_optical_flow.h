@@ -94,12 +94,12 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
     while (true) {
       input_queue.pop(input_ptr);
-      input_ptr->addTime("opticalflow_received");
 
       if (!input_ptr.get()) {
         if (output_queue) output_queue->push(nullptr);
         break;
       }
+      input_ptr->addTime("opticalflow_received");
 
       processFrame(input_ptr->t_ns, input_ptr);
     }

@@ -126,7 +126,6 @@ void KeypointVioEstimator::initialize(const Eigen::Vector3d& bg,
 
     while (true) {
       vision_data_queue.pop(curr_frame);
-      curr_frame->input_images->addTime("vio_received");
 
       if (config.vio_enforce_realtime) {
         // drop current frame if another frame is already in the queue.
@@ -136,6 +135,7 @@ void KeypointVioEstimator::initialize(const Eigen::Vector3d& bg,
       if (!curr_frame.get()) {
         break;
       }
+      curr_frame->input_images->addTime("vio_received");
 
       // Correct camera time offset
       // curr_frame->t_ns += calib.cam_time_offset_ns;
