@@ -111,6 +111,7 @@ class SqrtKeypointVioEstimator : public VioEstimatorBase,
 
   void addIMUToQueue(const ImuData<double>::Ptr& data) override;
   void addVisionToQueue(const OpticalFlowResult::Ptr& data) override;
+  int64_t fixLastKeyframe();
 
   typename ImuData<Scalar>::Ptr popFromImuDataQueue();
 
@@ -219,6 +220,7 @@ class SqrtKeypointVioEstimator : public VioEstimatorBase,
   bool take_kf;
   int frames_after_kf;
   std::set<int64_t> kf_ids;
+  std::set<int64_t> fixed_kf_ids;
 
   int64_t last_state_t_ns;
   Eigen::aligned_map<int64_t, IntegratedImuMeasurement<Scalar>> imu_meas;

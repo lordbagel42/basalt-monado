@@ -113,6 +113,8 @@ struct slam_tracker {
   void stop();
   void finalize();
 
+  void take_keyframe();
+
   /*!
    * @brief Push an IMU sample into the tracker.
    *

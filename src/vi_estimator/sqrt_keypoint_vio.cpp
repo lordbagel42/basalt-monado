@@ -288,6 +288,13 @@ void SqrtKeypointVioEstimator<Scalar_>::addVisionToQueue(
 }
 
 template <class Scalar_>
+int64_t SqrtKeypointVioEstimator<Scalar_>::fixLastKeyframe() {
+  // TODO@mateosss: a lock is needed for fixed_kf_ids
+  fixed_kf_ids.emplace(last_state_t_ns);
+  return last_state_t_ns;
+}
+
+template <class Scalar_>
 typename ImuData<Scalar_>::Ptr
 SqrtKeypointVioEstimator<Scalar_>::popFromImuDataQueue() {
   ImuData<double>::Ptr data;

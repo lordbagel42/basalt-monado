@@ -19,6 +19,7 @@
 
 #include <basalt/io/marg_data_io.h>
 #include <basalt/serialization/headers_serialization.h>
+#include "basalt/vi_estimator/sqrt_keypoint_vio.h"
 #include <basalt/vi_estimator/vio_estimator.h>
 #include "basalt/utils/vis_utils.h"
 
@@ -277,6 +278,13 @@ struct slam_tracker::implementation {
     image_data_queue->push(nullptr);
   }
 
+  void take_keyframe() {
+    printf(">>> Fixing keyframe...\n");
+    auto sqrt_vio = std::static_pointer_cast<SqrtKeypointVioEstimator<float>>(vio);
+    int64_t fixed_kf = sqrt_vio->fixLastKeyframe();
+    printf(">>> Keyframe %ld fixed\n", fixed_kf);
+  }
+
   bool is_running() { return running; }
 
   void push_imu_sample(const imu_sample &s) {
@@ -483,6 +491,8 @@ void slam_tracker::stop() { impl->stop(); }
 void slam_tracker::finalize() { impl->finalize(); }
 
 bool slam_tracker::is_running() { return impl->is_running(); }
+
+void slam_tracker::take_keyframe() { impl->take_keyframe(); }
 
 void slam_tracker::push_imu_sample(const imu_sample &s) { impl->push_imu_sample(s); }
 
