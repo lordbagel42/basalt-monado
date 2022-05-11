@@ -112,7 +112,7 @@ calib_template = Template('''{
         "accel_bias_std": [0.0, 0.0, 0.0],
         "gyro_bias_std": [0.0, 0.0, 0.0],
         "cam_time_offset_ns": 0,
-        "view_offset": 0
+        "view_offset": [0.0, 0.0]
     }
 }
 ''')
@@ -124,7 +124,7 @@ with open(kitti_calib_file, 'r') as stream:
     if len(lines) != 52:
         print('Issues loading calibration')
         print(lines)
-    
+
     P0 = np.array([float(x) for x in lines[1:13]]).reshape(3,4)
     P1 = np.array([float(x) for x in lines[14:26]]).reshape(3,4)
     print('P0\n', P0)
