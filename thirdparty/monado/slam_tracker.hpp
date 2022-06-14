@@ -259,6 +259,14 @@ DEFINE_FEATURE(ADD_IMU_CALIBRATION, AIC, 2, imu_calibration, void)
  */
 DEFINE_FEATURE(ENABLE_POSE_EXT_TIMING, EPET, 3, void, std::vector<std::string>)
 
+/*!
+ * Feature ENABLE_POSE_EXT_FEATURES
+ *
+ * Use it after constructor but before `start()`.
+ * TODO@mateosss: document
+ */
+DEFINE_FEATURE(ENABLE_POSE_EXT_FEATURES, EPEF, 4, void, void)
+
 /*
  * Pose extensions
  *
@@ -272,6 +280,7 @@ DEFINE_FEATURE(ENABLE_POSE_EXT_TIMING, EPET, 3, void, std::vector<std::string>)
 enum class pose_ext_type : int {
   UNDEFINED = 0,
   TIMING = 1,
+  FEATURES = 2,
 };
 
 struct pose_extension {
@@ -296,6 +305,12 @@ struct pose_ext_timing : pose_extension {
   std::vector<std::int64_t> timestamps{};
 
   pose_ext_timing() : pose_extension{pose_ext_type::TIMING} {}
+};
+
+struct pose_ext_features : pose_extension {
+  std::vector<std::pair<float, float>> features{};
+
+  pose_ext_features() : pose_extension{pose_ext_type::FEATURES} {}
 };
 
 } // namespace xrt::auxiliary::tracking::slam

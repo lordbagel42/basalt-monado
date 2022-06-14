@@ -15,6 +15,7 @@
 #include <string>
 #include <thread>
 #include <unordered_set>
+#include <utility>
 #include "sophus/se3.hpp"
 
 #include <basalt/io/marg_data_io.h>
@@ -29,6 +30,7 @@ const int IMPLEMENTATION_VERSION_MINOR = HEADER_VERSION_MINOR;
 const int IMPLEMENTATION_VERSION_PATCH = HEADER_VERSION_PATCH;
 
 using std::cout;
+using std::make_pair;
 using std::make_shared;
 using std::make_unique;
 using std::pair;
@@ -110,14 +112,15 @@ struct slam_tracker::implementation {
   MargDataSaver::Ptr marg_data_saver;
 
   // slam_tracker features
-  unordered_set<int> supported_features{F_ADD_CAMERA_CALIBRATION, F_ADD_IMU_CALIBRATION, F_ENABLE_POSE_EXT_TIMING};
+  unordered_set<int> supported_features{F_ADD_CAMERA_CALIBRATION, F_ADD_IMU_CALIBRATION, F_ENABLE_POSE_EXT_TIMING,
+                                        F_ENABLE_POSE_EXT_FEATURES};
 
   // Additional calibration data
   vector<cam_calibration> added_cam_calibs{};
   vector<imu_calibration> added_imu_calibs{};
 
-  // Pose timing
   bool pose_timing_enabled = false;
+  bool pose_features_enabled = false;
 
  public:
   implementation(const string &unified_config) {
@@ -186,10 +189,22 @@ struct slam_tracker::implementation {
     p.timestamp = state->t_ns;
     p.next = nullptr;
 
+    auto *next = &p.next;
+
     if (pose_timing_enabled) {
       auto pose_timing = make_shared<pose_ext_timing>();
-      pose_timing->timestamps = state->input_images->tss;
-      p.next = pose_timing;
+      pose_timing->timestamps = state->of->input_images->tss;
+      *next = pose_timing;
+      next = &pose_timing->next;
+    }
+
+    if (pose_features_enabled) {
+      auto pose_features = make_shared<pose_ext_features>();
+      for (const auto &[kid, v] : state->of->observations[0]) {
+        pose_features->features.push_back(make_pair(v.translation().x(), v.translation().y()));
+      }
+      *next = pose_features;
+      next = &pose_features->next;
     }
 
     return p;
@@ -204,11 +219,11 @@ struct slam_tracker::implementation {
         monado_out_state_queue.push(nullptr);
         break;
       }
-      data->input_images->addTime("tracker_consumer_received");
+      data->of->input_images->addTime("tracker_consumer_received");
 
       if (show_gui) ui.log_vio_data(data);
 
-      data->input_images->addTime("tracker_consumer_pushed");
+      data->of->input_images->addTime("tracker_consumer_pushed");
       monado_out_state_queue.push(data);
     }
 
@@ -367,7 +382,7 @@ struct slam_tracker::implementation {
     PoseVelBiasState<double>::Ptr state;
     bool dequeued = monado_out_state_queue.try_pop(state);
     if (dequeued) {
-      state->input_images->addTime("monado_dequeued");
+      state->of->input_images->addTime("monado_dequeued");
       p = get_pose_from_state(state);
     }
     return dequeued;
@@ -385,6 +400,8 @@ struct slam_tracker::implementation {
       add_imu_calibration(*casted_params);
     } else if (feature_id == FID_EPET) {
       result = enable_pose_ext_timing();
+    } else if (feature_id == FID_EPEF) {
+      enable_pose_ext_features();
     } else {
       return false;
     }
@@ -528,6 +545,8 @@ struct slam_tracker::implementation {
                           "monado_dequeued"};
     return make_shared<vector<string>>(titles);
   }
+
+  void enable_pose_ext_features() { pose_features_enabled = true; }
 };
 
 slam_tracker::slam_tracker(const string &config_file) { impl = make_unique<slam_tracker::implementation>(config_file); }

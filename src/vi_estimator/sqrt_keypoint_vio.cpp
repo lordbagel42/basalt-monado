@@ -160,7 +160,7 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_,
 
     typename ImuData<Scalar>::Ptr data = popFromImuDataQueue();
 
-    bool run = data != nullptr; // End VIO otherwise
+    bool run = data != nullptr;  // End VIO otherwise
     if (run) {
       data->accel = calib.calib_accel_bias.getCalibrated(data->accel);
       data->gyro = calib.calib_gyro_bias.getCalibrated(data->gyro);
@@ -492,8 +492,8 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
     typename PoseVelBiasState<double>::Ptr data(
         new PoseVelBiasState<double>(p.getState().template cast<double>()));
 
-    data->input_images = opt_flow_meas->input_images;
-    data->input_images->addTime("pose_produced");
+    data->of = opt_flow_meas;
+    data->of->input_images->addTime("pose_produced");
     out_state_queue->push(data);
   }
 
