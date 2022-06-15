@@ -2,6 +2,7 @@
 
 #include <pangolin/display/image_view.h>
 #include <pangolin/pangolin.h>
+#include "pangolin/gl/gldraw.h"
 
 #include <CLI/CLI.hpp>
 
@@ -124,7 +125,7 @@ class slam_tracker_ui {
     constexpr int UI_WIDTH = 200;
 
     calib = c;
-    string window_name = "Basalt SLAM Tracker for Monado";
+    string window_name = "Basalt 6DoF Tracker for Monado";
     pangolin::CreateWindowAndBind(window_name, 1800, 1000);
 
     glEnable(GL_DEPTH_TEST);
@@ -220,6 +221,7 @@ class slam_tracker_ui {
   pangolin::Var<bool> show_obs{"ui.show_obs", true, false, true};
   pangolin::Var<bool> show_ids{"ui.show_ids", false, false, true};
   pangolin::Var<bool> show_invdist{"ui.show_invdist", false, false, true};
+  pangolin::Var<bool> show_view_offset{"ui.show_view_offset", false, false, true};
 
   void draw_image_overlay(pangolin::View &v, size_t cam_id) {
     UNUSED(v);
@@ -257,6 +259,42 @@ class slam_tracker_ui {
 
             if (show_ids) pangolin::GlFont::I().Text("%d", int(c[3])).Draw(c[0], c[1]);
             if (show_invdist) pangolin::GlFont::I().Text("%.3lf", c[2]).Draw(c[0], c[1] + 5);
+          }
+        }
+
+        if (show_view_offset && cam_id == 1) {
+          using namespace Eigen;
+          const auto keypoints0 = curr_vis_data->projections[0];
+          const auto keypoints1 = curr_vis_data->projections[1];
+          for (const Vector4d kp1 : keypoints1) {
+            double u1 = kp1.x();
+            double v1 = kp1.y();
+            double invdist1 = kp1.z();
+            double id1 = kp1.w();
+
+            double u0 = 0;
+            double v0 = 0;
+            bool found = false;
+            for (const Vector4d kp0 : keypoints0) {
+              double id0 = kp0.w();
+              if (id1 != id0) continue;
+              u0 = kp0.x();
+              v0 = kp0.y();
+              found = true;
+              break;
+            }
+
+            // No viewoffset
+            if (found) {
+              glColor3f(0, 1, 1);  // Cyan
+              pangolin::glDrawLine(u1, v1, u0, v0);
+
+              // Fixed view offset
+              glColor3f(1, 0, 1);  // Magenta
+              pangolin::glDrawLine(u1, v1, u0 - calib.view_offset.x(), v0 - calib.view_offset.y());
+            }
+
+            // TODO@mateosss: Dynamic view offset
           }
         }
 
