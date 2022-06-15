@@ -219,6 +219,7 @@ class slam_tracker_ui {
 
   pangolin::Var<bool> show_obs{"ui.show_obs", true, false, true};
   pangolin::Var<bool> show_ids{"ui.show_ids", false, false, true};
+  pangolin::Var<bool> show_invdist{"ui.show_invdist", false, false, true};
 
   void draw_image_overlay(pangolin::View &v, size_t cam_id) {
     UNUSED(v);
@@ -255,6 +256,7 @@ class slam_tracker_ui {
             pangolin::glDrawCirclePerimeter(c[0], c[1], radius);
 
             if (show_ids) pangolin::GlFont::I().Text("%d", int(c[3])).Draw(c[0], c[1]);
+            if (show_invdist) pangolin::GlFont::I().Text("%.3lf", c[2]).Draw(c[0], c[1] + 5);
           }
         }
 

@@ -1,6 +1,7 @@
 // Copyright 2022, Collabora, Ltd.
 
 #include "slam_tracker.hpp"
+#include "basalt/vi_estimator/sqrt_keypoint_vio.h"
 #include "slam_tracker_ui.hpp"
 
 #include <pangolin/display/image_view.h>
@@ -30,6 +31,7 @@ const int IMPLEMENTATION_VERSION_MINOR = HEADER_VERSION_MINOR;
 const int IMPLEMENTATION_VERSION_PATCH = HEADER_VERSION_PATCH;
 
 using std::cout;
+using std::dynamic_pointer_cast;
 using std::make_pair;
 using std::make_shared;
 using std::make_unique;
@@ -199,9 +201,19 @@ struct slam_tracker::implementation {
     }
 
     if (pose_features_enabled) {
+      using namespace Eigen;
       auto pose_features = make_shared<pose_ext_features>();
-      for (const auto &[kid, v] : state->of->observations[0]) {
-        pose_features->features.push_back(make_pair(v.translation().x(), v.translation().y()));
+      // TODO@mateosss: the cast is config-specific
+      auto sqrtvio = dynamic_pointer_cast<SqrtKeypointVioEstimator<float>>(vio);
+
+      vector<aligned_vector<Vector4d>> projections;
+      projections.resize(state->of->observations.size());
+      sqrtvio->computeProjections(projections, p.timestamp);
+
+      for (const Vector4d &v : projections[1]) {  // TODO@mateosss: [1] hardcoded
+        // inverse distance: v.z()
+        // id: v.w()
+        pose_features->features.push_back(make_pair(v.x(), v.y()));
       }
       *next = pose_features;
       next = &pose_features->next;
