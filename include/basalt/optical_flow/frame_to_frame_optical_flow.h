@@ -38,7 +38,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <thread>
 
 #include <sophus/se2.hpp>
+#include "basalt/calibration/calibration.hpp"
 
+#include <eigen3/Eigen/src/Core/Matrix.h>
 #include <tbb/blocked_range.h>
 #include <tbb/concurrent_unordered_map.h>
 #include <tbb/parallel_for.h>
@@ -186,7 +188,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       const Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>&
           transform_map_1,
       Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>& transform_map_2,
-      Vector2 view_offset = Vector2::Zero()) const {
+      bool use_view_offset = false) const {
     size_t num_points = transform_map_1.size();
 
     std::vector<KeypointId> ids;
@@ -210,6 +212,18 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
         const Eigen::AffineCompact2f& transform_1 = init_vec[r];
         Eigen::AffineCompact2f transform_2 = transform_1;
+
+        Eigen::Vector2f view_offset{0, 0};
+        if (use_view_offset) {
+          view_offset =
+              calib
+                  .viewOffset(transform_1.translation().cast<double>().x(),
+                              transform_1.translation().cast<double>().y())
+                  .template cast<float>();
+          // std::cout << "(" << transform_1.translation().x() << ", "
+          //           << transform_1.translation().y() << ") -> ("
+          //           << view_offset[0] << ", " << view_offset[1] << ")\n";
+        }
         transform_2.translation() -= view_offset;
 
         bool valid = transform_2.translation()(0) >= 0 &&
@@ -341,8 +355,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     }
 
     if (calib.intrinsics.size() > 1) {
-      trackPoints(pyramid->at(0), pyramid->at(1), new_poses0, new_poses1,
-                  calib.view_offset);
+      trackPoints(pyramid->at(0), pyramid->at(1), new_poses0, new_poses1, true);
 
       for (const auto& kv : new_poses1) {
         transforms->observations.at(1).emplace(kv);

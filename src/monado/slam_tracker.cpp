@@ -272,7 +272,9 @@ struct slam_tracker::implementation {
     bool view_offset_unknown = calib.view_offset(0) == 0 && calib.view_offset(1) == 0;
     if (calib_from_monado || view_offset_unknown) {
       compute_view_offset();
-      cout << "Computed view_offset = " << calib.view_offset.transpose() << "\n";
+      cout << "viewOffset(w/2,h/2)="
+           << calib.viewOffset(calib.resolution[0][0] / 2, calib.resolution[0][1] / 2).transpose() << "\n";
+      // cout << "Computed view_offset = " << calib.view_offset.transpose() << "\n";
     }
 
     // Overwrite IMU calibration data
@@ -429,11 +431,17 @@ struct slam_tracker::implementation {
     Sophus::SE3d T_c1_i = T_i_c1.inverse();
     Sophus::SE3d T_c1_c0 = T_c1_i * T_i_c0;  // Maps a point in c0 space to c1 space
     Eigen::Vector4d p3d{0, 0, DISTANCE_TO_WALL, 1};
+    Eigen::Vector2d c0_p2d{width / 2, height / 2};
+    calib.intrinsics[0].unproject(c0_p2d, p3d);
     Eigen::Vector4d p3d_in_c1 = T_c1_c0 * p3d;
     Eigen::Vector2d p2d;
     calib.intrinsics[1].project(p3d_in_c1, p2d);
-    calib.view_offset.x() = (width / 2) - p2d.x();
-    calib.view_offset.y() = (height / 2) - p2d.y();
+
+    Eigen::Vector2d viof{width / 2 - p2d.x(), height / 2 - p2d.y()};
+    cout << "compute_view_offset = " << viof.transpose() << "\n";
+
+    // calib.view_offset.x() = (width / 2) - p2d.x();
+    // calib.view_offset.y() = (height / 2) - p2d.y();
   }
 
   void add_cam_calibration(const cam_calibration &cam_calib) { added_cam_calibs.push_back(cam_calib); }
