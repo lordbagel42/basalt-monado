@@ -222,6 +222,7 @@ class slam_tracker_ui {
   pangolin::Var<bool> show_ids{"ui.show_ids", false, false, true};
   pangolin::Var<bool> show_invdist{"ui.show_invdist", false, false, true};
   pangolin::Var<bool> show_view_offset{"ui.show_view_offset", true, false, true};
+  pangolin::Var<double> depth_for_view_offset{"ui.depth", 2, 0, 20};
 
   void draw_image_overlay(pangolin::View &v, size_t cam_id) {
     UNUSED(v);
@@ -284,17 +285,20 @@ class slam_tracker_ui {
               break;
             }
 
-            // No viewoffset
             if (found) {
-              glColor3f(0, 1, 1);  // Cyan
-              pangolin::glDrawLine(u1, v1, u0, v0);
-
               // Fixed view offset
               glColor3f(1, 0, 1);  // Magenta
               pangolin::glDrawLine(u1, v1, u0 - calib.view_offset.x(), v0 - calib.view_offset.y());
-            }
 
-            // TODO@mateosss: Dynamic view offset
+              // No viewoffset
+              glColor3f(0, 1, 1);  // Cyan
+              pangolin::glDrawLine(u1, v1, u0, v0);
+
+              // Dynamic view offset
+              glColor3f(1, 1, 0);  // Yellow
+              auto viof = calib.viewOffset(u0, v0, depth_for_view_offset);
+              pangolin::glDrawLine(u1, v1, u0 - viof.x(), v0 - viof.y());
+            }
           }
         }
 
