@@ -202,18 +202,23 @@ struct slam_tracker::implementation {
 
     if (pose_features_enabled) {
       using namespace Eigen;
-      auto pose_features = make_shared<pose_ext_features>();
+
       // TODO@mateosss: the cast is config-specific
       auto sqrtvio = dynamic_pointer_cast<SqrtKeypointVioEstimator<float>>(vio);
+      size_t cam_count = state->of->observations.size();
 
       vector<aligned_vector<Vector4d>> projections;
-      projections.resize(state->of->observations.size());
+      projections.resize(cam_count);
       sqrtvio->computeProjections(projections, p.timestamp);
 
-      for (const Vector4d &v : projections[1]) {  // TODO@mateosss: [1] hardcoded
-        // inverse distance: v.z()
-        // id: v.w()
-        pose_features->features.push_back(make_pair(v.x(), v.y()));
+      auto pose_features = make_shared<pose_ext_features>();
+      pose_features->features_per_cam.resize(cam_count);
+      using Feature = xrt::auxiliary::tracking::slam::pose_ext_features::feature;
+      for (size_t i = 0; i < cam_count; i++) {
+        for (const Vector4d &v : projections[i]) {
+          Feature feature{int(v.w()), float(v.x()), float(v.y()), float(v.z())};
+          pose_features->features_per_cam[i].push_back(feature);
+        }
       }
       *next = pose_features;
       next = &pose_features->next;
@@ -387,6 +392,7 @@ struct slam_tracker::implementation {
 
     if (!s.is_left) {
       partial_frame->addTime("tracker_pushed");
+      partial_frame->depth_avg = ui.depth_avg;
       image_data_queue->push(partial_frame);
       if (show_gui) ui.update_last_image(partial_frame);
     }

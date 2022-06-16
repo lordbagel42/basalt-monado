@@ -57,7 +57,7 @@ struct OpticalFlowInput {
 
   int64_t t_ns;
   std::vector<ImageData> img_data;
-
+  double depth_avg = 2;
   // Keep track of internal timestamps for this input
   bool timing_enabled = false;
   std::vector<int64_t> tss{};

@@ -218,7 +218,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
           view_offset =
               calib
                   .viewOffset(transform_1.translation().cast<double>().x(),
-                              transform_1.translation().cast<double>().y())
+                              transform_1.translation().cast<double>().y(),
+                              transforms->input_images->depth_avg)
                   .template cast<float>();
           // std::cout << "(" << transform_1.translation().x() << ", "
           //           << transform_1.translation().y() << ") -> ("

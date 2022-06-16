@@ -308,7 +308,13 @@ struct pose_ext_timing : pose_extension {
 };
 
 struct pose_ext_features : pose_extension {
-  std::vector<std::pair<float, float>> features{};
+  struct feature {
+    int id;
+    float u, v;
+    float depth;
+  };
+
+  std::vector<std::vector<feature>> features_per_cam{};
 
   pose_ext_features() : pose_extension{pose_ext_type::FEATURES} {}
 };

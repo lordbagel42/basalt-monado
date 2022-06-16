@@ -223,6 +223,7 @@ class slam_tracker_ui {
   pangolin::Var<bool> show_invdist{"ui.show_invdist", false, false, true};
   pangolin::Var<bool> show_view_offset{"ui.show_view_offset", true, false, true};
   pangolin::Var<double> depth_for_view_offset{"ui.depth", 2, 0, 20};
+  pangolin::Var<double> depth_avg{"ui.depth_avg", 2};
 
   void draw_image_overlay(pangolin::View &v, size_t cam_id) {
     UNUSED(v);
@@ -267,10 +268,18 @@ class slam_tracker_ui {
           using namespace Eigen;
           const auto keypoints0 = curr_vis_data->projections[0];
           const auto keypoints1 = curr_vis_data->projections[1];
+
+          double invdist1_avg = 0;
+          for (const Vector4d kp1 : keypoints1) {
+            invdist1_avg += kp1.z();
+          }
+          invdist1_avg /= keypoints1.size();
+          depth_avg = invdist1_avg > 0 ? 1 / invdist1_avg : 2;
+
           for (const Vector4d kp1 : keypoints1) {
             double u1 = kp1.x();
             double v1 = kp1.y();
-            double invdist1 = kp1.z();
+            // double invdist1 = kp1.z();
             double id1 = kp1.w();
 
             double u0 = 0;
@@ -298,6 +307,11 @@ class slam_tracker_ui {
               glColor3f(1, 1, 0);  // Yellow
               auto viof = calib.viewOffset(u0, v0, depth_for_view_offset);
               pangolin::glDrawLine(u1, v1, u0 - viof.x(), v0 - viof.y());
+
+              // Average inv_dist1 viewoffset
+              glColor3f(0, 1, 0);  // Green
+              auto viof_avg = calib.viewOffset(u0, v0, depth_avg);
+              pangolin::glDrawLine(u1, v1, u0 - viof_avg.x(), v0 - viof_avg.y());
             }
           }
         }
