@@ -1,7 +1,7 @@
 # Options for the Basalt SLAM Tracker
 
 # Show GUI
-show-gui=0
+show-gui=1
 
 # Ground-truth camera calibration used for simulation.
 cam-calib="/home/mateo/Documents/apps/bsltdeps/basalt/data/euroc_ds_calib.json"

@@ -440,8 +440,8 @@ struct slam_tracker::implementation {
     Eigen::Vector2d viof{width / 2 - p2d.x(), height / 2 - p2d.y()};
     cout << "compute_view_offset = " << viof.transpose() << "\n";
 
-    // calib.view_offset.x() = (width / 2) - p2d.x();
-    // calib.view_offset.y() = (height / 2) - p2d.y();
+    calib.view_offset.x() = (width / 2) - p2d.x();
+    calib.view_offset.y() = (height / 2) - p2d.y();
   }
 
   void add_cam_calibration(const cam_calibration &cam_calib) { added_cam_calibs.push_back(cam_calib); }

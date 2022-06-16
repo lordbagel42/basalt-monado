@@ -221,7 +221,7 @@ class slam_tracker_ui {
   pangolin::Var<bool> show_obs{"ui.show_obs", true, false, true};
   pangolin::Var<bool> show_ids{"ui.show_ids", false, false, true};
   pangolin::Var<bool> show_invdist{"ui.show_invdist", false, false, true};
-  pangolin::Var<bool> show_view_offset{"ui.show_view_offset", false, false, true};
+  pangolin::Var<bool> show_view_offset{"ui.show_view_offset", true, false, true};
 
   void draw_image_overlay(pangolin::View &v, size_t cam_id) {
     UNUSED(v);
