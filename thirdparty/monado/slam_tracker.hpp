@@ -317,10 +317,10 @@ struct timestats {
     }
 
     if (custom_ts != INT64_MIN) {
-      tss.push_back(custom_ts);
+      timing.push_back(custom_ts);
     } else {
       auto ts = std::chrono::steady_clock::now().time_since_epoch().count();
-      tss.push_back(ts);
+      timing.push_back(ts);
     }
   }
 

@@ -195,7 +195,7 @@ struct slam_tracker::implementation {
 
     if (pose_timing_enabled) {
       auto pose_timing = make_shared<pose_ext_timing>();
-      pose_timing->timestamps = state->of->input_images->tss;
+      pose_timing->timestamps = state->of->input_images->stats->timing;
       *next = pose_timing;
       next = &pose_timing->next;
     }
