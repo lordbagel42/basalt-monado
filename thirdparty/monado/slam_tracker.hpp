@@ -22,6 +22,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <chrono>
 
 namespace xrt::auxiliary::tracking::slam {
 
@@ -276,6 +277,60 @@ DEFINE_FEATURE(ENABLE_POSE_EXT_FEATURES, EPEF, 4, void, void)
  * can be enabled with the corresponding `use_feature()` call.
  *
  */
+
+// Keep track of internal timestamps for an input set
+// (old timekeeper), statskeeper, posestats, packetstats
+struct timestats {
+  using ptr = std::shared_ptr<timestats>;
+
+  std::int64_t ts;
+
+  // Timing extension
+  bool timing_enabled = false;
+  std::vector<std::string> *timing_titles{};
+  std::vector<std::int64_t> timing{};
+
+  // Features extension
+  struct feature {
+    std::int64_t host_cam_ts;
+    std::int64_t host_cam_id;
+    std::int64_t id;
+    float u;
+    float v;
+    float depth;
+    float initial_estimate_error;
+  };
+  struct cam_features {
+    std::vector<feature> features;
+  };
+
+  bool features_enabled = false;
+  std::vector<cam_features> features_per_cam;
+
+  timestats() = default;
+  timestats(std::int64_t ts, bool t = false, bool f = false)
+      : timing_enabled(t), features_enabled(f) {}
+
+  void addTime(const char * /* name */, int64_t custom_ts = INT64_MIN) {
+    if (!timing_enabled) {
+      return;
+    }
+
+    if (custom_ts != INT64_MIN) {
+      tss.push_back(custom_ts);
+    } else {
+      auto ts = std::chrono::steady_clock::now().time_since_epoch().count();
+      tss.push_back(ts);
+    }
+  }
+
+  void addFeature(size_t cam, const feature &f) {
+    if (!features_enabled) {
+      return;
+    }
+    features_per_cam.at(cam)->push_back(f);
+  }
+};
 
 enum class pose_ext_type : int {
   UNDEFINED = 0,

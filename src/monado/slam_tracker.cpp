@@ -364,8 +364,9 @@ struct slam_tracker::implementation {
 
     int i = -1;
     if (s.is_left) {
+      timestats::ptr stats = make_shared<timestats>(s.timestamp, pose_timing_enabled, pose_features_enabled);
       partial_frame = make_shared<OpticalFlowInput>();
-      partial_frame->timing_enabled = pose_timing_enabled;
+      partial_frame->stats = stats;
       partial_frame->addTime("frame_ts", s.timestamp);
       partial_frame->addTime("tracker_received");
       partial_frame->img_data.resize(NUM_CAMS);
