@@ -60,6 +60,8 @@ struct OpticalFlowInput {
   int64_t t_ns;
   std::vector<ImageData> img_data;
 
+  double depth_avg = 2; // TODO@mateosss: remove?
+
   timestats::ptr stats;  //!< Keeps track of internal metrics for this t_ns
   void addTime(const char* name, int64_t custom_ts = INT64_MIN) {
     stats->addTime(name, custom_ts);

@@ -194,32 +194,18 @@ struct slam_tracker::implementation {
     auto *next = &p.next;
 
     if (pose_timing_enabled) {
+      auto petd = dynamic_pointer_cast<pose_ext_timing_data>(state->of->input_images->stats);
       auto pose_timing = make_shared<pose_ext_timing>();
-      pose_timing->timestamps = state->of->input_images->stats->timing;
+      pose_timing->timing_titles = petd->timing_titles;  // TODO@mateosss: make titles a static var
+      pose_timing->timing = petd->timing;
       *next = pose_timing;
       next = &pose_timing->next;
     }
 
     if (pose_features_enabled) {
-      using namespace Eigen;
-
-      // TODO@mateosss: the cast is config-specific
-      auto sqrtvio = dynamic_pointer_cast<SqrtKeypointVioEstimator<float>>(vio);
-      size_t cam_count = state->of->observations.size();
-
-      vector<aligned_vector<Vector4d>> projections;
-      projections.resize(cam_count);
-      sqrtvio->computeProjections(projections, p.timestamp);
-
+      auto pefd = dynamic_pointer_cast<pose_ext_features_data>(state->of->input_images->stats);
       auto pose_features = make_shared<pose_ext_features>();
-      pose_features->features_per_cam.resize(cam_count);
-      using Feature = xrt::auxiliary::tracking::slam::pose_ext_features::feature;
-      for (size_t i = 0; i < cam_count; i++) {
-        for (const Vector4d &v : projections[i]) {
-          Feature feature{int(v.w()), float(v.x()), float(v.y()), float(v.z())};
-          pose_features->features_per_cam[i].push_back(feature);
-        }
-      }
+      pose_features->features_per_cam = pefd->features_per_cam;
       *next = pose_features;
       next = &pose_features->next;
     }
@@ -273,7 +259,7 @@ struct slam_tracker::implementation {
       apply_cam_calibration(c);
     }
 
-    bool calib_from_monado = added_cam_calibs.size() == 2;
+    bool calib_from_monado = added_cam_calibs.size() == NUM_CAMS;
     bool view_offset_unknown = calib.view_offset(0) == 0 && calib.view_offset(1) == 0;
     if (calib_from_monado || view_offset_unknown) {
       compute_view_offset();
@@ -365,6 +351,7 @@ struct slam_tracker::implementation {
     int i = -1;
     if (s.is_left) {
       timestats::ptr stats = make_shared<timestats>(s.timestamp, pose_timing_enabled, pose_features_enabled);
+      stats->features_per_cam.resize(NUM_CAMS);  // TODO@mateosss: Is there any other way to get camera count?
       partial_frame = make_shared<OpticalFlowInput>();
       partial_frame->stats = stats;
       partial_frame->addTime("frame_ts", s.timestamp);

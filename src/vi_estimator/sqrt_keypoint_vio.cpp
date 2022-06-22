@@ -53,6 +53,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <tbb/parallel_reduce.h>
 
 #include <chrono>
+#include <slam_tracker.hpp>
 
 namespace basalt {
 
@@ -486,6 +487,12 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
   optimize_and_marg(opt_flow_meas->input_images, num_points_connected,
                     lost_landmaks);
 
+  std::vector<Eigen::aligned_vector<Eigen::Vector4d>> projections{};
+  if (opt_flow_meas->input_images->stats->features_enabled || out_state_queue) {
+    projections.resize(opt_flow_meas->observations.size());
+    computeProjections(projections, last_state_t_ns);
+  }
+
   if (out_state_queue) {
     PoseVelBiasStateWithLin p = frame_states.at(last_state_t_ns);
 
@@ -494,6 +501,27 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
 
     data->of = opt_flow_meas;
     data->of->input_images->addTime("pose_produced");
+
+    // TODO@mateosss: make a curr_stats class field similar to curr_frame and
+    // operate on that
+    if (data->of->input_images->stats->features_enabled) {
+      using Feature =
+          xrt::auxiliary::tracking::slam::pose_ext_features_data::feature;
+      size_t cam_count = 2;  // TODO@mateosss
+      for (size_t i = 0; i < cam_count; i++) {
+        for (const Eigen::Vector4d& v : projections[i]) {
+          Feature feature{};
+          // feature.host_cam_ts = int64_t; // TODO@mateosss: enable
+          // feature.host_cam_id = int64_t; // TODO@mateosss: enable
+          feature.id = v.w();
+          feature.u = v.x();
+          feature.v = v.y();
+          feature.depth = v.z();
+          // feature.initial_estimate_error = float; // TODO@mateosss: enable
+          data->of->input_images->stats->addFeature(i, feature);
+        }
+      }
+    }
     out_state_queue->push(data);
   }
 
@@ -513,8 +541,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
 
     get_current_points(data->points, data->point_ids);
 
-    data->projections.resize(opt_flow_meas->observations.size());
-    computeProjections(data->projections, last_state_t_ns);
+    data->projections = projections;
 
     data->opt_flow_res = prev_opt_flow_res[last_state_t_ns];
 
