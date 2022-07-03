@@ -273,6 +273,8 @@ struct slam_tracker::implementation {
       apply_imu_calibration(c);
     }
 
+    print_calibration();
+
     ASSERT(calib_data_ready.imu, "Missing IMU calibration");
     ASSERT(calib_data_ready.cam0, "Missing left camera (cam0) calibration");
     ASSERT(calib_data_ready.cam1, "Missing right camera (cam1) calibration");
@@ -380,6 +382,7 @@ struct slam_tracker::implementation {
 
     if (!s.is_left) {
       partial_frame->addTime("tracker_pushed");
+      // partial_frame->depth_avg = ui.depth_for_view_offset;
       partial_frame->depth_avg = ui.depth_avg;
       image_data_queue->push(partial_frame);
       if (show_gui) ui.update_last_image(partial_frame);
