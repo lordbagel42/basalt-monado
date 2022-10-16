@@ -4,6 +4,7 @@
 #include <apriltags/TagDetector.h>
 
 #include <apriltags/Tag36h11.h>
+#include "basalt/image/image.h"
 
 namespace basalt {
 
@@ -42,8 +43,9 @@ ApriltagDetector::ApriltagDetector(int numTags) {
 
 ApriltagDetector::~ApriltagDetector() { delete data; }
 
+template <typename PixelType>
 void ApriltagDetector::detectTags(
-    basalt::ManagedImage<uint16_t>& img_raw,
+    basalt::ManagedImage<PixelType>& img_raw,
     Eigen::aligned_vector<Eigen::Vector2d>& corners, std::vector<int>& ids,
     std::vector<double>& radii,
     Eigen::aligned_vector<Eigen::Vector2d>& corners_rejected,
@@ -58,10 +60,21 @@ void ApriltagDetector::detectTags(
   cv::Mat image(img_raw.h, img_raw.w, CV_8U);
 
   uint8_t* dst = image.ptr();
-  const uint16_t* src = img_raw.ptr;
+  const PixelType* src = img_raw.ptr;
 
-  for (size_t i = 0; i < img_raw.size(); i++) {
-    dst[i] = (src[i] >> 8);
+  constexpr bool IS_8BIT = std::is_same_v<PixelType, uint8_t>;
+  constexpr bool IS_16BIT = std::is_same_v<PixelType, uint16_t>;
+  static_assert(IS_8BIT || IS_16BIT, "Unsupported underlying pixel type");
+
+  if constexpr (IS_8BIT) {
+    for (size_t i = 0; i < img_raw.size(); i++) {
+      // TODO@mateosss: Do not copy, transfer ownership
+      dst[i] = src[i];
+    }
+  } else if constexpr (IS_16BIT) {
+    for (size_t i = 0; i < img_raw.size(); i++) {
+      dst[i] = (src[i] >> 8);
+    }
   }
 
   // detect the tags

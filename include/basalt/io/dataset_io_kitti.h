@@ -92,20 +92,21 @@ class KittiVioDataset : public VioDataset {
 
     for (size_t i = 0; i < num_cams; i++) {
       std::string full_image_path = path + folder[i] + image_path[t_ns];
+      ImageData &mimg = res[i];
 
       if (fs::exists(full_image_path)) {
         cv::Mat img = cv::imread(full_image_path, cv::IMREAD_UNCHANGED);
 
         if (img.type() == CV_8UC1) {
-          res[i].img.reset(new ManagedImage<uint16_t>(img.cols, img.rows));
+          mimg.createImage<uint8_t>(img.cols, img.rows);
 
           const uint8_t *data_in = img.ptr();
-          uint16_t *data_out = res[i].img->ptr;
+          uint8_t *data_out = mimg.getPtr<uint8_t>();
 
+          // TODO@mateosss: avoid copy and just move ownership of cv::Mat memory
           size_t full_size = img.cols * img.rows;
           for (size_t i = 0; i < full_size; i++) {
             int val = data_in[i];
-            val = val << 8;
             data_out[i] = val;
           }
         } else {

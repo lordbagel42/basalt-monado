@@ -96,37 +96,39 @@ class UzhVioDataset : public VioDataset {
       std::string full_image_path =
           path + "/" +
           (i == 0 ? left_image_path.at(t_ns) : right_image_path.at(t_ns));
+      ImageData &mimg = res[i];
 
       if (fs::exists(full_image_path)) {
         cv::Mat img = cv::imread(full_image_path, cv::IMREAD_UNCHANGED);
 
         if (img.type() == CV_8UC1) {
-          res[i].img.reset(new ManagedImage<uint16_t>(img.cols, img.rows));
+          mimg.createImage<uint8_t>(img.cols, img.rows);
 
           const uint8_t *data_in = img.ptr();
-          uint16_t *data_out = res[i].img->ptr;
+          uint8_t *data_out = mimg.getPtr<uint8_t>();
 
+          // TODO@mateosss: avoid copy and just move ownership of cv::Mat memory
           size_t full_size = img.cols * img.rows;
           for (size_t i = 0; i < full_size; i++) {
             int val = data_in[i];
-            val = val << 8;
             data_out[i] = val;
           }
         } else if (img.type() == CV_8UC3) {
-          res[i].img.reset(new ManagedImage<uint16_t>(img.cols, img.rows));
+          mimg.createImage<uint8_t>(img.cols, img.rows);
 
           const uint8_t *data_in = img.ptr();
-          uint16_t *data_out = res[i].img->ptr;
+          uint8_t *data_out = mimg.getPtr<uint8_t>();
 
+          // TODO@mateosss: avoid copy and just move ownership of cv::Mat memory
           size_t full_size = img.cols * img.rows;
           for (size_t i = 0; i < full_size; i++) {
             int val = data_in[i * 3];
-            val = val << 8;
             data_out[i] = val;
           }
         } else if (img.type() == CV_16UC1) {
-          res[i].img.reset(new ManagedImage<uint16_t>(img.cols, img.rows));
-          std::memcpy(res[i].img->ptr, img.ptr(),
+          mimg.createImage<uint16_t>(img.cols, img.rows);
+          // TODO@mateosss: avoid copy and just move ownership of cv::Mat memory
+          std::memcpy(mimg.getPtr<uint16_t>(), img.ptr(),
                       img.cols * img.rows * sizeof(uint16_t));
 
         } else {

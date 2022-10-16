@@ -216,7 +216,7 @@ void serialize(Archive& ar, basalt::OpticalFlowInput& m) {
 template <class Archive>
 void serialize(Archive& ar, basalt::ImageData& m) {
   ar(m.exposure);
-  ar(m.img);
+  // ar(m.img); // TODO@mateosss: what to do here?
 }
 
 template <class Archive>

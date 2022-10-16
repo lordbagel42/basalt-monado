@@ -124,12 +124,24 @@ void CalibHelper::detectCorners(const VioDatasetPtr &vio_data,
               vio_data->get_image_data(timestamp_ns);
 
           for (size_t i = 0; i < img_vec.size(); i++) {
-            if (img_vec[i].img.get()) {
+            auto &img = img_vec[i];
+            if (img.isPopulated()) {
               CalibCornerData ccd_good;
               CalibCornerData ccd_bad;
-              ad.detectTags(*img_vec[i].img, ccd_good.corners,
-                            ccd_good.corner_ids, ccd_good.radii,
-                            ccd_bad.corners, ccd_bad.corner_ids, ccd_bad.radii);
+
+              if (img.getPixelSize() == 1) {
+                ad.detectTags(*img.getSharedPtr<uint8_t>(), ccd_good.corners,
+                              ccd_good.corner_ids, ccd_good.radii,
+                              ccd_bad.corners, ccd_bad.corner_ids,
+                              ccd_bad.radii);
+              } else if (img.getPixelSize() == 2) {
+                ad.detectTags(*img.getSharedPtr<uint16_t>(), ccd_good.corners,
+                              ccd_good.corner_ids, ccd_good.radii,
+                              ccd_bad.corners, ccd_bad.corner_ids,
+                              ccd_bad.radii);
+              } else {
+                BASALT_ASSERT(false);
+              }
 
               //                std::cout << "image (" << timestamp_ns << ","
               //                << i

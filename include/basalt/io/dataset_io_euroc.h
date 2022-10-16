@@ -38,6 +38,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/io/dataset_io.h>
 #include <basalt/utils/filesystem.h>
 
+#include <memory>
 #include <opencv2/highgui/highgui.hpp>
 
 namespace basalt {
@@ -96,37 +97,39 @@ class EurocVioDataset : public VioDataset {
     for (size_t i = 0; i < num_cams; i++) {
       std::string full_image_path =
           path + folder[i] + "data/" + image_path[t_ns];
+      ImageData &mimg = res[i];
 
       if (fs::exists(full_image_path)) {
         cv::Mat img = cv::imread(full_image_path, cv::IMREAD_UNCHANGED);
 
         if (img.type() == CV_8UC1) {
-          res[i].img.reset(new ManagedImage<uint16_t>(img.cols, img.rows));
+          mimg.createImage<uint8_t>(img.cols, img.rows);
 
           const uint8_t *data_in = img.ptr();
-          uint16_t *data_out = res[i].img->ptr;
+          uint8_t *data_out = mimg.getPtr<uint8_t>();
 
+          // TODO@mateosss: avoid copy and just move ownership of cv::Mat memory
           size_t full_size = img.cols * img.rows;
           for (size_t i = 0; i < full_size; i++) {
             int val = data_in[i];
-            val = val << 8;
             data_out[i] = val;
           }
         } else if (img.type() == CV_8UC3) {
-          res[i].img.reset(new ManagedImage<uint16_t>(img.cols, img.rows));
+          mimg.createImage<uint8_t>(img.cols, img.rows);
 
           const uint8_t *data_in = img.ptr();
-          uint16_t *data_out = res[i].img->ptr;
+          uint8_t *data_out = mimg.getPtr<uint8_t>();
 
+          // TODO@mateosss: avoid copy and just move ownership of cv::Mat memory
           size_t full_size = img.cols * img.rows;
           for (size_t i = 0; i < full_size; i++) {
             int val = data_in[i * 3];
-            val = val << 8;
             data_out[i] = val;
           }
         } else if (img.type() == CV_16UC1) {
-          res[i].img.reset(new ManagedImage<uint16_t>(img.cols, img.rows));
-          std::memcpy(res[i].img->ptr, img.ptr(),
+          mimg.createImage<uint16_t>(img.cols, img.rows);
+          // TODO@mateosss: avoid copy and just move ownership of cv::Mat memory
+          std::memcpy(mimg.getPtr<uint16_t>(), img.ptr(),
                       img.cols * img.rows * sizeof(uint16_t));
 
         } else {
@@ -136,7 +139,7 @@ class EurocVioDataset : public VioDataset {
 
         auto exp_it = exposure_times[i].find(t_ns);
         if (exp_it != exposure_times[i].end()) {
-          res[i].exposure = exp_it->second;
+          mimg.exposure = exp_it->second;
         }
       }
     }

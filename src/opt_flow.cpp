@@ -240,23 +240,31 @@ int main(int argc, char** argv) {
       if (show_frame.GuiChanged()) {
         size_t frame_id = static_cast<size_t>(show_frame);
         int64_t timestamp = vio_dataset->get_image_timestamps()[frame_id];
-
-        const std::vector<basalt::ImageData>& img_vec =
-            vio_dataset->get_image_data(timestamp);
+        auto img_vec = vio_dataset->get_image_data(timestamp);
 
         for (size_t cam_id = 0; cam_id < calib.intrinsics.size(); cam_id++) {
-          if (img_vec[cam_id].img.get()) {
-            auto img = img_vec[cam_id].img;
+          auto& img = img_vec[cam_id];
+          auto& view = img_view[cam_id];
 
-            pangolin::GlPixFormat fmt;
-            fmt.glformat = GL_LUMINANCE;
+          if (!img.isPopulated()) {
+            view->Clear();
+            continue;
+          }
+
+          pangolin::GlPixFormat fmt;
+          fmt.glformat = GL_LUMINANCE;
+          if (img.getPixelSize() == 1) {
+            fmt.gltype = GL_UNSIGNED_BYTE;
+            fmt.scalable_internal_format = GL_LUMINANCE8;
+            view->SetImage(img.getPtr<uint8_t>(), img.getWidth(),
+                           img.getHeight(), img.getPitch(), fmt);
+          } else if (img.getPixelSize() == 2) {
             fmt.gltype = GL_UNSIGNED_SHORT;
             fmt.scalable_internal_format = GL_LUMINANCE16;
-
-            img_view[cam_id]->SetImage(img->ptr, img->w, img->h, img->pitch,
-                                       fmt);
+            view->SetImage(img.getPtr<uint16_t>(), img.getWidth(),
+                           img.getHeight(), img.getPitch(), fmt);
           } else {
-            img_view[cam_id]->Clear();
+            BASALT_ASSERT_MSG(false, "Invalid pixel size");
           }
         }
       }

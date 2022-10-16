@@ -272,25 +272,34 @@ int main(int argc, char** argv) {
         int64_t timestamp = image_t_ns[frame_id];
         size_t cam_id = show_cam1;
 
+        auto& view = img_view[0];
         if (nrf_mapper->img_data.count(timestamp) > 0 &&
             nrf_mapper->img_data.at(timestamp).get()) {
           const std::vector<basalt::ImageData>& img_vec =
               nrf_mapper->img_data.at(timestamp)->img_data;
+          auto& img = img_vec[cam_id];
 
-          pangolin::GlPixFormat fmt;
-          fmt.glformat = GL_LUMINANCE;
-          fmt.gltype = GL_UNSIGNED_SHORT;
-          fmt.scalable_internal_format = GL_LUMINANCE16;
-
-          if (img_vec[cam_id].img.get()) {
-            img_view[0]->SetImage(
-                img_vec[cam_id].img->ptr, img_vec[cam_id].img->w,
-                img_vec[cam_id].img->h, img_vec[cam_id].img->pitch, fmt);
+          if (img.isPopulated()) {
+            pangolin::GlPixFormat fmt;
+            fmt.glformat = GL_LUMINANCE;
+            if (img.getPixelSize() == 1) {
+              fmt.gltype = GL_UNSIGNED_BYTE;
+              fmt.scalable_internal_format = GL_LUMINANCE8;
+              view->SetImage(img.getPtr<uint8_t>(), img.getWidth(),
+                             img.getHeight(), img.getPitch(), fmt);
+            } else if (img.getPixelSize() == 2) {
+              fmt.gltype = GL_UNSIGNED_SHORT;
+              fmt.scalable_internal_format = GL_LUMINANCE16;
+              view->SetImage(img.getPtr<uint16_t>(), img.getWidth(),
+                             img.getHeight(), img.getPitch(), fmt);
+            } else {
+              BASALT_ASSERT_MSG(false, "Invalid pixel size");
+            }
           } else {
-            img_view[0]->Clear();
+            view->Clear();
           }
         } else {
-          img_view[0]->Clear();
+          view->Clear();
         }
       }
 
@@ -307,25 +316,34 @@ int main(int argc, char** argv) {
         int64_t timestamp = image_t_ns[frame_id];
         size_t cam_id = show_cam2;
 
+        auto& view = img_view[1];
         if (nrf_mapper->img_data.count(timestamp) > 0 &&
             nrf_mapper->img_data.at(timestamp).get()) {
           const std::vector<basalt::ImageData>& img_vec =
               nrf_mapper->img_data.at(timestamp)->img_data;
+          auto& img = img_vec[cam_id];
 
-          pangolin::GlPixFormat fmt;
-          fmt.glformat = GL_LUMINANCE;
-          fmt.gltype = GL_UNSIGNED_SHORT;
-          fmt.scalable_internal_format = GL_LUMINANCE16;
-
-          if (img_vec[cam_id].img.get()) {
-            img_view[1]->SetImage(
-                img_vec[cam_id].img->ptr, img_vec[cam_id].img->w,
-                img_vec[cam_id].img->h, img_vec[cam_id].img->pitch, fmt);
+          if (img.isPopulated()) {
+            pangolin::GlPixFormat fmt;
+            fmt.glformat = GL_LUMINANCE;
+            if (img.getPixelSize() == 1) {
+              fmt.gltype = GL_UNSIGNED_BYTE;
+              fmt.scalable_internal_format = GL_LUMINANCE8;
+              view->SetImage(img.getPtr<uint8_t>(), img.getWidth(),
+                             img.getHeight(), img.getPitch(), fmt);
+            } else if (img.getPixelSize() == 2) {
+              fmt.gltype = GL_UNSIGNED_SHORT;
+              fmt.scalable_internal_format = GL_LUMINANCE16;
+              view->SetImage(img.getPtr<uint16_t>(), img.getWidth(),
+                             img.getHeight(), img.getPitch(), fmt);
+            } else {
+              BASALT_ASSERT_MSG(false, "Invalid pixel size");
+            }
           } else {
-            img_view[1]->Clear();
+            view->Clear();
           }
         } else {
-          img_view[1]->Clear();
+          view->Clear();
         }
       }
 

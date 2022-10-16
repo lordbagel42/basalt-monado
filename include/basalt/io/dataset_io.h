@@ -40,6 +40,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <iomanip>
 #include <memory>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include <cereal/archives/binary.hpp>
@@ -69,7 +70,83 @@ namespace basalt {
 struct ImageData {
   ImageData() : exposure(0) {}
 
-  ManagedImage<uint16_t>::Ptr img;
+  std::variant<ManagedImage<uint16_t>::Ptr, ManagedImage<uint8_t>::Ptr> img;
+
+  template <typename PixelType>
+  void createImage(int width, int height) {
+    constexpr bool IS_8BIT = std::is_same_v<PixelType, uint8_t>;
+    constexpr bool IS_16BIT = std::is_same_v<PixelType, uint16_t>;
+    static_assert(IS_8BIT || IS_16BIT, "Unsupported underlying pixel type");
+
+    std::visit([&](auto &img) { img = nullptr; }, img);
+
+    if constexpr (IS_8BIT) {
+      img = std::make_shared<ManagedImage<uint8_t>>(width, height);
+    } else if (IS_16BIT) {
+      img = std::make_shared<ManagedImage<uint16_t>>(width, height);
+    }
+  }
+
+  bool isPopulated() const {
+    bool isPopulated = false;
+    std::visit([&](const auto &img) { isPopulated = img != nullptr; }, img);
+    return isPopulated;
+  }
+
+  bool inBounds(float x, float y, float border) const {
+    bool res;
+    std::visit([&](const auto &img) { res = img->InBounds(x, y, border); },
+               img);
+    return res;
+  }
+
+  template <typename S>
+  S interp(const Eigen::Matrix<S, 2, 1> &p) const {
+    bool res;
+    std::visit([&](const auto &img) { res = img->interp(p); }, img);
+    return res;
+  }
+
+  size_t getPixelSize() const {
+    if (std::holds_alternative<ManagedImage<uint16_t>::Ptr>(img)) {
+      return 2;
+    } else if (std::holds_alternative<ManagedImage<uint8_t>::Ptr>(img)) {
+      return 1;
+    } else {
+      BASALT_ASSERT_MSG(false, "Invalid underlying img type");
+    }
+  }
+
+  template <typename PixelType>
+  typename ManagedImage<PixelType>::Ptr getSharedPtr() const {
+    return std::get<typename ManagedImage<PixelType>::Ptr>(img);
+  }
+
+  size_t getPitch() const {
+    size_t pitch = 0;
+    std::visit([&](const auto &img) { pitch = img->pitch; }, img);
+    return pitch;
+  }
+
+  template <typename PixelType>
+  PixelType *getPtr() const {
+    return getSharedPtr<PixelType>()->ptr;
+  }
+
+  size_t getWidth() const {
+    size_t w = 0;
+    std::visit([&](const auto &img) { w = img->w; }, img);
+    return w;
+  }
+
+  size_t getHeight() const {
+    size_t h = 0;
+    std::visit([&](const auto &img) { h = img->h; }, img);
+    return h;
+  }
+
+  size_t getSize() const { return getHeight() * getWidth(); }
+
   double exposure;
 };
 

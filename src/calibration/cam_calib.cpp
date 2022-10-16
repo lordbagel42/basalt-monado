@@ -168,10 +168,11 @@ void CamCalib::computeVign() {
 
     for (size_t j = 0; j < calib_opt->calib->intrinsics.size(); j++) {
       TimeCamId tcid(timestamp_ns, j);
+      auto &img = img_vec[j];
 
       auto it = reprojected_vignette.find(tcid);
 
-      if (it != reprojected_vignette.end() && img_vec[j].img.get()) {
+      if (it != reprojected_vignette.end() && img.isPopulated()) {
         Eigen::aligned_vector<Eigen::Vector3d> rv;
         rv.resize(it->second.corners_proj.size());
 
@@ -180,13 +181,13 @@ void CamCalib::computeVign() {
 
           rv[k].head<2>() = pos;
 
-          if (img_vec[j].img->InBounds(pos[0], pos[1], 1) &&
+          if (img.inBounds(pos[0], pos[1], 1) &&
               it->second.corners_proj_success[k]) {
-            double val = img_vec[j].img->interp(pos);
+            double val = img.interp(pos);
             val /= std::numeric_limits<uint16_t>::max();
 
-            if (img_vec[j].exposure > 0) {
-              val *= 0.001 / img_vec[j].exposure;  // bring to common exposure
+            if (img.exposure > 0) {
+              val *= 0.001 / img.exposure;  // bring to common exposure
             }
 
             rv[k][2] = val;

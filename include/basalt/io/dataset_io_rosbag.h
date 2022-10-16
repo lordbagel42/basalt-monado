@@ -121,32 +121,36 @@ class RosbagVioDataset : public VioDataset {
         //        img_msg->height "
         //                  << img_msg->height << std::endl;
 
-        id.img.reset(
-            new ManagedImage<uint16_t>(img_msg->width, img_msg->height));
+        // id.img.reset(
+        //     new ManagedImage<uint16_t>(img_msg->width, img_msg->height));
+
+        if (img_msg->encoding == "mono8") {
+          id.createImage<uint8_t>(img_msg->width, img_msg->height);
+
+          const uint8_t *data_in = img_msg->data.data();
+          uint8_t *data_out = id.getPtr<uint8_t>();
+
+          // TODO@mateosss: avoid copy and just move ownership of rosbag frame
+          for (size_t i = 0; i < img_msg->data.size(); i++) {
+            int val = data_in[i];
+            data_out[i] = val;
+          }
+
+        } else if (img_msg->encoding == "mono16") {
+          id.createImage<uint16_t>(img_msg->width, img_msg->height);
+          std::memcpy(id.getPtr<uint16_t>(), img_msg->data.data(),
+                      img_msg->data.size());
+        } else {
+          std::cerr << "Encoding " << img_msg->encoding << " is not supported."
+                    << std::endl;
+          std::abort();
+        }
 
         if (!img_msg->header.frame_id.empty() &&
             std::isdigit(img_msg->header.frame_id[0])) {
           id.exposure = std::stol(img_msg->header.frame_id) * 1e-9;
         } else {
           id.exposure = -1;
-        }
-
-        if (img_msg->encoding == "mono8") {
-          const uint8_t *data_in = img_msg->data.data();
-          uint16_t *data_out = id.img->ptr;
-
-          for (size_t i = 0; i < img_msg->data.size(); i++) {
-            int val = data_in[i];
-            val = val << 8;
-            data_out[i] = val;
-          }
-
-        } else if (img_msg->encoding == "mono16") {
-          std::memcpy(id.img->ptr, img_msg->data.data(), img_msg->data.size());
-        } else {
-          std::cerr << "Encoding " << img_msg->encoding << " is not supported."
-                    << std::endl;
-          std::abort();
         }
       }
 
