@@ -49,6 +49,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/optical_flow/optical_flow.h>
 #include <basalt/optical_flow/patch.h>
 
+#include <basalt/image/image.h>
 #include <basalt/image/image_pyr.h>
 #include <basalt/utils/keypoints.h>
 
@@ -125,7 +126,7 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowBase {
       transforms->pyramid_levels.resize(calib.intrinsics.size());
       transforms->t_ns = t_ns;
 
-      pyramid.reset(new std::vector<basalt::ManagedImagePyr<uint16_t>>);
+      pyramid.reset(new std::vector<basalt::TypedImagePyr>);
       pyramid->resize(calib.intrinsics.size());
 
       tbb::parallel_for(tbb::blocked_range<size_t>(0, calib.intrinsics.size()),
@@ -146,7 +147,7 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowBase {
 
       old_pyramid = pyramid;
 
-      pyramid.reset(new std::vector<basalt::ManagedImagePyr<uint16_t>>);
+      pyramid.reset(new std::vector<basalt::TypedImagePyr>);
       pyramid->resize(calib.intrinsics.size());
       tbb::parallel_for(tbb::blocked_range<size_t>(0, calib.intrinsics.size()),
                         [&](const tbb::blocked_range<size_t>& r) {
@@ -194,8 +195,7 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowBase {
   }
 
   void trackPoints(
-      const basalt::ManagedImagePyr<uint16_t>& pyr_1,
-      const basalt::ManagedImagePyr<uint16_t>& pyr_2,
+      const basalt::TypedImagePyr& pyr_1, const basalt::TypedImagePyr& pyr_2,
       const Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>&
           transform_map_1,
       const std::map<KeypointId, size_t>& pyramid_levels_1,
@@ -266,8 +266,8 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowBase {
                             result_pyramid_level.end());
   }
 
-  inline bool trackPoint(const basalt::ManagedImagePyr<uint16_t>& old_pyr,
-                         const basalt::ManagedImagePyr<uint16_t>& pyr,
+  inline bool trackPoint(const basalt::TypedImagePyr& old_pyr,
+                         const basalt::TypedImagePyr& pyr,
                          const Eigen::AffineCompact2f& old_transform,
                          const size_t pyramid_level,
                          Eigen::AffineCompact2f& transform) const {
@@ -307,8 +307,7 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowBase {
     return patch_valid;
   }
 
-  inline bool trackPointAtLevel(const Image<const uint16_t>& img_2,
-                                const PatchT& dp,
+  inline bool trackPointAtLevel(const ImageView& img_2, const PatchT& dp,
                                 Eigen::AffineCompact2f& transform) const {
     bool patch_valid = true;
 
@@ -456,8 +455,7 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowBase {
   basalt::Calibration<Scalar> calib;
 
   OpticalFlowResult::Ptr transforms;
-  std::shared_ptr<std::vector<basalt::ManagedImagePyr<uint16_t>>> old_pyramid,
-      pyramid;
+  std::shared_ptr<std::vector<basalt::TypedImagePyr>> old_pyramid, pyramid;
 
   // map from stereo pair -> essential matrix
   Matrix4 E;

@@ -68,7 +68,7 @@ struct OpticalFlowPatch {
 
   OpticalFlowPatch() = default;
 
-  OpticalFlowPatch(const Image<const uint16_t> &img, const Vector2 &pos) {
+  OpticalFlowPatch(const ImageView &img, const Vector2 &pos) {
     setFromImage(img, pos);
   }
 
@@ -144,12 +144,18 @@ struct OpticalFlowPatch {
     J_se2 *= mean_inv;
   }
 
-  void setFromImage(const Image<const uint16_t> &img, const Vector2 &pos) {
+  void setFromImage(const ImageView &img, const Vector2 &pos) {
     this->pos = pos;
 
     MatrixP3 J_se2;
 
-    setDataJacSe2(img, pos, mean, data, J_se2);
+    if (img.getBytesPerPixel() == 1) {
+      setDataJacSe2(img.getImage<uint8_t>(), pos, mean, data, J_se2);
+    } else if (img.getBytesPerPixel() == 2) {
+      setDataJacSe2(img.getImage<uint16_t>(), pos, mean, data, J_se2);
+    } else {
+      BASALT_ASSERT(false);
+    }
 
     Matrix3 H_se2 = J_se2.transpose() * J_se2;
     Matrix3 H_se2_inv;
@@ -169,7 +175,7 @@ struct OpticalFlowPatch {
             data.array().isFinite().all();
   }
 
-  inline bool residual(const Image<const uint16_t> &img,
+  inline bool residual(const ImageView &img,
                        const Matrix2P &transformed_pattern,
                        VectorP &residual) const {
     Scalar sum = 0;

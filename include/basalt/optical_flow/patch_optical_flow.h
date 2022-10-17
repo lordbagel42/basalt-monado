@@ -45,6 +45,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/optical_flow/optical_flow.h>
 #include <basalt/optical_flow/patch.h>
 
+#include <basalt/image/image.h>
 #include <basalt/image/image_pyr.h>
 #include <basalt/utils/keypoints.h>
 
@@ -125,7 +126,7 @@ class PatchOpticalFlow : public OpticalFlowBase {
       transforms->observations.resize(calib.intrinsics.size());
       transforms->t_ns = t_ns;
 
-      pyramid.reset(new std::vector<basalt::ManagedImagePyr<uint16_t>>);
+      pyramid.reset(new std::vector<basalt::TypedImagePyr>);
       pyramid->resize(calib.intrinsics.size());
       for (size_t i = 0; i < calib.intrinsics.size(); i++) {
         pyramid->at(i).setFromImage(*new_img_vec->img_data[i].img,
@@ -142,7 +143,7 @@ class PatchOpticalFlow : public OpticalFlowBase {
 
       old_pyramid = pyramid;
 
-      pyramid.reset(new std::vector<basalt::ManagedImagePyr<uint16_t>>);
+      pyramid.reset(new std::vector<basalt::TypedImagePyr>);
       pyramid->resize(calib.intrinsics.size());
       for (size_t i = 0; i < calib.intrinsics.size(); i++) {
         pyramid->at(i).setFromImage(*new_img_vec->img_data[i].img,
@@ -173,8 +174,8 @@ class PatchOpticalFlow : public OpticalFlowBase {
     frame_counter++;
   }
 
-  void trackPoints(const basalt::ManagedImagePyr<uint16_t>& pyr_1,
-                   const basalt::ManagedImagePyr<uint16_t>& pyr_2,
+  void trackPoints(const basalt::TypedImagePyr& pyr_1,
+                   const basalt::TypedImagePyr& pyr_2,
                    const Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>&
                        transform_map_1,
                    Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>&
@@ -234,7 +235,7 @@ class PatchOpticalFlow : public OpticalFlowBase {
     transform_map_2.insert(result.begin(), result.end());
   }
 
-  inline bool trackPoint(const basalt::ManagedImagePyr<uint16_t>& pyr,
+  inline bool trackPoint(const basalt::TypedImagePyr& pyr,
                          const Eigen::aligned_vector<PatchT>& patch_vec,
                          Eigen::AffineCompact2f& transform) const {
     bool patch_valid = true;
@@ -259,8 +260,7 @@ class PatchOpticalFlow : public OpticalFlowBase {
     return patch_valid;
   }
 
-  inline bool trackPointAtLevel(const Image<const uint16_t>& img_2,
-                                const PatchT& dp,
+  inline bool trackPointAtLevel(const ImageView& img_2, const PatchT& dp,
                                 Eigen::AffineCompact2f& transform) const {
     bool patch_valid = true;
 
@@ -399,8 +399,7 @@ class PatchOpticalFlow : public OpticalFlowBase {
       patches;
 
   OpticalFlowResult::Ptr transforms;
-  std::shared_ptr<std::vector<basalt::ManagedImagePyr<uint16_t>>> old_pyramid,
-      pyramid;
+  std::shared_ptr<std::vector<basalt::TypedImagePyr>> old_pyramid, pyramid;
 
   Eigen::Matrix4d E;
 
