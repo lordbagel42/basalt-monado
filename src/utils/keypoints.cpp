@@ -43,6 +43,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <opengv/relative_pose/CentralRelativeAdapter.hpp>
 #include <opengv/relative_pose/methods.hpp>
 #include <opengv/sac/Ransac.hpp>
+#include "basalt/image/image.h"
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -159,24 +160,27 @@ void detectKeypointsMapping(const basalt::Image<const uint16_t>& img_raw,
 }
 
 void detectKeypoints(
-    const basalt::Image<const uint16_t>& img_raw, KeypointsData& kd,
-    int PATCH_SIZE, int num_points_cell,
+    const basalt::ImageView& img_raw, KeypointsData& kd, int PATCH_SIZE,
+    int num_points_cell,
     const Eigen::aligned_vector<Eigen::Vector2d>& current_points) {
   kd.corners.clear();
   kd.corner_angles.clear();
   kd.corner_descriptors.clear();
 
-  const size_t x_start = (img_raw.w % PATCH_SIZE) / 2;
-  const size_t x_stop = x_start + PATCH_SIZE * (img_raw.w / PATCH_SIZE - 1);
+  const size_t x_start = (img_raw.getWidth() % PATCH_SIZE) / 2;
+  const size_t x_stop =
+      x_start + PATCH_SIZE * (img_raw.getWidth() / PATCH_SIZE - 1);
 
-  const size_t y_start = (img_raw.h % PATCH_SIZE) / 2;
-  const size_t y_stop = y_start + PATCH_SIZE * (img_raw.h / PATCH_SIZE - 1);
+  const size_t y_start = (img_raw.getHeight() % PATCH_SIZE) / 2;
+  const size_t y_stop =
+      y_start + PATCH_SIZE * (img_raw.getHeight() / PATCH_SIZE - 1);
 
   //  std::cerr << "x_start " << x_start << " x_stop " << x_stop << std::endl;
   //  std::cerr << "y_start " << y_start << " y_stop " << y_stop << std::endl;
 
   Eigen::MatrixXi cells;
-  cells.setZero(img_raw.h / PATCH_SIZE + 1, img_raw.w / PATCH_SIZE + 1);
+  cells.setZero(img_raw.getHeight() / PATCH_SIZE + 1,
+                img_raw.getWidth() / PATCH_SIZE + 1);
 
   for (const Eigen::Vector2d& p : current_points) {
     if (p[0] >= x_start && p[1] >= y_start && p[0] < x_stop + PATCH_SIZE &&
@@ -193,16 +197,28 @@ void detectKeypoints(
       if (cells((y - y_start) / PATCH_SIZE, (x - x_start) / PATCH_SIZE) > 0)
         continue;
 
-      const basalt::Image<const uint16_t> sub_img_raw =
+      const basalt::ImageView sub_img_raw =
           img_raw.SubImage(x, y, PATCH_SIZE, PATCH_SIZE);
 
       cv::Mat subImg(PATCH_SIZE, PATCH_SIZE, CV_8U);
 
-      for (int y = 0; y < PATCH_SIZE; y++) {
-        uchar* sub_ptr = subImg.ptr(y);
-        for (int x = 0; x < PATCH_SIZE; x++) {
-          sub_ptr[x] = (sub_img_raw(x, y) >> 8);
+      if (sub_img_raw.getBytesPerPixel() == 1) {
+        // TODO@mateosss: Unnecessary copy, can wrap memory with cv::Mat instead
+        for (int y = 0; y < PATCH_SIZE; y++) {
+          uchar* sub_ptr = subImg.ptr(y);
+          for (int x = 0; x < PATCH_SIZE; x++) {
+            sub_ptr[x] = sub_img_raw.at<uint8_t>(x, y);
+          }
         }
+      } else if (sub_img_raw.getBytesPerPixel() == 2) {
+        for (int y = 0; y < PATCH_SIZE; y++) {
+          uchar* sub_ptr = subImg.ptr(y);
+          for (int x = 0; x < PATCH_SIZE; x++) {
+            sub_ptr[x] = (sub_img_raw.at<uint16_t>(x, y) >> 8);
+          }
+        }
+      } else {
+        BASALT_ASSERT(false);
       }
 
       int points_added = 0;
