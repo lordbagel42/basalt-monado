@@ -1,4 +1,5 @@
 
+#include <basalt/image/image.h>
 #include <basalt/utils/apriltag.h>
 
 #include <apriltags/TagDetector.h>
@@ -43,9 +44,8 @@ ApriltagDetector::ApriltagDetector(int numTags) {
 ApriltagDetector::~ApriltagDetector() { delete data; }
 
 void ApriltagDetector::detectTags(
-    basalt::ManagedImage<uint16_t>& img_raw,
-    Eigen::aligned_vector<Eigen::Vector2d>& corners, std::vector<int>& ids,
-    std::vector<double>& radii,
+    basalt::TypedImage& timg, Eigen::aligned_vector<Eigen::Vector2d>& corners,
+    std::vector<int>& ids, std::vector<double>& radii,
     Eigen::aligned_vector<Eigen::Vector2d>& corners_rejected,
     std::vector<int>& ids_rejected, std::vector<double>& radii_rejected) {
   corners.clear();
@@ -55,13 +55,18 @@ void ApriltagDetector::detectTags(
   ids_rejected.clear();
   radii_rejected.clear();
 
-  cv::Mat image(img_raw.h, img_raw.w, CV_8U);
+  cv::Mat image(timg.getHeight(), timg.getWidth(), CV_8U);
 
-  uint8_t* dst = image.ptr();
-  const uint16_t* src = img_raw.ptr;
-
-  for (size_t i = 0; i < img_raw.size(); i++) {
-    dst[i] = (src[i] >> 8);
+  if (timg.getBytesPerPixel() == 1) {
+    std::memcpy(image.ptr(), timg.getPtr(), timg.getSizeBytes());
+  } else if (timg.getBytesPerPixel() == 2) {
+    uint8_t* dst = image.ptr();
+    const uint16_t* src = (uint16_t*)timg.getPtr();
+    for (size_t i = 0; i < timg.getSize(); i++) {
+      dst[i] = (src[i] >> 8);
+    }
+  } else {
+    BASALT_ASSERT(false);
   }
 
   // detect the tags

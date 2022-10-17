@@ -69,7 +69,7 @@ namespace basalt {
 struct ImageData {
   ImageData() : exposure(0) {}
 
-  ManagedImage<uint16_t>::Ptr img;
+  TypedImage::Ptr img;
   double exposure;
 };
 
@@ -153,13 +153,13 @@ class DatasetIoFactory {
 namespace cereal {
 
 template <class Archive>
-void serialize(Archive &archive, basalt::ManagedImage<uint8_t> &m) {
+void serialize(Archive &archive, basalt::TypedImage &m) {
   archive(m.w);
   archive(m.h);
 
   m.Reinitialise(m.w, m.h);
 
-  archive(binary_data(m.ptr, m.size()));
+  archive(binary_data(m.ptr, m.ByteSize()));
 }
 
 template <class Archive>

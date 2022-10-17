@@ -99,40 +99,23 @@ class UzhVioDataset : public VioDataset {
 
       if (fs::exists(full_image_path)) {
         cv::Mat img = cv::imread(full_image_path, cv::IMREAD_UNCHANGED);
+        TypedImage &timg = *res[i].img;
 
+        size_t bytes_per_pixel = 0;
         if (img.type() == CV_8UC1) {
-          res[i].img.reset(new ManagedImage<uint16_t>(img.cols, img.rows));
-
-          const uint8_t *data_in = img.ptr();
-          uint16_t *data_out = res[i].img->ptr;
-
-          size_t full_size = img.cols * img.rows;
-          for (size_t i = 0; i < full_size; i++) {
-            int val = data_in[i];
-            val = val << 8;
-            data_out[i] = val;
-          }
+          bytes_per_pixel = 1;
         } else if (img.type() == CV_8UC3) {
-          res[i].img.reset(new ManagedImage<uint16_t>(img.cols, img.rows));
-
-          const uint8_t *data_in = img.ptr();
-          uint16_t *data_out = res[i].img->ptr;
-
-          size_t full_size = img.cols * img.rows;
-          for (size_t i = 0; i < full_size; i++) {
-            int val = data_in[i * 3];
-            val = val << 8;
-            data_out[i] = val;
-          }
+          bytes_per_pixel = 1;
         } else if (img.type() == CV_16UC1) {
-          res[i].img.reset(new ManagedImage<uint16_t>(img.cols, img.rows));
-          std::memcpy(res[i].img->ptr, img.ptr(),
-                      img.cols * img.rows * sizeof(uint16_t));
-
+          bytes_per_pixel = 2;
         } else {
-          std::cerr << "img.fmt.bpp " << img.type() << std::endl;
+          std::cerr << "img.type()=" << img.type() << std::endl;
           std::abort();
         }
+
+        timg.Reinitialise(img.cols, img.rows, bytes_per_pixel);
+        // TODO@mateosss: do not copy, transfer ownership instead
+        std::memcpy(timg.getPtr(), img.ptr(), timg.getSizeBytes());
 
         auto exp_it = exposure_times[i].find(t_ns);
         if (exp_it != exposure_times[i].end()) {

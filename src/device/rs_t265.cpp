@@ -34,6 +34,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #include <basalt/device/rs_t265.h>
+#include <basalt/image/image.h>
 
 std::string get_date();
 
@@ -179,6 +180,7 @@ void RsT265Device::start() {
       //      std::cout << "Reading frame " << frame_counter << std::endl;
 
       for (int i = 0; i < NUM_CAMS; i++) {
+        auto& img = data->img_data[i];
         const auto& vf = vfs[i];
 
         int64_t t_ns = vf.get_timestamp() * 1e6;
@@ -188,25 +190,25 @@ void RsT265Device::start() {
 
         data->t_ns = t_ns;
 
-        data->img_data[i].exposure =
+        img.exposure =
             vf.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE) * 1e-6;
 
-        data->img_data[i].img.reset(new basalt::ManagedImage<uint16_t>(
-            vf.get_width(), vf.get_height()));
+        img.img.reset(
+            new basalt::TypedImage(vf.get_width(), vf.get_height(), 1));
 
         const uint8_t* data_in = (const uint8_t*)vf.get_data();
-        uint16_t* data_out = data->img_data[i].img->ptr;
+        uint8_t* data_out = img.img->ptr;
 
         size_t full_size = vf.get_width() * vf.get_height();
         for (size_t j = 0; j < full_size; j++) {
           int val = data_in[j];
-          val = val << 8;
           data_out[j] = val;
         }
+        std::memcpy(img.img->ptr, vf.get_data(), img.ByteSize())
 
         //        std::cout << "Timestamp / exposure " << i << ": " <<
         //        data->t_ns << " / "
-        //                  << int(data->img_data[i].exposure * 1e3) << "ms" <<
+        //                  << int(img.exposure * 1e3) << "ms" <<
         //                  std::endl;
       }
 

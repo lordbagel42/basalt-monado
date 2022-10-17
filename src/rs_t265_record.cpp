@@ -55,6 +55,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <tbb/concurrent_queue.h>
 
 #include <basalt/device/rs_t265.h>
+#include <basalt/image/image.h>
 #include <basalt/serialization/headers_serialization.h>
 #include <basalt/utils/filesystem.h>
 #include <CLI/CLI.hpp>
@@ -124,19 +125,16 @@ void image_save_worker() {
   while (!stop_workers) {
     if (image_data_queue2.try_pop(img)) {
       for (size_t cam_id = 0; cam_id < NUM_CAMS; ++cam_id) {
-        basalt::ManagedImage<uint16_t>::Ptr image_raw =
-            img->img_data[cam_id].img;
+        auto timg_ptr = img->img_data[cam_id].img;
 
-        if (!image_raw.get()) continue;
+        if (!timg_ptr) continue;
 
-        cv::Mat image(image_raw->h, image_raw->w, CV_8U);
+        basalt::TypedImage &timg = *timg_ptr;
 
-        uint8_t *dst = image.ptr();
-        const uint16_t *src = image_raw->ptr;
+        cv::Mat image(timg.getHeight(), timg.getWidth(), CV_8U);
 
-        for (size_t i = 0; i < image_raw->size(); i++) {
-          dst[i] = (src[i] >> 8);
-        }
+        // TODO@mateosss: do not copy, transfer ownership instead
+        std::memcpy(image.ptr(), timg.getPtr(), timg.getSizeBytes());
 
 #if CV_MAJOR_VERSION >= 3
         std::string filename = dataset_dir + "mav0/cam" +

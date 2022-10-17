@@ -52,6 +52,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/Imu.h>
 
+#include <basalt/image/image.h>
 #include <basalt/utils/filesystem.h>
 
 namespace basalt {
@@ -109,6 +110,7 @@ class RosbagVioDataset : public VioDataset {
     if (it != image_data_idx.end())
       for (size_t i = 0; i < num_cams; i++) {
         ImageData &id = res[i];
+        TypedImage &timg = *id.img;
 
         if (!it->second[i].has_value()) continue;
 
@@ -121,32 +123,27 @@ class RosbagVioDataset : public VioDataset {
         //        img_msg->height "
         //                  << img_msg->height << std::endl;
 
-        id.img.reset(
-            new ManagedImage<uint16_t>(img_msg->width, img_msg->height));
+        size_t bytes_per_pixel = 0;
+        if (img_msg->encoding == "mono8") {
+          bytes_per_pixel = 1;
+        } else if (img_msg->encoding == "mono16") {
+          bytes_per_pixel = 2;
+        } else {
+          std::cerr << "Encoding " << img_msg->encoding << " is not supported."
+                    << std::endl;
+          std::abort();
+        }
+
+        timg.Reinitialise(img_msg->width, img_msg->height, bytes_per_pixel);
+        BASALT_ASSERT(img_msg->data.size() == timg.getSizeBytes());
+        // TODO@mateosss: do not copy, transfer ownership instead
+        std::memcpy(timg.getPtr(), img_msg->data.data(), img_msg->data.size());
 
         if (!img_msg->header.frame_id.empty() &&
             std::isdigit(img_msg->header.frame_id[0])) {
           id.exposure = std::stol(img_msg->header.frame_id) * 1e-9;
         } else {
           id.exposure = -1;
-        }
-
-        if (img_msg->encoding == "mono8") {
-          const uint8_t *data_in = img_msg->data.data();
-          uint16_t *data_out = id.img->ptr;
-
-          for (size_t i = 0; i < img_msg->data.size(); i++) {
-            int val = data_in[i];
-            val = val << 8;
-            data_out[i] = val;
-          }
-
-        } else if (img_msg->encoding == "mono16") {
-          std::memcpy(id.img->ptr, img_msg->data.data(), img_msg->data.size());
-        } else {
-          std::cerr << "Encoding " << img_msg->encoding << " is not supported."
-                    << std::endl;
-          std::abort();
         }
       }
 
