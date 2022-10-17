@@ -78,3 +78,13 @@ CheckOptions:
     value:  ''
   - key:    readability-identifier-naming.ConstexprVariableCase
     value:  UPPER_CASE
+
+# Minimum identifier name lengths
+  - key:    readability-identifier-length.MinimumVariableNameLength
+  - value: 1
+  - key:    readability-identifier-length.MinimumParameterNameLength
+  - value: 1
+  - key:    readability-identifier-length.MinimumLoopCounterNameLength
+  - value: 1
+  - key:    readability-identifier-length.MinimumExceptionNameLength
+  - value: 1
