@@ -134,15 +134,22 @@ const static char pattern_31_y_b[256] = {
     -9,  -1,  -2,  -8,  5,   10,  5,   5,   11,  -6,  -12, 9,   4,   -2, -2,
     -11};
 
-void detectKeypointsMapping(const basalt::Image<const uint16_t>& img_raw,
-                            KeypointsData& kd, int num_features) {
-  cv::Mat image(img_raw.h, img_raw.w, CV_8U);
+void detectKeypointsMapping(const basalt::ImageView& img_raw, KeypointsData& kd,
+                            int num_features) {
+  cv::Mat image(img_raw.getHeight(), img_raw.getWidth(), CV_8U);
 
-  uint8_t* dst = image.ptr();
-  const uint16_t* src = img_raw.ptr;
+  if (img_raw.getBytesPerPixel() == 1) {
+    // TODO@mateosss: Transfer ownership instead of copying
+    std::memcpy(image.ptr(), img_raw.getPtr(), img_raw.getSizeBytes());
+  } else if (img_raw.getBytesPerPixel() == 2) {
+    uint8_t* dst = image.ptr();
+    const uint16_t* src = (uint16_t*)img_raw.getPtr();
 
-  for (size_t i = 0; i < img_raw.size(); i++) {
-    dst[i] = (src[i] >> 8);
+    for (size_t i = 0; i < img_raw.getSize(); i++) {
+      dst[i] = (src[i] >> 8);
+    }
+  } else {
+    BASALT_ASSERT(false);
   }
 
   std::vector<cv::Point2f> points;
@@ -265,8 +272,8 @@ void detectKeypoints(
   //  }
 }
 
-void computeAngles(const basalt::Image<const uint16_t>& img_raw,
-                   KeypointsData& kd, bool rotate_features) {
+void computeAngles(const basalt::ImageView& img_raw, KeypointsData& kd,
+                   bool rotate_features) {
   kd.corner_angles.resize(kd.corners.size());
 
   for (size_t i = 0; i < kd.corners.size(); i++) {
@@ -282,7 +289,7 @@ void computeAngles(const basalt::Image<const uint16_t>& img_raw,
       for (int x = -HALF_PATCH_SIZE; x <= HALF_PATCH_SIZE; x++) {
         for (int y = -HALF_PATCH_SIZE; y <= HALF_PATCH_SIZE; y++) {
           if (x * x + y * y <= HALF_PATCH_SIZE * HALF_PATCH_SIZE) {
-            double val = img_raw(cx + x, cy + y);
+            double val = img_raw.at_as<double>(cx + x, cy + y);
             m01 += y * val;
             m10 += x * val;
           }
@@ -296,8 +303,7 @@ void computeAngles(const basalt::Image<const uint16_t>& img_raw,
   }
 }
 
-void computeDescriptors(const basalt::Image<const uint16_t>& img_raw,
-                        KeypointsData& kd) {
+void computeDescriptors(const basalt::ImageView& img_raw, KeypointsData& kd) {
   kd.corner_descriptors.resize(kd.corners.size());
 
   for (size_t i = 0; i < kd.corners.size(); i++) {
@@ -319,8 +325,8 @@ void computeDescriptors(const basalt::Image<const uint16_t>& img_raw,
       Eigen::Vector2i vva = (mat_rot * va).array().round().cast<int>();
       Eigen::Vector2i vvb = (mat_rot * vb).array().round().cast<int>();
 
-      descriptor[i] =
-          img_raw(cx + vva[0], cy + vva[1]) < img_raw(cx + vvb[0], cy + vvb[1]);
+      descriptor[i] = img_raw.at_as<int>(cx + vva[0], cy + vva[1]) <
+                      img_raw.at_as<int>(cx + vvb[0], cy + vvb[1]);
     }
 
     kd.corner_descriptors[i] = descriptor;

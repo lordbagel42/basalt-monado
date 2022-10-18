@@ -59,11 +59,10 @@ void detectKeypoints(
     const Eigen::aligned_vector<Eigen::Vector2d>& current_points =
         Eigen::aligned_vector<Eigen::Vector2d>());
 
-void computeAngles(const basalt::Image<const uint16_t>& img_raw,
-                   KeypointsData& kd, bool rotate_features);
+void computeAngles(const basalt::ImageView& img_raw, KeypointsData& kd,
+                   bool rotate_features);
 
-void computeDescriptors(const basalt::Image<const uint16_t>& img_raw,
-                        KeypointsData& kd);
+void computeDescriptors(const basalt::ImageView& img_raw, KeypointsData& kd);
 
 void matchDescriptors(const std::vector<std::bitset<256>>& corner_descriptors_1,
                       const std::vector<std::bitset<256>>& corner_descriptors_2,
