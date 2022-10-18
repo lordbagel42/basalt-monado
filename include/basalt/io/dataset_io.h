@@ -153,13 +153,23 @@ class DatasetIoFactory {
 namespace cereal {
 
 template <class Archive>
-void serialize(Archive &archive, basalt::TypedImage &m) {
+void serialize(Archive &archive, basalt::ManagedImage<uint8_t> &m) {
   archive(m.w);
   archive(m.h);
 
   m.Reinitialise(m.w, m.h);
 
-  archive(binary_data(m.ptr, m.ByteSize()));
+  archive(binary_data(m.ptr, m.size()));
+}
+
+template <class Archive>
+void serialize(Archive &archive, basalt::TypedImage &m) {
+  archive(m.getWidth());
+  archive(m.getHeight());
+
+  m.Reinitialise(m.getWidth(), m.getHeight());
+
+  archive(binary_data(m.getPtr(), m.getSizeBytes()));
 }
 
 template <class Archive>

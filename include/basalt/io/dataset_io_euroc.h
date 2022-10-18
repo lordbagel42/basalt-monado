@@ -100,6 +100,7 @@ class EurocVioDataset : public VioDataset {
 
       if (fs::exists(full_image_path)) {
         cv::Mat img = cv::imread(full_image_path, cv::IMREAD_UNCHANGED);
+        TypedImage &timg = *res[i].img;
 
         size_t bytes_per_pixel = 0;
         if (img.type() == CV_8UC1) {
@@ -113,9 +114,9 @@ class EurocVioDataset : public VioDataset {
           std::abort();
         }
 
-        res[i].img.reset(new TypedImage(img.cols, img.rows, bytes_per_pixel));
+        timg.Reinitialise(img.cols, img.rows, bytes_per_pixel);
         // TODO@mateosss: do not copy, transfer ownership instead
-        std::memcpy(res[i].img->ptr, img.ptr(), res[i].img.ByteSize());
+        std::memcpy(timg.getPtr(), img.ptr(), timg.getSizeBytes());
 
         auto exp_it = exposure_times[i].find(t_ns);
         if (exp_it != exposure_times[i].end()) {
