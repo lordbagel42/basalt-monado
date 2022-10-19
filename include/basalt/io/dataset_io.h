@@ -64,12 +64,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/camera/generic_camera.hpp>
 #include <basalt/camera/stereographic_param.hpp>
 
+#include <opencv2/core.hpp>
+
 namespace basalt {
 
 struct ImageData {
   ImageData() : exposure(0) {}
 
-  ManagedImage<uint16_t>::Ptr img;
+  ManagedImage::Ptr img;
   double exposure;
 };
 
@@ -147,6 +149,37 @@ class DatasetIoFactory {
   static DatasetIoInterfacePtr getDatasetIo(const std::string &dataset_type,
                                             bool load_mocap_as_gt = false);
 };
+
+std::shared_ptr<ManagedImage> import_cvmat(cv::Mat img) {
+  // TODO@mateosss: Transfer ownership instead of copying when possible
+  std::shared_ptr<ManagedImage> res = nullptr;
+  if (img.type() == CV_8UC1) {
+    res = std::make_shared<ManagedImage>(img.cols, img.rows, Image::BIT8);
+    for (int y = 0; y < img.rows; y++) {
+      for (int x = 0; x < img.cols; x++) {
+        res->at<uint8_t>(x, y) = img.at<uint8_t>(x, y);
+      }
+    }
+  } else if (img.type() == CV_8UC3) {
+    res = std::make_shared<ManagedImage>(img.cols, img.rows, Image::BIT8);
+    for (int y = 0; y < img.rows; y++) {
+      for (int x = 0; x < img.cols; x++) {
+        res->at<uint8_t>(x, y) = img.at<cv::Vec3b>(x, y)[0];
+      }
+    }
+  } else if (img.type() == CV_16UC1) {
+    res = std::make_shared<ManagedImage>(img.cols, img.rows, Image::BIT16);
+    for (int y = 0; y < img.rows; y++) {
+      for (int x = 0; x < img.cols; x++) {
+        res->at<uint16_t>(x, y) = img.at<uint16_t>(x, y);
+      }
+    }
+  } else {
+    std::cerr << "img.type()=" << img.type() << std::endl;
+    BASALT_ASSERT(false);
+  }
+  return res;
+}
 
 }  // namespace basalt
 

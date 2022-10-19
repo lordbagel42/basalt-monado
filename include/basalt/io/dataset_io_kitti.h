@@ -95,23 +95,7 @@ class KittiVioDataset : public VioDataset {
 
       if (fs::exists(full_image_path)) {
         cv::Mat img = cv::imread(full_image_path, cv::IMREAD_UNCHANGED);
-
-        if (img.type() == CV_8UC1) {
-          res[i].img.reset(new ManagedImage<uint16_t>(img.cols, img.rows));
-
-          const uint8_t *data_in = img.ptr();
-          uint16_t *data_out = res[i].img->ptr;
-
-          size_t full_size = img.cols * img.rows;
-          for (size_t i = 0; i < full_size; i++) {
-            int val = data_in[i];
-            val = val << 8;
-            data_out[i] = val;
-          }
-        } else {
-          std::cerr << "img.fmt.bpp " << img.type() << std::endl;
-          std::abort();
-        }
+        res[i].img = import_cvmat(img);
       }
     }
 
