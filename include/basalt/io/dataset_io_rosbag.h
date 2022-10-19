@@ -121,9 +121,6 @@ class RosbagVioDataset : public VioDataset {
         //        img_msg->height "
         //                  << img_msg->height << std::endl;
 
-        id.img.reset(
-            new ManagedImage<uint16_t>(img_msg->width, img_msg->height));
-
         if (!img_msg->header.frame_id.empty() &&
             std::isdigit(img_msg->header.frame_id[0])) {
           id.exposure = std::stol(img_msg->header.frame_id) * 1e-9;
@@ -131,18 +128,23 @@ class RosbagVioDataset : public VioDataset {
           id.exposure = -1;
         }
 
+        // TODO@mateosss: Transfer ownership instead of copying when possible
+        uint32_t w = img_msg->width;
+        uint32_t h = img_msg->height;
         if (img_msg->encoding == "mono8") {
-          const uint8_t *data_in = img_msg->data.data();
-          uint16_t *data_out = id.img->ptr;
-
-          for (size_t i = 0; i < img_msg->data.size(); i++) {
-            int val = data_in[i];
-            val = val << 8;
-            data_out[i] = val;
+          res[i].img = std::make_shared<ManagedImage>(w, h, Image::BIT8);
+          for (uint32_t y = 0; y < h; y++) {
+            for (uint32_t x = 0; x < w; x++) {
+              res[i].img->at<uint8_t>(x, y) = img_msg->data[y * w + x];
+            }
           }
-
         } else if (img_msg->encoding == "mono16") {
-          std::memcpy(id.img->ptr, img_msg->data.data(), img_msg->data.size());
+          res[i].img = std::make_shared<ManagedImage>(w, h, Image::BIT16);
+          for (uint32_t y = 0; y < h; y++) {
+            for (uint32_t x = 0; x < w; x++) {
+              res[i].img->at<uint16_t>(x, y) = img_msg->data[y * w + x * 2];
+            }
+          }
         } else {
           std::cerr << "Encoding " << img_msg->encoding << " is not supported."
                     << std::endl;
