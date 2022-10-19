@@ -187,27 +187,14 @@ void RsT265Device::start() {
         BASALT_ASSERT(i == 0 || t_ns == data->t_ns);
 
         data->t_ns = t_ns;
-
-        data->img_data[i].exposure =
+        auto& imdat = data->img_data[i];
+        imdat.exposure =
             vf.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE) * 1e-6;
 
-        data->img_data[i].img.reset(new basalt::ManagedImage<uint16_t>(
-            vf.get_width(), vf.get_height()));
+        imdat.img = std::make_shared<basalt::ManagedImage>(
+            vf.get_width(), vf.get_height(), basalt::Image::BIT8);
 
-        const uint8_t* data_in = (const uint8_t*)vf.get_data();
-        uint16_t* data_out = data->img_data[i].img->ptr;
-
-        size_t full_size = vf.get_width() * vf.get_height();
-        for (size_t j = 0; j < full_size; j++) {
-          int val = data_in[j];
-          val = val << 8;
-          data_out[j] = val;
-        }
-
-        //        std::cout << "Timestamp / exposure " << i << ": " <<
-        //        data->t_ns << " / "
-        //                  << int(data->img_data[i].exposure * 1e3) << "ms" <<
-        //                  std::endl;
+        std::memcpy(imdat.img->ptr, vf.get_data(), imdat.img->SizeBytes());
       }
 
       last_img_data = data;

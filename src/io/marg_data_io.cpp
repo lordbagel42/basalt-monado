@@ -183,21 +183,27 @@ void MargDataLoader::start(const std::string& path) {
 
 namespace cereal {
 
-template <class Archive, class T>
-void save(Archive& ar, const basalt::ManagedImage<T>& m) {
+template <class Archive>
+void save(Archive& ar, const basalt::ManagedImage& m) {
+  ar(m.pitch);
   ar(m.w);
   ar(m.h);
-  ar(cereal::binary_data(m.ptr, sizeof(T) * m.w * m.h));
+  ar(m.bpp);
+  ar(cereal::binary_data(m.ptr, m.SizeBytes()));
 }
 
-template <class Archive, class T>
-void load(Archive& ar, basalt::ManagedImage<T>& m) {
+template <class Archive>
+void load(Archive& ar, basalt::ManagedImage& m) {
+  size_t pitch;
   size_t w;
   size_t h;
+  basalt::Image::BPP bpp;
+  ar(pitch);
   ar(w);
   ar(h);
-  m.Reinitialise(w, h);
-  ar(cereal::binary_data(m.ptr, sizeof(T) * m.w * m.h));
+  ar(bpp);
+  m.Reinitialise(w, h, pitch, bpp);
+  ar(cereal::binary_data(m.ptr, m.SizeBytes()));
 }
 
 template <class Archive>
