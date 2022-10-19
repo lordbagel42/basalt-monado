@@ -461,8 +461,8 @@ void CamCalib::initCamIntrinsics() {
         Eigen::Vector4d init_intr;
 
         bool success = CalibHelper::initializeIntrinsics(
-            cid.corners, cid.corner_ids, april_grid, img_vec[j].img->w,
-            img_vec[j].img->h, init_intr);
+            cid.corners, cid.corner_ids, april_grid, img_vec[j].img->getWidth(),
+            img_vec[j].img->getHeight(), init_intr);
 
         if (success) {
           cam_initialized[j] = true;
@@ -495,8 +495,8 @@ void CamCalib::initCamIntrinsics() {
           }
         }
 
-        w = img_vec[j].img->w;
-        h = img_vec[j].img->h;
+        w = img_vec[j].img->getWidth();
+        h = img_vec[j].img->getHeight();
       }
 
       BASALT_ASSERT(w > 0 && h > 0);
@@ -550,7 +550,7 @@ void CamCalib::initCamIntrinsics() {
     Eigen::aligned_vector<Eigen::Vector2i> res;
 
     for (size_t i = 0; i < vio_dataset->get_num_cams(); i++) {
-      res.emplace_back(img_data[i].img->w, img_data[i].img->h);
+      res.emplace_back(img_data[i].img->getWidth(), img_data[i].img->getHeight());
     }
 
     calib_opt->setResolution(res);

@@ -197,14 +197,14 @@ void RsT265Device::start() {
             new basalt::TypedImage(vf.get_width(), vf.get_height(), 1));
 
         const uint8_t* data_in = (const uint8_t*)vf.get_data();
-        uint8_t* data_out = img.img->ptr;
+        uint8_t* data_out = (uint8_t*)img.img->getPtr();
 
         size_t full_size = vf.get_width() * vf.get_height();
         for (size_t j = 0; j < full_size; j++) {
           int val = data_in[j];
           data_out[j] = val;
         }
-        std::memcpy(img.img->ptr, vf.get_data(), img.ByteSize())
+        std::memcpy(img.img->getPtr(), vf.get_data(), img.img->getSizeBytes());
 
         //        std::cout << "Timestamp / exposure " << i << ": " <<
         //        data->t_ns << " / "
