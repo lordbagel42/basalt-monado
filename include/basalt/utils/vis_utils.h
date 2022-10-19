@@ -36,8 +36,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <Eigen/Dense>
 
+#include <pangolin/display/image_view.h>
 #include <pangolin/gl/gldraw.h>
+#include <pangolin/pangolin.h>
 
+#include <basalt/image/image.h>
+#include <basalt/io/dataset_io.h>
 #include <basalt/utils/sophus_utils.hpp>
 
 const uint8_t cam_color[3]{250, 0, 26};
@@ -83,24 +87,40 @@ inline void getcolor(float p, float np, float& r, float& g, float& b) {
   g = 0.0f;
   b = 0.0f;
 
-  if ((0 <= x && x <= 1) || (5 <= x && x <= 6))
-    r = 1.0f;
-  else if (4 <= x && x <= 5)
-    r = x - 4;
-  else if (1 <= x && x <= 2)
-    r = 1.0f - (x - 1);
+  if ((0 <= x && x <= 1) || (5 <= x && x <= 6)) r = 1.0f;
+  else if (4 <= x && x <= 5) r = x - 4;
+  else if (1 <= x && x <= 2) r = 1.0f - (x - 1);
 
-  if (1 <= x && x <= 3)
-    g = 1.0f;
-  else if (0 <= x && x <= 1)
-    g = x - 0;
-  else if (3 <= x && x <= 4)
-    g = 1.0f - (x - 3);
+  if (1 <= x && x <= 3) g = 1.0f;
+  else if (0 <= x && x <= 1) g = x - 0;
+  else if (3 <= x && x <= 4) g = 1.0f - (x - 3);
 
-  if (3 <= x && x <= 5)
-    b = 1.0f;
-  else if (2 <= x && x <= 3)
-    b = x - 2;
-  else if (5 <= x && x <= 6)
-    b = 1.0f - (x - 5);
+  if (3 <= x && x <= 5) b = 1.0f;
+  else if (2 <= x && x <= 3) b = x - 2;
+  else if (5 <= x && x <= 6) b = 1.0f - (x - 5);
+}
+
+inline void setImageViewFromData(const basalt::ImageData& img,
+                                 std::shared_ptr<pangolin::ImageView> view) {
+  if (!img.img) {
+    view->Clear();
+    return;
+  }
+
+  const basalt::TypedImage& timg = *img.img;
+  pangolin::GlPixFormat fmt;
+  fmt.glformat = GL_LUMINANCE;
+  if (timg.getBytesPerPixel() == 1) {
+    fmt.gltype = GL_UNSIGNED_BYTE;
+    fmt.scalable_internal_format = GL_LUMINANCE8;
+    view->SetImage(timg.getPtr(), timg.getWidth(), timg.getHeight(),
+                   timg.getPitch(), fmt);
+  } else if (timg.getBytesPerPixel() == 2) {
+    fmt.gltype = GL_UNSIGNED_SHORT;
+    fmt.scalable_internal_format = GL_LUMINANCE16;
+    view->SetImage(timg.getPtr(), timg.getWidth(), timg.getHeight(),
+                   timg.getPitch(), fmt);
+  } else {
+    BASALT_ASSERT_MSG(false, "Invalid pixel size");
+  }
 }

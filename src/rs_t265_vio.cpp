@@ -324,21 +324,13 @@ int main(int argc, char** argv) {
       img_view_display.Activate();
 
       {
-        pangolin::GlPixFormat fmt;
-        fmt.glformat = GL_LUMINANCE;
-        fmt.gltype = GL_UNSIGNED_SHORT;
-        fmt.scalable_internal_format = GL_LUMINANCE16;
-
         if (curr_vis_data.get() && curr_vis_data->opt_flow_res.get() &&
             curr_vis_data->opt_flow_res->input_images.get()) {
           auto& img_data = curr_vis_data->opt_flow_res->input_images->img_data;
 
           for (size_t cam_id = 0; cam_id < basalt::RsT265Device::NUM_CAMS;
                cam_id++) {
-            if (img_data[cam_id].img.get())
-              img_view[cam_id]->SetImage(
-                  img_data[cam_id].img->ptr, img_data[cam_id].img->w,
-                  img_data[cam_id].img->h, img_data[cam_id].img->pitch, fmt);
+            setImageViewFromData(img_data[cam_id], img_view[cam_id]);
           }
         }
 

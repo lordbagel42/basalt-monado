@@ -60,6 +60,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/utils/filesystem.h>
 #include <CLI/CLI.hpp>
 #include <cereal/archives/json.hpp>
+#include "basalt/utils/vis_utils.h"
 
 constexpr int UI_WIDTH = 200;
 
@@ -455,20 +456,11 @@ int main(int argc, char *argv[]) {
 
     while (!pangolin::ShouldQuit()) {
       {
-        pangolin::GlPixFormat fmt;
-        fmt.glformat = GL_LUMINANCE;
-        fmt.gltype = GL_UNSIGNED_SHORT;
-        fmt.scalable_internal_format = GL_LUMINANCE16;
-
         if (t265_device->last_img_data.get())
           for (size_t cam_id = 0; cam_id < basalt::RsT265Device::NUM_CAMS;
                cam_id++) {
-            if (t265_device->last_img_data->img_data[cam_id].img.get())
-              img_view[cam_id]->SetImage(
-                  t265_device->last_img_data->img_data[cam_id].img->ptr,
-                  t265_device->last_img_data->img_data[cam_id].img->w,
-                  t265_device->last_img_data->img_data[cam_id].img->h,
-                  t265_device->last_img_data->img_data[cam_id].img->pitch, fmt);
+            setImageViewFromData(t265_device->last_img_data->img_data[cam_id],
+                                 img_view[cam_id]);
           }
       }
 
