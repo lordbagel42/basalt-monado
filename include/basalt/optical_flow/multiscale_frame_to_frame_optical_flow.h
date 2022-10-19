@@ -307,7 +307,7 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowBase {
     return patch_valid;
   }
 
-  inline bool trackPointAtLevel(const ImageView& img_2, const PatchT& dp,
+  inline bool trackPointAtLevel(const TypedRawImage& img_2, const PatchT& dp,
                                 Eigen::AffineCompact2f& transform) const {
     bool patch_valid = true;
 

@@ -474,7 +474,7 @@ void NfrMapper::detect_keypoints() {
 
               if (!kv->second->img_data[i].img.get()) continue;
 
-              const ImageView img = kv->second->img_data[i].img->getImageView();
+              const TypedRawImage img = kv->second->img_data[i].img->getTypedRawImage();
 
               detectKeypointsMapping(img, kd,
                                      config.mapper_detection_num_points);

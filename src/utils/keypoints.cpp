@@ -134,7 +134,7 @@ const static char pattern_31_y_b[256] = {
     -9,  -1,  -2,  -8,  5,   10,  5,   5,   11,  -6,  -12, 9,   4,   -2, -2,
     -11};
 
-void detectKeypointsMapping(const basalt::ImageView& img_raw, KeypointsData& kd,
+void detectKeypointsMapping(const basalt::TypedRawImage& img_raw, KeypointsData& kd,
                             int num_features) {
   cv::Mat image(img_raw.getHeight(), img_raw.getWidth(), CV_8U);
 
@@ -167,7 +167,7 @@ void detectKeypointsMapping(const basalt::ImageView& img_raw, KeypointsData& kd,
 }
 
 void detectKeypoints(
-    const basalt::ImageView& img_raw, KeypointsData& kd, int PATCH_SIZE,
+    const basalt::TypedRawImage& img_raw, KeypointsData& kd, int PATCH_SIZE,
     int num_points_cell,
     const Eigen::aligned_vector<Eigen::Vector2d>& current_points) {
   kd.corners.clear();
@@ -204,7 +204,7 @@ void detectKeypoints(
       if (cells((y - y_start) / PATCH_SIZE, (x - x_start) / PATCH_SIZE) > 0)
         continue;
 
-      const basalt::ImageView sub_img_raw =
+      const basalt::TypedRawImage sub_img_raw =
           img_raw.SubImage(x, y, PATCH_SIZE, PATCH_SIZE);
 
       cv::Mat subImg(PATCH_SIZE, PATCH_SIZE, CV_8U);
@@ -272,7 +272,7 @@ void detectKeypoints(
   //  }
 }
 
-void computeAngles(const basalt::ImageView& img_raw, KeypointsData& kd,
+void computeAngles(const basalt::TypedRawImage& img_raw, KeypointsData& kd,
                    bool rotate_features) {
   kd.corner_angles.resize(kd.corners.size());
 
@@ -303,7 +303,7 @@ void computeAngles(const basalt::ImageView& img_raw, KeypointsData& kd,
   }
 }
 
-void computeDescriptors(const basalt::ImageView& img_raw, KeypointsData& kd) {
+void computeDescriptors(const basalt::TypedRawImage& img_raw, KeypointsData& kd) {
   kd.corner_descriptors.resize(kd.corners.size());
 
   for (size_t i = 0; i < kd.corners.size(); i++) {
