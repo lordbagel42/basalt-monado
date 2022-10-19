@@ -125,7 +125,7 @@ else()
 
   if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 9)
       # These are disabled to avoid lot's of warnings in Eigen code with gcc-9
-      set(BASALT_CXX_FLAGS "${BASALT_CXX_FLAGS} -Wno-error=deprecated-copy")
+      set(BASALT_CXX_FLAGS "${BASALT_CXX_FLAGS} -Wno-error=deprecated-copy -fdiagnostics-color=always")
   endif()
   if(CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 10.0)
     # These are disabled due to warnings in pangolin
