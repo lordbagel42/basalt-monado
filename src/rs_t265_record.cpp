@@ -124,18 +124,22 @@ void image_save_worker() {
   while (!stop_workers) {
     if (image_data_queue2.try_pop(img)) {
       for (size_t cam_id = 0; cam_id < NUM_CAMS; ++cam_id) {
-        basalt::ManagedImage<uint16_t>::Ptr image_raw =
-            img->img_data[cam_id].img;
+        basalt::ManagedImage::Ptr image_raw = img->img_data[cam_id].img;
 
         if (!image_raw.get()) continue;
 
         cv::Mat image(image_raw->h, image_raw->w, CV_8U);
 
-        uint8_t *dst = image.ptr();
-        const uint16_t *src = image_raw->ptr;
-
-        for (size_t i = 0; i < image_raw->size(); i++) {
-          dst[i] = (src[i] >> 8);
+        switch (image_raw->bpp) {
+          case basalt::Image::BIT8:
+            for (size_t y = 0; y < image_raw->h; y++)
+              for (size_t x = 0; x < image_raw->w; x++)
+                image.at<uint8_t>(y, x) = image_raw->at<uint8_t>(x, y);
+          case basalt::Image::BIT16:
+            for (size_t y = 0; y < image_raw->h; y++)
+              for (size_t x = 0; x < image_raw->w; x++)
+                image.at<uint8_t>(y, x) = image_raw->at<uint16_t>(x, y) >> 8;
+          default: BASALT_ASSERT(false);
         }
 
 #if CV_MAJOR_VERSION >= 3

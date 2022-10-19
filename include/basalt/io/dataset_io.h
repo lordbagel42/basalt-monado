@@ -157,21 +157,21 @@ std::shared_ptr<ManagedImage> import_cvmat(cv::Mat img) {
     res = std::make_shared<ManagedImage>(img.cols, img.rows, Image::BIT8);
     for (int y = 0; y < img.rows; y++) {
       for (int x = 0; x < img.cols; x++) {
-        res->at<uint8_t>(x, y) = img.at<uint8_t>(x, y);
+        res->at<uint8_t>(x, y) = img.at<uint8_t>(y, x);
       }
     }
   } else if (img.type() == CV_8UC3) {
     res = std::make_shared<ManagedImage>(img.cols, img.rows, Image::BIT8);
     for (int y = 0; y < img.rows; y++) {
       for (int x = 0; x < img.cols; x++) {
-        res->at<uint8_t>(x, y) = img.at<cv::Vec3b>(x, y)[0];
+        res->at<uint8_t>(x, y) = img.at<cv::Vec3b>(y, x)[0];
       }
     }
   } else if (img.type() == CV_16UC1) {
     res = std::make_shared<ManagedImage>(img.cols, img.rows, Image::BIT16);
     for (int y = 0; y < img.rows; y++) {
       for (int x = 0; x < img.cols; x++) {
-        res->at<uint16_t>(x, y) = img.at<uint16_t>(x, y);
+        res->at<uint16_t>(x, y) = img.at<uint16_t>(y, x);
       }
     }
   } else {
@@ -186,13 +186,15 @@ std::shared_ptr<ManagedImage> import_cvmat(cv::Mat img) {
 namespace cereal {
 
 template <class Archive>
-void serialize(Archive &archive, basalt::ManagedImage<uint8_t> &m) {
+void serialize(Archive &archive, basalt::ManagedImage &m) {
+  archive(m.pitch);
   archive(m.w);
   archive(m.h);
+  archive(m.bpp);
 
-  m.Reinitialise(m.w, m.h);
+  m.Reinitialise(m.w, m.h, m.pitch, m.bpp);
 
-  archive(binary_data(m.ptr, m.size()));
+  archive(binary_data(m.ptr, m.SizeBytes()));
 }
 
 template <class Archive>
