@@ -194,6 +194,7 @@ void RsT265Device::start() {
         imdat.img = std::make_shared<basalt::ManagedImage>(
             vf.get_width(), vf.get_height(), basalt::Image::BIT8);
 
+        BASALT_ASSERT(vf.get_bits_per_pixel() == 8);
         std::memcpy(imdat.img->ptr, vf.get_data(), imdat.img->SizeBytes());
       }
 
