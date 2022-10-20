@@ -100,8 +100,9 @@ struct OpticalFlowPatch {
     data /= mean;
   }
 
-  static void setDataJacSe2(const Image &img, const Vector2 &pos, Scalar &mean,
-                            VectorP &data, MatrixP3 &J_se2) {
+  template <typename ImageType>
+  static void setDataJacSe2(const ImageType &img, const Vector2 &pos,
+                            Scalar &mean, VectorP &data, MatrixP3 &J_se2) {
     int num_valid_points = 0;
     Scalar sum = 0;
     Vector3 grad_sum_se2(0, 0, 0);
