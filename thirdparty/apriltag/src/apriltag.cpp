@@ -1,4 +1,5 @@
 
+#include <basalt/image/opencv_interop.h>
 #include <basalt/utils/apriltag.h>
 
 #include <apriltags/TagDetector.h>
@@ -56,18 +57,7 @@ void ApriltagDetector::detectTags(
   radii_rejected.clear();
 
   cv::Mat image(img_raw.h, img_raw.w, CV_8U);
-
-  switch (img_raw.bpp) {
-    case Image::BIT8:
-      for (size_t y = 0; y < img_raw.h; y++)
-        for (size_t x = 0; x < img_raw.w; x++)
-          image.at<uint8_t>(y, x) = img_raw.at<uint8_t>(x, y);
-    case Image::BIT16:
-      for (size_t y = 0; y < img_raw.h; y++)
-        for (size_t x = 0; x < img_raw.w; x++)
-          image.at<uint8_t>(y, x) = img_raw.at<uint16_t>(x, y) >> 8;
-    default: BASALT_ASSERT(false);
-  }
+  image = export_cvmat_u8(img_raw);
 
   // detect the tags
   std::vector<AprilTags::TagDetection> detections =
