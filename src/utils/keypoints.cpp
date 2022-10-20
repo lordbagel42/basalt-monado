@@ -135,9 +135,9 @@ const static char pattern_31_y_b[256] = {
     -9,  -1,  -2,  -8,  5,   10,  5,   5,   11,  -6,  -12, 9,   4,   -2, -2,
     -11};
 
-void detectKeypointsMapping(const basalt::Image& img_raw, KeypointsData& kd,
+void detectKeypointsMapping(basalt::Image& img_raw, KeypointsData& kd,
                             int num_features) {
-  cv::Mat image = export_cvmat(img_raw);
+  cv::Mat image = export_cvmat_u8(img_raw);
 
   std::vector<cv::Point2f> points;
   goodFeaturesToTrack(image, points, num_features, 0.01, 8);
@@ -272,8 +272,12 @@ void computeAngles(const basalt::Image& img_raw, KeypointsData& kd,
 void computeAngles(const basalt::Image& img_raw, KeypointsData& kd,
                    bool rotate_features) {
   switch (img_raw.bpp) {
-    case Image::BIT8: computeAngles<uint8_t>(img_raw, kd, rotate_features);
-    case Image::BIT16: computeAngles<uint16_t>(img_raw, kd, rotate_features);
+    case Image::BIT8:
+      computeAngles<uint8_t>(img_raw, kd, rotate_features);
+      return;
+    case Image::BIT16:
+      computeAngles<uint16_t>(img_raw, kd, rotate_features);
+      return;
     default: BASALT_ASSERT(false);
   }
 }
@@ -311,8 +315,8 @@ void computeDescriptors(const basalt::Image& img_raw, KeypointsData& kd) {
 
 void computeDescriptors(const basalt::Image& img_raw, KeypointsData& kd) {
   switch (img_raw.bpp) {
-    case Image::BIT8: computeDescriptors<uint8_t>(img_raw, kd);
-    case Image::BIT16: computeDescriptors<uint16_t>(img_raw, kd);
+    case Image::BIT8: computeDescriptors<uint8_t>(img_raw, kd); return;
+    case Image::BIT16: computeDescriptors<uint16_t>(img_raw, kd); return;
     default: BASALT_ASSERT(false);
   }
 }
