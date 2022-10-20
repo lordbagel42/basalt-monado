@@ -35,6 +35,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
+#include <basalt/image/opencv_interop.h>
 #include <basalt/io/dataset_io.h>
 #include <basalt/utils/filesystem.h>
 

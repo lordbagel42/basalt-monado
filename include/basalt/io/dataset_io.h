@@ -150,37 +150,6 @@ class DatasetIoFactory {
                                             bool load_mocap_as_gt = false);
 };
 
-std::shared_ptr<ManagedImage> import_cvmat(cv::Mat img) {
-  // TODO@mateosss: Transfer ownership instead of copying when possible
-  std::shared_ptr<ManagedImage> res = nullptr;
-  if (img.type() == CV_8UC1) {
-    res = std::make_shared<ManagedImage>(img.cols, img.rows, Image::BIT8);
-    for (int y = 0; y < img.rows; y++) {
-      for (int x = 0; x < img.cols; x++) {
-        res->at<uint8_t>(x, y) = img.at<uint8_t>(y, x);
-      }
-    }
-  } else if (img.type() == CV_8UC3) {
-    res = std::make_shared<ManagedImage>(img.cols, img.rows, Image::BIT8);
-    for (int y = 0; y < img.rows; y++) {
-      for (int x = 0; x < img.cols; x++) {
-        res->at<uint8_t>(x, y) = img.at<cv::Vec3b>(y, x)[0];
-      }
-    }
-  } else if (img.type() == CV_16UC1) {
-    res = std::make_shared<ManagedImage>(img.cols, img.rows, Image::BIT16);
-    for (int y = 0; y < img.rows; y++) {
-      for (int x = 0; x < img.cols; x++) {
-        res->at<uint16_t>(x, y) = img.at<uint16_t>(y, x);
-      }
-    }
-  } else {
-    std::cerr << "img.type()=" << img.type() << std::endl;
-    BASALT_ASSERT(false);
-  }
-  return res;
-}
-
 }  // namespace basalt
 
 namespace cereal {
