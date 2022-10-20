@@ -285,7 +285,7 @@ void VignetteEstimator::compute_data_log(
 void VignetteEstimator::save_vign_png(const std::string &path) {
   for (size_t k = 0; k < vio_dataset->get_num_cams(); k++) {
     ManagedImage vign_img(resolutions[k][0], resolutions[k][1], Image::BIT16);
-    vign_img.Fill<uint16_t>(0);
+    vign_img.Fill(0);
 
     Eigen::Vector2d oc = optical_centers[k];
 
