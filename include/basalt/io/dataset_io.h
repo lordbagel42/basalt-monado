@@ -154,17 +154,17 @@ class DatasetIoFactory {
 
 namespace cereal {
 
-template <class Archive>
-void serialize(Archive &archive, basalt::ManagedImage &m) {
-  archive(m.pitch);
-  archive(m.w);
-  archive(m.h);
-  archive(m.bpp);
+// template <class Archive>
+// void serialize(Archive &archive, basalt::ManagedImage &m) {
+//   archive(m.pitch);
+//   archive(m.w);
+//   archive(m.h);
+//   archive(m.bpp);
 
-  m.Reinitialise(m.w, m.h, m.pitch, m.bpp);
+//   m.Reinitialise(m.w, m.h, m.pitch, m.bpp);
 
-  archive(binary_data(m.ptr, m.SizeBytes()));
-}
+//   archive(binary_data(m.ptr, m.SizeBytes()));
+// }
 
 template <class Archive>
 void serialize(Archive &ar, basalt::GyroData &c) {
