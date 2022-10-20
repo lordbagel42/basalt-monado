@@ -259,8 +259,7 @@ class PatchOpticalFlow : public OpticalFlowBase {
     return patch_valid;
   }
 
-  inline bool trackPointAtLevel(const Image<const uint16_t>& img_2,
-                                const PatchT& dp,
+  inline bool trackPointAtLevel(const Image& img_2, const PatchT& dp,
                                 Eigen::AffineCompact2f& transform) const {
     bool patch_valid = true;
 
