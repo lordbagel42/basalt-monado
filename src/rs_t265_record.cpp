@@ -130,17 +130,10 @@ void image_save_worker() {
 
         cv::Mat image(image_raw->h, image_raw->w, CV_8U);
 
-        switch (image_raw->bpp) {
-          case basalt::Image::BIT8:
-            for (size_t y = 0; y < image_raw->h; y++)
-              for (size_t x = 0; x < image_raw->w; x++)
-                image.at<uint8_t>(y, x) = image_raw->at<uint8_t>(x, y);
-          case basalt::Image::BIT16:
-            for (size_t y = 0; y < image_raw->h; y++)
-              for (size_t x = 0; x < image_raw->w; x++)
-                image.at<uint8_t>(y, x) = image_raw->at<uint16_t>(x, y) >> 8;
-          default: BASALT_ASSERT(false);
-        }
+        BASALT_ASSERT(image_raw->bpp == basalt::Image::BIT8);
+        for (size_t y = 0; y < image_raw->h; y++)
+          for (size_t x = 0; x < image_raw->w; x++)
+            image.at<uint8_t>(y, x) = image_raw->at<uint8_t>(x, y);
 
 #if CV_MAJOR_VERSION >= 3
         std::string filename = dataset_dir + "mav0/cam" +
