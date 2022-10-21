@@ -244,10 +244,8 @@ class PosesOptimization {
   Sophus::SE3d getT_w_i(int64_t i) {
     auto it = timestam_to_pose.find(i);
 
-    if (it == timestam_to_pose.end())
-      return Sophus::SE3d();
-    else
-      return it->second;
+    if (it == timestam_to_pose.end()) return Sophus::SE3d();
+    else return it->second;
   }
 
   void setAprilgridCorners3d(const Eigen::aligned_vector<Eigen::Vector4d> &v) {
