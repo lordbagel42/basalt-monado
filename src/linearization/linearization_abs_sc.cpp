@@ -285,8 +285,7 @@ void LinearizationAbsSC<Scalar, POSE_SIZE>::get_dense_Q2Jp_Q2r(
   for (int i = 0; i < Q2r.size(); ++i) {
     if (D_sqrt(i) > std::sqrt(std::numeric_limits<Scalar>::min()))
       Q2r(i) /= D_sqrt(i);
-    else
-      Q2r(i) = 0;
+    else Q2r(i) = 0;
   }
 }
 

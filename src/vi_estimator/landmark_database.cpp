@@ -54,8 +54,7 @@ void LandmarkDatabase<Scalar_>::removeFrame(const FrameId &frame) {
     for (auto it2 = it->second.obs.begin(); it2 != it->second.obs.end();) {
       if (it2->first.frame_id == frame)
         it2 = removeLandmarkObservationHelper(it, it2);
-      else
-        it2++;
+      else it2++;
     }
 
     if (it->second.obs.size() < min_num_obs) {
@@ -80,8 +79,7 @@ void LandmarkDatabase<Scalar_>::removeKeyframes(
         if (poses_to_marg.count(fid) > 0 || states_to_marg_all.count(fid) > 0 ||
             kfs_to_marg.count(fid) > 0)
           it2 = removeLandmarkObservationHelper(it, it2);
-        else
-          it2++;
+        else it2++;
       }
 
       if (it->second.obs.size() < min_num_obs) {
@@ -223,8 +221,7 @@ void LandmarkDatabase<Scalar_>::removeObservations(
   for (auto it2 = it->second.obs.begin(); it2 != it->second.obs.end();) {
     if (obs.count(it2->first) > 0) {
       it2 = removeLandmarkObservationHelper(it, it2);
-    } else
-      it2++;
+    } else it2++;
   }
 
   if (it->second.obs.size() < min_num_obs) {
