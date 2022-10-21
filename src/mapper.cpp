@@ -276,19 +276,7 @@ int main(int argc, char** argv) {
             nrf_mapper->img_data.at(timestamp).get()) {
           const std::vector<basalt::ImageData>& img_vec =
               nrf_mapper->img_data.at(timestamp)->img_data;
-
-          pangolin::GlPixFormat fmt;
-          fmt.glformat = GL_LUMINANCE;
-          fmt.gltype = GL_UNSIGNED_SHORT;
-          fmt.scalable_internal_format = GL_LUMINANCE16;
-
-          if (img_vec[cam_id].img.get()) {
-            img_view[0]->SetImage(
-                img_vec[cam_id].img->ptr, img_vec[cam_id].img->w,
-                img_vec[cam_id].img->h, img_vec[cam_id].img->pitch, fmt);
-          } else {
-            img_view[0]->Clear();
-          }
+          setImageViewFromData(img_vec[cam_id], img_view[0]);
         } else {
           img_view[0]->Clear();
         }
@@ -311,19 +299,7 @@ int main(int argc, char** argv) {
             nrf_mapper->img_data.at(timestamp).get()) {
           const std::vector<basalt::ImageData>& img_vec =
               nrf_mapper->img_data.at(timestamp)->img_data;
-
-          pangolin::GlPixFormat fmt;
-          fmt.glformat = GL_LUMINANCE;
-          fmt.gltype = GL_UNSIGNED_SHORT;
-          fmt.scalable_internal_format = GL_LUMINANCE16;
-
-          if (img_vec[cam_id].img.get()) {
-            img_view[1]->SetImage(
-                img_vec[cam_id].img->ptr, img_vec[cam_id].img->w,
-                img_vec[cam_id].img->h, img_vec[cam_id].img->pitch, fmt);
-          } else {
-            img_view[1]->Clear();
-          }
+          setImageViewFromData(img_vec[cam_id], img_view[1]);
         } else {
           img_view[1]->Clear();
         }

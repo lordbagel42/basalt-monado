@@ -44,11 +44,9 @@ namespace basalt {
 
 bool isLinearizationSqrt(const LinearizationType& type) {
   switch (type) {
-    case LinearizationType::ABS_QR:
-      return true;
+    case LinearizationType::ABS_QR: return true;
     case LinearizationType::ABS_SC:
-    case LinearizationType::REL_SC:
-      return false;
+    case LinearizationType::REL_SC: return false;
     default:
       BASALT_ASSERT_STREAM(false, "Linearization type is not supported.");
       return false;
