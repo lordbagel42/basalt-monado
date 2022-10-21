@@ -54,6 +54,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/io/dataset_io.h>
 #include <basalt/spline/se3_spline.h>
 
+#include <basalt/utils/vis_utils.h>
 #include <basalt/calibration/calibration.hpp>
 
 #include <basalt/optical_flow/optical_flow.h>
@@ -245,19 +246,7 @@ int main(int argc, char** argv) {
             vio_dataset->get_image_data(timestamp);
 
         for (size_t cam_id = 0; cam_id < calib.intrinsics.size(); cam_id++) {
-          if (img_vec[cam_id].img.get()) {
-            auto img = img_vec[cam_id].img;
-
-            pangolin::GlPixFormat fmt;
-            fmt.glformat = GL_LUMINANCE;
-            fmt.gltype = GL_UNSIGNED_SHORT;
-            fmt.scalable_internal_format = GL_LUMINANCE16;
-
-            img_view[cam_id]->SetImage(img->ptr, img->w, img->h, img->pitch,
-                                       fmt);
-          } else {
-            img_view[cam_id]->Clear();
-          }
+          setImageViewFromData(img_vec[cam_id], img_view[cam_id]);
         }
       }
 

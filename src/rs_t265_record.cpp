@@ -57,6 +57,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/device/rs_t265.h>
 #include <basalt/serialization/headers_serialization.h>
 #include <basalt/utils/filesystem.h>
+#include <basalt/utils/vis_utils.h>
 #include <CLI/CLI.hpp>
 #include <cereal/archives/json.hpp>
 
@@ -462,22 +463,10 @@ int main(int argc, char *argv[]) {
                       pangolin::Colour::Blue(), "accel z");
 
     while (!pangolin::ShouldQuit()) {
-      {
-        pangolin::GlPixFormat fmt;
-        fmt.glformat = GL_LUMINANCE;
-        fmt.gltype = GL_UNSIGNED_SHORT;
-        fmt.scalable_internal_format = GL_LUMINANCE16;
-
-        if (t265_device->last_img_data.get())
-          for (size_t cam_id = 0; cam_id < basalt::RsT265Device::NUM_CAMS;
-               cam_id++) {
-            if (t265_device->last_img_data->img_data[cam_id].img.get())
-              img_view[cam_id]->SetImage(
-                  t265_device->last_img_data->img_data[cam_id].img->ptr,
-                  t265_device->last_img_data->img_data[cam_id].img->w,
-                  t265_device->last_img_data->img_data[cam_id].img->h,
-                  t265_device->last_img_data->img_data[cam_id].img->pitch, fmt);
-          }
+      if (t265_device->last_img_data.get()) {
+        auto &img_vec = t265_device->last_img_data->img_data;
+        for (size_t cam = 0; cam < basalt::RsT265Device::NUM_CAMS; cam++)
+          setImageViewFromData(img_vec[cam], img_view[cam]);
       }
 
       if (manual_exposure && exposure.GuiChanged()) {
