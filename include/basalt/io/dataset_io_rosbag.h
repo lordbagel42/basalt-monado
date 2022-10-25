@@ -128,7 +128,6 @@ class RosbagVioDataset : public VioDataset {
           id.exposure = -1;
         }
 
-        // TODO@mateosss: Transfer ownership instead of copying when possible
         uint32_t w = img_msg->width;
         uint32_t h = img_msg->height;
         if (img_msg->encoding == "mono8") {
