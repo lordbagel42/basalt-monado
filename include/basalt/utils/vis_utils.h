@@ -111,11 +111,11 @@ inline void setImageViewFromData(const basalt::ImageData& img,
   fmt.glformat = GL_LUMINANCE;
 
   switch (mimg.t) {
-    case basalt::Image::BIT8: {
+    case basalt::Image::U8: {
       fmt.gltype = GL_UNSIGNED_BYTE;
       fmt.scalable_internal_format = GL_LUMINANCE8;
     } break;
-    case basalt::Image::BIT16: {
+    case basalt::Image::U16: {
       fmt.gltype = GL_UNSIGNED_SHORT;
       fmt.scalable_internal_format = GL_LUMINANCE16;
     } break;

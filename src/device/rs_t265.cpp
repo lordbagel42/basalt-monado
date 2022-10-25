@@ -192,7 +192,7 @@ void RsT265Device::start() {
             vf.get_frame_metadata(RS2_FRAME_METADATA_ACTUAL_EXPOSURE) * 1e-6;
 
         imdat.img = std::make_shared<basalt::ManagedImage>(
-            vf.get_width(), vf.get_height(), basalt::Image::BIT8);
+            vf.get_width(), vf.get_height(), basalt::Image::U8);
 
         BASALT_ASSERT(vf.get_bits_per_pixel() == 8);
         std::memcpy(imdat.img->ptr, vf.get_data(), imdat.img->SizeBytes());

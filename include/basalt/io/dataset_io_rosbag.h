@@ -132,14 +132,14 @@ class RosbagVioDataset : public VioDataset {
         uint32_t w = img_msg->width;
         uint32_t h = img_msg->height;
         if (img_msg->encoding == "mono8") {
-          res[i].img = std::make_shared<ManagedImage>(w, h, Image::BIT8);
+          res[i].img = std::make_shared<ManagedImage>(w, h, Image::U8);
           for (uint32_t y = 0; y < h; y++) {
             for (uint32_t x = 0; x < w; x++) {
               res[i].img->at<uint8_t>(x, y) = img_msg->data[y * w + x];
             }
           }
         } else if (img_msg->encoding == "mono16") {
-          res[i].img = std::make_shared<ManagedImage>(w, h, Image::BIT16);
+          res[i].img = std::make_shared<ManagedImage>(w, h, Image::U16);
           for (uint32_t y = 0; y < h; y++) {
             for (uint32_t x = 0; x < w; x++) {
               res[i].img->at<uint16_t>(x, y) = img_msg->data[y * w + x * 2];

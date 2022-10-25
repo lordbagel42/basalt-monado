@@ -272,10 +272,10 @@ void computeAngles(const basalt::Image& img_raw, KeypointsData& kd,
 void computeAngles(const basalt::Image& img_raw, KeypointsData& kd,
                    bool rotate_features) {
   switch (img_raw.t) {
-    case Image::BIT8:
+    case Image::U8:
       computeAngles<uint8_t>(img_raw, kd, rotate_features);
       return;
-    case Image::BIT16:
+    case Image::U16:
       computeAngles<uint16_t>(img_raw, kd, rotate_features);
       return;
     default: BASALT_ASSERT(false);
@@ -315,8 +315,8 @@ void computeDescriptors(const basalt::Image& img_raw, KeypointsData& kd) {
 
 void computeDescriptors(const basalt::Image& img_raw, KeypointsData& kd) {
   switch (img_raw.t) {
-    case Image::BIT8: computeDescriptors<uint8_t>(img_raw, kd); return;
-    case Image::BIT16: computeDescriptors<uint16_t>(img_raw, kd); return;
+    case Image::U8: computeDescriptors<uint8_t>(img_raw, kd); return;
+    case Image::U16: computeDescriptors<uint16_t>(img_raw, kd); return;
     default: BASALT_ASSERT(false);
   }
 }
