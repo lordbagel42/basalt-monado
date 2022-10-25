@@ -1,8 +1,8 @@
 #pragma once
 
-#include "pangolin/display/display.h"
 #include <pangolin/display/image_view.h>
 #include <pangolin/pangolin.h>
+#include <pangolin/display/display.h>
 
 #include <CLI/CLI.hpp>
 
@@ -203,25 +203,15 @@ class slam_tracker_ui {
       }
       depth_guess = opt_flow->depth_guess;
 
-      {
-        pangolin::GlPixFormat fmt;
-        fmt.glformat = GL_LUMINANCE;
-        fmt.gltype = GL_UNSIGNED_SHORT;
-        fmt.scalable_internal_format = GL_LUMINANCE16;
+      if (curr_vis_data && curr_vis_data->opt_flow_res && curr_vis_data->opt_flow_res->input_images) {
+        auto &img_data = curr_vis_data->opt_flow_res->input_images->img_data;
 
-        if (curr_vis_data && curr_vis_data->opt_flow_res && curr_vis_data->opt_flow_res->input_images) {
-          auto &img_data = curr_vis_data->opt_flow_res->input_images->img_data;
-
-          for (size_t cam_id = 0; cam_id < num_cams; cam_id++) {
-            if (img_data[cam_id].img) {
-              img_view[cam_id]->SetImage(img_data[cam_id].img->ptr, img_data[cam_id].img->w, img_data[cam_id].img->h,
-                                         img_data[cam_id].img->pitch, fmt);
-            }
-          }
+        for (size_t cam_id = 0; cam_id < num_cams; cam_id++) {
+          setImageViewFromData(img_data[cam_id], img_view[cam_id]);
         }
-
-        draw_plots();
       }
+
+      draw_plots();
 
       if (show_est_vel.GuiChanged() || show_est_pos.GuiChanged() || show_est_ba.GuiChanged() ||
           show_est_bg.GuiChanged()) {

@@ -17,10 +17,11 @@
 #include <unordered_set>
 #include "sophus/se3.hpp"
 
+#include <basalt/image/opencv_interop.h>
 #include <basalt/io/marg_data_io.h>
 #include <basalt/serialization/headers_serialization.h>
+#include <basalt/utils/vis_utils.h>
 #include <basalt/vi_estimator/vio_estimator.h>
-#include "basalt/utils/vis_utils.h"
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 #define EXPORT __declspec(dllexport)
@@ -370,18 +371,7 @@ struct slam_tracker::implementation {
       i = 1;
     }
 
-    int width = s.img.cols;
-    int height = s.img.rows;
-    // Forced to use uint16_t here, in place because of cameras with 12-bit grayscale support
-    auto &mimg = partial_frame->img_data[i].img;
-    mimg.reset(new ManagedImage<uint16_t>(width, height));
-
-    // TODO: We could avoid this copy. Maybe by writing a custom
-    // allocator for ManagedImage that ties the OpenCV allocator
-    size_t full_size = width * height;
-    for (size_t j = 0; j < full_size; j++) {
-      mimg->ptr[j] = s.img.at<uchar>(j) << 8;
-    }
+    partial_frame->img_data[i].img = import_cvmat(s.img);
 
     if (!s.is_left) {
       partial_frame->addTime("tracker_pushed");
