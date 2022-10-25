@@ -131,7 +131,7 @@ void image_save_worker() {
 
         cv::Mat image(image_raw->h, image_raw->w, CV_8U);
 
-        BASALT_ASSERT(image_raw->bpp == basalt::Image::BIT8);
+        BASALT_ASSERT(image_raw->t == basalt::Image::BIT8);
         for (size_t y = 0; y < image_raw->h; y++)
           for (size_t x = 0; x < image_raw->w; x++)
             image.at<uint8_t>(y, x) = image_raw->at<uint8_t>(x, y);

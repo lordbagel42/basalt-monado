@@ -188,7 +188,7 @@ void save(Archive& ar, const basalt::ManagedImage& m) {
   ar(m.pitch);
   ar(m.w);
   ar(m.h);
-  ar(m.bpp);
+  ar(m.t);
   ar(cereal::binary_data(m.ptr, m.SizeBytes()));
 }
 
@@ -197,12 +197,12 @@ void load(Archive& ar, basalt::ManagedImage& m) {
   size_t pitch;
   size_t w;
   size_t h;
-  basalt::Image::BPP bpp;
+  basalt::Image::Type t;
   ar(pitch);
   ar(w);
   ar(h);
-  ar(bpp);
-  m.Reinitialise(w, h, pitch, bpp);
+  ar(t);
+  m.Reinitialise(w, h, pitch, t);
   ar(cereal::binary_data(m.ptr, m.SizeBytes()));
 }
 

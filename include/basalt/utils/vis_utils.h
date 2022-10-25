@@ -110,7 +110,7 @@ inline void setImageViewFromData(const basalt::ImageData& img,
   pangolin::GlPixFormat fmt;
   fmt.glformat = GL_LUMINANCE;
 
-  switch (mimg.bpp) {
+  switch (mimg.t) {
     case basalt::Image::BIT8: {
       fmt.gltype = GL_UNSIGNED_BYTE;
       fmt.scalable_internal_format = GL_LUMINANCE8;
