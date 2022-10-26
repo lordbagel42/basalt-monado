@@ -136,7 +136,7 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowBase {
                         [&](const tbb::blocked_range<size_t>& r) {
                           for (size_t i = r.begin(); i != r.end(); ++i) {
                             pyramid->at(i).setFromImage(
-                                *new_img_vec->img_data[i].img,
+                                new_img_vec->img_data[i].img,
                                 config.optical_flow_levels);
                           }
                         });
@@ -156,7 +156,7 @@ class MultiscaleFrameToFrameOpticalFlow : public OpticalFlowBase {
                         [&](const tbb::blocked_range<size_t>& r) {
                           for (size_t i = r.begin(); i != r.end(); ++i) {
                             pyramid->at(i).setFromImage(
-                                *new_img_vec->img_data[i].img,
+                                new_img_vec->img_data[i].img,
                                 config.optical_flow_levels);
                           }
                         });
