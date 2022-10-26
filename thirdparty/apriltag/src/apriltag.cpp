@@ -56,7 +56,7 @@ void ApriltagDetector::detectTags(
   ids_rejected.clear();
   radii_rejected.clear();
 
-  cv::Mat image = export_cvmat_copy(img_raw, CV_8UC1);
+  cv::Mat image = export_cvmat(img_raw, CV_8UC1);
 
   // detect the tags
   std::vector<AprilTags::TagDetection> detections =

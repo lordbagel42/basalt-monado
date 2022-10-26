@@ -137,7 +137,7 @@ const static char pattern_31_y_b[256] = {
 
 void detectKeypointsMapping(const basalt::Image& img_raw, KeypointsData& kd,
                             int num_features) {
-  cv::Mat image = export_cvmat_copy(img_raw, CV_8UC1);
+  cv::Mat image = export_cvmat(img_raw, CV_8UC1);
 
   std::vector<cv::Point2f> points;
   goodFeaturesToTrack(image, points, num_features, 0.01, 8);
@@ -191,7 +191,7 @@ void detectKeypoints(
       const basalt::Image sub_img_raw =
           img_raw.SubImage(x, y, PATCH_SIZE, PATCH_SIZE);
 
-      cv::Mat subImg = export_cvmat_copy(sub_img_raw, CV_8UC1);
+      cv::Mat subImg = export_cvmat(sub_img_raw, CV_8UC1);
 
       int points_added = 0;
       int threshold = 40;
