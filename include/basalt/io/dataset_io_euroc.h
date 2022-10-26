@@ -100,7 +100,7 @@ class EurocVioDataset : public VioDataset {
 
       if (fs::exists(full_image_path)) {
         cv::Mat img = cv::imread(full_image_path, cv::IMREAD_GRAYSCALE);
-        res[i].img = import_cvmat_copy(img, Image::U16);
+        res[i].img = import_cvmat(img);
 
         auto exp_it = exposure_times[i].find(t_ns);
         if (exp_it != exposure_times[i].end()) {

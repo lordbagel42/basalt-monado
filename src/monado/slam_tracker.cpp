@@ -372,7 +372,7 @@ struct slam_tracker::implementation {
     }
 
     auto &mimg = partial_frame->img_data[i].img;
-    mimg = import_cvmat_copy(s.img, Image::U16);
+    mimg = import_cvmat(s.img);
 
     if (!s.is_left) {
       partial_frame->addTime("tracker_pushed");
