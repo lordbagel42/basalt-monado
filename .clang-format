@@ -4,4 +4,4 @@ BasedOnStyle: Google
 IndentWidth: 2
 IncludeBlocks: Preserve
 AllowShortCaseLabelsOnASingleLine: true
-AllowShortIfStatementsOnASingleLine: AllIfsAndElse
+AllowShortIfStatementsOnASingleLine: Always
