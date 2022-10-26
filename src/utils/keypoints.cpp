@@ -35,6 +35,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <unordered_set>
 
+#include <basalt/image/image.h>
+#include <basalt/image/opencv_interop.h>
 #include <basalt/utils/keypoints.h>
 
 #include <opencv2/features2d/features2d.hpp>
@@ -133,16 +135,9 @@ const static char pattern_31_y_b[256] = {
     -9,  -1,  -2,  -8,  5,   10,  5,   5,   11,  -6,  -12, 9,   4,   -2, -2,
     -11};
 
-void detectKeypointsMapping(const basalt::Image<const uint16_t>& img_raw,
-                            KeypointsData& kd, int num_features) {
-  cv::Mat image(img_raw.h, img_raw.w, CV_8U);
-
-  uint8_t* dst = image.ptr();
-  const uint16_t* src = img_raw.ptr;
-
-  for (size_t i = 0; i < img_raw.size(); i++) {
-    dst[i] = (src[i] >> 8);
-  }
+void detectKeypointsMapping(const basalt::Image& img_raw, KeypointsData& kd,
+                            int num_features) {
+  cv::Mat image = export_cvmat_copy(img_raw, CV_8UC1);
 
   std::vector<cv::Point2f> points;
   goodFeaturesToTrack(image, points, num_features, 0.01, 8);
@@ -159,8 +154,8 @@ void detectKeypointsMapping(const basalt::Image<const uint16_t>& img_raw,
 }
 
 void detectKeypoints(
-    const basalt::Image<const uint16_t>& img_raw, KeypointsData& kd,
-    int PATCH_SIZE, int num_points_cell,
+    const basalt::Image& img_raw, KeypointsData& kd, int PATCH_SIZE,
+    int num_points_cell,
     const Eigen::aligned_vector<Eigen::Vector2d>& current_points) {
   kd.corners.clear();
   kd.corner_angles.clear();
@@ -193,17 +188,10 @@ void detectKeypoints(
       if (cells((y - y_start) / PATCH_SIZE, (x - x_start) / PATCH_SIZE) > 0)
         continue;
 
-      const basalt::Image<const uint16_t> sub_img_raw =
+      const basalt::Image sub_img_raw =
           img_raw.SubImage(x, y, PATCH_SIZE, PATCH_SIZE);
 
-      cv::Mat subImg(PATCH_SIZE, PATCH_SIZE, CV_8U);
-
-      for (int y = 0; y < PATCH_SIZE; y++) {
-        uchar* sub_ptr = subImg.ptr(y);
-        for (int x = 0; x < PATCH_SIZE; x++) {
-          sub_ptr[x] = (sub_img_raw(x, y) >> 8);
-        }
-      }
+      cv::Mat subImg = export_cvmat_copy(sub_img_raw, CV_8UC1);
 
       int points_added = 0;
       int threshold = 40;
@@ -249,8 +237,9 @@ void detectKeypoints(
   //  }
 }
 
-void computeAngles(const basalt::Image<const uint16_t>& img_raw,
-                   KeypointsData& kd, bool rotate_features) {
+template <typename T>
+void computeAngles(const basalt::Image& img_raw, KeypointsData& kd,
+                   bool rotate_features) {
   kd.corner_angles.resize(kd.corners.size());
 
   for (size_t i = 0; i < kd.corners.size(); i++) {
@@ -266,7 +255,7 @@ void computeAngles(const basalt::Image<const uint16_t>& img_raw,
       for (int x = -HALF_PATCH_SIZE; x <= HALF_PATCH_SIZE; x++) {
         for (int y = -HALF_PATCH_SIZE; y <= HALF_PATCH_SIZE; y++) {
           if (x * x + y * y <= HALF_PATCH_SIZE * HALF_PATCH_SIZE) {
-            double val = img_raw(cx + x, cy + y);
+            double val = img_raw.at<T>(cx + x, cy + y);
             m01 += y * val;
             m10 += x * val;
           }
@@ -280,8 +269,21 @@ void computeAngles(const basalt::Image<const uint16_t>& img_raw,
   }
 }
 
-void computeDescriptors(const basalt::Image<const uint16_t>& img_raw,
-                        KeypointsData& kd) {
+void computeAngles(const basalt::Image& img_raw, KeypointsData& kd,
+                   bool rotate_features) {
+  switch (img_raw.t) {
+    case Image::U8:
+      computeAngles<uint8_t>(img_raw, kd, rotate_features);
+      return;
+    case Image::U16:
+      computeAngles<uint16_t>(img_raw, kd, rotate_features);
+      return;
+    default: BASALT_ASSERT(false);
+  }
+}
+
+template <typename T>
+void computeDescriptors(const basalt::Image& img_raw, KeypointsData& kd) {
   kd.corner_descriptors.resize(kd.corners.size());
 
   for (size_t i = 0; i < kd.corners.size(); i++) {
@@ -303,11 +305,19 @@ void computeDescriptors(const basalt::Image<const uint16_t>& img_raw,
       Eigen::Vector2i vva = (mat_rot * va).array().round().cast<int>();
       Eigen::Vector2i vvb = (mat_rot * vb).array().round().cast<int>();
 
-      descriptor[i] =
-          img_raw(cx + vva[0], cy + vva[1]) < img_raw(cx + vvb[0], cy + vvb[1]);
+      descriptor[i] = img_raw.at<T>(cx + vva[0], cy + vva[1]) <
+                      img_raw.at<T>(cx + vvb[0], cy + vvb[1]);
     }
 
     kd.corner_descriptors[i] = descriptor;
+  }
+}
+
+void computeDescriptors(const basalt::Image& img_raw, KeypointsData& kd) {
+  switch (img_raw.t) {
+    case Image::U8: computeDescriptors<uint8_t>(img_raw, kd); return;
+    case Image::U16: computeDescriptors<uint16_t>(img_raw, kd); return;
+    default: BASALT_ASSERT(false);
   }
 }
 

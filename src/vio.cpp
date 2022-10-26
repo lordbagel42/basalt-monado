@@ -512,15 +512,7 @@ int main(int argc, char** argv) {
           std::vector<basalt::ImageData> img_vec =
               vio_dataset->get_image_data(timestamp);
 
-          pangolin::GlPixFormat fmt;
-          fmt.glformat = GL_LUMINANCE;
-          fmt.gltype = GL_UNSIGNED_SHORT;
-          fmt.scalable_internal_format = GL_LUMINANCE16;
-
-          if (img_vec[cam_id].img.get())
-            img_view[cam_id]->SetImage(
-                img_vec[cam_id].img->ptr, img_vec[cam_id].img->w,
-                img_vec[cam_id].img->h, img_vec[cam_id].img->pitch, fmt);
+          setImageViewFromData(img_vec[cam_id], img_view[cam_id]);
         }
 
         draw_plots();

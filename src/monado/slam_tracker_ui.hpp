@@ -1,6 +1,6 @@
 #pragma once
 
-#include "pangolin/display/display.h"
+#include <pangolin/display/display.h>
 #include <pangolin/display/image_view.h>
 #include <pangolin/pangolin.h>
 
@@ -11,14 +11,15 @@
 #include <memory>
 #include <string>
 #include <thread>
-#include "basalt/optical_flow/optical_flow.h"
-#include "basalt/utils/vio_config.h"
-#include "sophus/se3.hpp"
+
+#include <sophus/se3.hpp>
 
 #include <basalt/io/marg_data_io.h>
+#include <basalt/optical_flow/optical_flow.h>
 #include <basalt/serialization/headers_serialization.h>
+#include <basalt/utils/vio_config.h>
+#include <basalt/utils/vis_utils.h>
 #include <basalt/vi_estimator/vio_estimator.h>
-#include "basalt/utils/vis_utils.h"
 
 #define ASSERT(cond, ...)                                      \
   do {                                                         \
@@ -203,25 +204,15 @@ class slam_tracker_ui {
       }
       depth_guess = opt_flow->depth_guess;
 
-      {
-        pangolin::GlPixFormat fmt;
-        fmt.glformat = GL_LUMINANCE;
-        fmt.gltype = GL_UNSIGNED_SHORT;
-        fmt.scalable_internal_format = GL_LUMINANCE16;
+      if (curr_vis_data && curr_vis_data->opt_flow_res && curr_vis_data->opt_flow_res->input_images) {
+        auto &img_data = curr_vis_data->opt_flow_res->input_images->img_data;
 
-        if (curr_vis_data && curr_vis_data->opt_flow_res && curr_vis_data->opt_flow_res->input_images) {
-          auto &img_data = curr_vis_data->opt_flow_res->input_images->img_data;
-
-          for (size_t cam_id = 0; cam_id < num_cams; cam_id++) {
-            if (img_data[cam_id].img) {
-              img_view[cam_id]->SetImage(img_data[cam_id].img->ptr, img_data[cam_id].img->w, img_data[cam_id].img->h,
-                                         img_data[cam_id].img->pitch, fmt);
-            }
-          }
+        for (size_t cam_id = 0; cam_id < num_cams; cam_id++) {
+          setImageViewFromData(img_data[cam_id], img_view[cam_id]);
         }
-
-        draw_plots();
       }
+
+      draw_plots();
 
       if (show_est_vel.GuiChanged() || show_est_pos.GuiChanged() || show_est_ba.GuiChanged() ||
           show_est_bg.GuiChanged()) {

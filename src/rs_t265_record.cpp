@@ -57,6 +57,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/device/rs_t265.h>
 #include <basalt/serialization/headers_serialization.h>
 #include <basalt/utils/filesystem.h>
+#include <basalt/utils/vis_utils.h>
 #include <CLI/CLI.hpp>
 #include <cereal/archives/json.hpp>
 
@@ -124,19 +125,16 @@ void image_save_worker() {
   while (!stop_workers) {
     if (image_data_queue2.try_pop(img)) {
       for (size_t cam_id = 0; cam_id < NUM_CAMS; ++cam_id) {
-        basalt::ManagedImage<uint16_t>::Ptr image_raw =
-            img->img_data[cam_id].img;
+        basalt::ManagedImage::Ptr image_raw = img->img_data[cam_id].img;
 
         if (!image_raw.get()) continue;
 
         cv::Mat image(image_raw->h, image_raw->w, CV_8U);
 
-        uint8_t *dst = image.ptr();
-        const uint16_t *src = image_raw->ptr;
-
-        for (size_t i = 0; i < image_raw->size(); i++) {
-          dst[i] = (src[i] >> 8);
-        }
+        BASALT_ASSERT(image_raw->t == basalt::Image::U8);
+        for (size_t y = 0; y < image_raw->h; y++)
+          for (size_t x = 0; x < image_raw->w; x++)
+            image.at<uint8_t>(y, x) = image_raw->at<uint8_t>(x, y);
 
 #if CV_MAJOR_VERSION >= 3
         std::string filename = dataset_dir + "mav0/cam" +
@@ -465,22 +463,10 @@ int main(int argc, char *argv[]) {
                       pangolin::Colour::Blue(), "accel z");
 
     while (!pangolin::ShouldQuit()) {
-      {
-        pangolin::GlPixFormat fmt;
-        fmt.glformat = GL_LUMINANCE;
-        fmt.gltype = GL_UNSIGNED_SHORT;
-        fmt.scalable_internal_format = GL_LUMINANCE16;
-
-        if (t265_device->last_img_data.get())
-          for (size_t cam_id = 0; cam_id < basalt::RsT265Device::NUM_CAMS;
-               cam_id++) {
-            if (t265_device->last_img_data->img_data[cam_id].img.get())
-              img_view[cam_id]->SetImage(
-                  t265_device->last_img_data->img_data[cam_id].img->ptr,
-                  t265_device->last_img_data->img_data[cam_id].img->w,
-                  t265_device->last_img_data->img_data[cam_id].img->h,
-                  t265_device->last_img_data->img_data[cam_id].img->pitch, fmt);
-          }
+      if (t265_device->last_img_data.get()) {
+        auto &img_vec = t265_device->last_img_data->img_data;
+        for (size_t cam = 0; cam < basalt::RsT265Device::NUM_CAMS; cam++)
+          setImageViewFromData(img_vec[cam], img_view[cam]);
       }
 
       if (manual_exposure && exposure.GuiChanged()) {

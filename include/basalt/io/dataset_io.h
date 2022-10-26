@@ -64,12 +64,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/camera/generic_camera.hpp>
 #include <basalt/camera/stereographic_param.hpp>
 
+#include <opencv2/core.hpp>
+
 namespace basalt {
 
 struct ImageData {
   ImageData() : exposure(0) {}
 
-  ManagedImage<uint16_t>::Ptr img;
+  ManagedImage::Ptr img;
   double exposure;
 };
 
@@ -151,16 +153,6 @@ class DatasetIoFactory {
 }  // namespace basalt
 
 namespace cereal {
-
-template <class Archive>
-void serialize(Archive &archive, basalt::ManagedImage<uint8_t> &m) {
-  archive(m.w);
-  archive(m.h);
-
-  m.Reinitialise(m.w, m.h);
-
-  archive(binary_data(m.ptr, m.size()));
-}
 
 template <class Archive>
 void serialize(Archive &ar, basalt::GyroData &c) {

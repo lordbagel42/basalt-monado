@@ -284,7 +284,7 @@ void VignetteEstimator::compute_data_log(
 
 void VignetteEstimator::save_vign_png(const std::string &path) {
   for (size_t k = 0; k < vio_dataset->get_num_cams(); k++) {
-    ManagedImage<uint16_t> vign_img(resolutions[k][0], resolutions[k][1]);
+    ManagedImage vign_img(resolutions[k][0], resolutions[k][1], Image::U16);
     vign_img.Fill(0);
 
     Eigen::Vector2d oc = optical_centers[k];
@@ -297,7 +297,7 @@ void VignetteEstimator::save_vign_png(const std::string &path) {
         uint16_t val_int =
             val >= 1.0 ? std::numeric_limits<uint16_t>::max()
                        : uint16_t(val * std::numeric_limits<uint16_t>::max());
-        vign_img(x, y) = val_int;
+        vign_img.at<uint16_t>(x, y) = val_int;
       }
     }
 

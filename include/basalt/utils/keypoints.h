@@ -50,20 +50,19 @@ namespace basalt {
 
 typedef std::bitset<256> Descriptor;
 
-void detectKeypointsMapping(const basalt::Image<const uint16_t>& img_raw,
-                            KeypointsData& kd, int num_features);
+void detectKeypointsMapping(const basalt::Image& img_raw, KeypointsData& kd,
+                            int num_features);
 
 void detectKeypoints(
-    const basalt::Image<const uint16_t>& img_raw, KeypointsData& kd,
-    int PATCH_SIZE = 32, int num_points_cell = 1,
+    const basalt::Image& img_raw, KeypointsData& kd, int PATCH_SIZE = 32,
+    int num_points_cell = 1,
     const Eigen::aligned_vector<Eigen::Vector2d>& current_points =
         Eigen::aligned_vector<Eigen::Vector2d>());
 
-void computeAngles(const basalt::Image<const uint16_t>& img_raw,
-                   KeypointsData& kd, bool rotate_features);
+void computeAngles(const basalt::Image& img_raw, KeypointsData& kd,
+                   bool rotate_features);
 
-void computeDescriptors(const basalt::Image<const uint16_t>& img_raw,
-                        KeypointsData& kd);
+void computeDescriptors(const basalt::Image& img_raw, KeypointsData& kd);
 
 void matchDescriptors(const std::vector<std::bitset<256>>& corner_descriptors_1,
                       const std::vector<std::bitset<256>>& corner_descriptors_2,
