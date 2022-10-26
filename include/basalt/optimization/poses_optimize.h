@@ -244,8 +244,7 @@ class PosesOptimization {
   Sophus::SE3d getT_w_i(int64_t i) {
     auto it = timestam_to_pose.find(i);
 
-    if (it == timestam_to_pose.end())
-      return Sophus::SE3d();
+    if (it == timestam_to_pose.end()) return Sophus::SE3d();
     else
       return it->second;
   }
