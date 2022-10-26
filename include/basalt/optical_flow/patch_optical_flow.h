@@ -128,7 +128,7 @@ class PatchOpticalFlow : public OpticalFlowBase {
       pyramid.reset(new std::vector<basalt::ManagedImagePyr>);
       pyramid->resize(calib.intrinsics.size());
       for (size_t i = 0; i < calib.intrinsics.size(); i++) {
-        pyramid->at(i).setFromImage(*new_img_vec->img_data[i].img,
+        pyramid->at(i).setFromImage(new_img_vec->img_data[i].img,
                                     config.optical_flow_levels);
       }
 
@@ -145,7 +145,7 @@ class PatchOpticalFlow : public OpticalFlowBase {
       pyramid.reset(new std::vector<basalt::ManagedImagePyr>);
       pyramid->resize(calib.intrinsics.size());
       for (size_t i = 0; i < calib.intrinsics.size(); i++) {
-        pyramid->at(i).setFromImage(*new_img_vec->img_data[i].img,
+        pyramid->at(i).setFromImage(new_img_vec->img_data[i].img,
                                     config.optical_flow_levels);
       }
 
