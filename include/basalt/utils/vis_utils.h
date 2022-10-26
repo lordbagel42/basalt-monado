@@ -83,22 +83,19 @@ inline void getcolor(float p, float np, float& r, float& g, float& b) {
   g = 0.0f;
   b = 0.0f;
 
-  if ((0 <= x && x <= 1) || (5 <= x && x <= 6))
-    r = 1.0f;
+  if ((0 <= x && x <= 1) || (5 <= x && x <= 6)) r = 1.0f;
   else if (4 <= x && x <= 5)
     r = x - 4;
   else if (1 <= x && x <= 2)
     r = 1.0f - (x - 1);
 
-  if (1 <= x && x <= 3)
-    g = 1.0f;
+  if (1 <= x && x <= 3) g = 1.0f;
   else if (0 <= x && x <= 1)
     g = x - 0;
   else if (3 <= x && x <= 4)
     g = 1.0f - (x - 3);
 
-  if (3 <= x && x <= 5)
-    b = 1.0f;
+  if (3 <= x && x <= 5) b = 1.0f;
   else if (2 <= x && x <= 3)
     b = x - 2;
   else if (5 <= x && x <= 6)

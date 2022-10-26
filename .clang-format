@@ -1,7 +1,7 @@
 ---
-Language:       Cpp
-BasedOnStyle:   Google
-IndentWidth:    2
-IncludeBlocks:  Preserve
-...
-
+Language: Cpp
+BasedOnStyle: Google
+IndentWidth: 2
+IncludeBlocks: Preserve
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortIfStatementsOnASingleLine: Always
