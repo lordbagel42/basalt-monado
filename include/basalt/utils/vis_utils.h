@@ -36,8 +36,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <Eigen/Dense>
 
+#include <pangolin/display/image_view.h>
 #include <pangolin/gl/gldraw.h>
 
+#include <basalt/image/image.h>
+#include <basalt/io/dataset_io.h>
 #include <basalt/utils/sophus_utils.hpp>
 
 const uint8_t cam_color[3]{250, 0, 26};
@@ -100,4 +103,29 @@ inline void getcolor(float p, float np, float& r, float& g, float& b) {
     b = x - 2;
   else if (5 <= x && x <= 6)
     b = 1.0f - (x - 5);
+}
+
+inline void setImageViewFromData(const basalt::ImageData& img,
+                                 std::shared_ptr<pangolin::ImageView> view) {
+  if (!img.img) {
+    view->Clear();
+    return;
+  }
+
+  const basalt::ManagedImage& mimg = *img.img;
+  pangolin::GlPixFormat fmt;
+  fmt.glformat = GL_LUMINANCE;
+
+  switch (mimg.t) {
+    case basalt::Image::U8: {
+      fmt.gltype = GL_UNSIGNED_BYTE;
+      fmt.scalable_internal_format = GL_LUMINANCE8;
+    } break;
+    case basalt::Image::U16: {
+      fmt.gltype = GL_UNSIGNED_SHORT;
+      fmt.scalable_internal_format = GL_LUMINANCE16;
+    } break;
+    default: BASALT_ASSERT(false);
+  }
+  view->SetImage(mimg.ptr, mimg.w, mimg.h, mimg.pitch, fmt);
 }

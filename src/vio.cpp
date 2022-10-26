@@ -143,7 +143,7 @@ size_t last_frame_processed = 0;
 tbb::concurrent_unordered_map<int64_t, int, std::hash<int64_t>> timestamp_to_id;
 
 std::mutex m;
-std::condition_variable cv;
+std::condition_variable cvar;
 bool step_by_step = false;
 size_t max_frames = 0;
 
@@ -169,7 +169,7 @@ void feed_images() {
 
     if (step_by_step) {
       std::unique_lock<std::mutex> lk(m);
-      cv.wait(lk);
+      cvar.wait(lk);
     }
 
     basalt::OpticalFlowInput::Ptr data(new basalt::OpticalFlowInput);
@@ -504,15 +504,7 @@ int main(int argc, char** argv) {
           std::vector<basalt::ImageData> img_vec =
               vio_dataset->get_image_data(timestamp);
 
-          pangolin::GlPixFormat fmt;
-          fmt.glformat = GL_LUMINANCE;
-          fmt.gltype = GL_UNSIGNED_SHORT;
-          fmt.scalable_internal_format = GL_LUMINANCE16;
-
-          if (img_vec[cam_id].img.get())
-            img_view[cam_id]->SetImage(
-                img_vec[cam_id].img->ptr, img_vec[cam_id].img->w,
-                img_vec[cam_id].img->h, img_vec[cam_id].img->pitch, fmt);
+          setImageViewFromData(img_vec[cam_id], img_view[cam_id]);
         }
 
         draw_plots();
@@ -829,7 +821,7 @@ bool next_step() {
   if (show_frame < int(vio_dataset->get_image_timestamps().size()) - 1) {
     show_frame = show_frame + 1;
     show_frame.Meta().gui_changed = true;
-    cv.notify_one();
+    cvar.notify_one();
     return true;
   } else {
     return false;

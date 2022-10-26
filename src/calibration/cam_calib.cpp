@@ -44,6 +44,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/serialization/headers_serialization.h>
 
 #include <basalt/utils/filesystem.h>
+#include <basalt/utils/vis_utils.h>
 
 namespace basalt {
 
@@ -259,18 +260,7 @@ void CamCalib::renderingLoop() {
             vio_dataset->get_image_data(timestamp);
 
         for (size_t cam_id = 0; cam_id < vio_dataset->get_num_cams(); cam_id++)
-          if (img_vec[cam_id].img.get()) {
-            pangolin::GlPixFormat fmt;
-            fmt.glformat = GL_LUMINANCE;
-            fmt.gltype = GL_UNSIGNED_SHORT;
-            fmt.scalable_internal_format = GL_LUMINANCE16;
-
-            img_view[cam_id]->SetImage(
-                img_vec[cam_id].img->ptr, img_vec[cam_id].img->w,
-                img_vec[cam_id].img->h, img_vec[cam_id].img->pitch, fmt);
-          } else {
-            img_view[cam_id]->Clear();
-          }
+          setImageViewFromData(img_vec[cam_id], img_view[cam_id]);
       }
     }
 

@@ -1,4 +1,5 @@
 
+#include <basalt/image/opencv_interop.h>
 #include <basalt/utils/apriltag.h>
 
 #include <apriltags/TagDetector.h>
@@ -43,7 +44,7 @@ ApriltagDetector::ApriltagDetector(int numTags) {
 ApriltagDetector::~ApriltagDetector() { delete data; }
 
 void ApriltagDetector::detectTags(
-    basalt::ManagedImage<uint16_t>& img_raw,
+    basalt::ManagedImage& img_raw,
     Eigen::aligned_vector<Eigen::Vector2d>& corners, std::vector<int>& ids,
     std::vector<double>& radii,
     Eigen::aligned_vector<Eigen::Vector2d>& corners_rejected,
@@ -55,14 +56,7 @@ void ApriltagDetector::detectTags(
   ids_rejected.clear();
   radii_rejected.clear();
 
-  cv::Mat image(img_raw.h, img_raw.w, CV_8U);
-
-  uint8_t* dst = image.ptr();
-  const uint16_t* src = img_raw.ptr;
-
-  for (size_t i = 0; i < img_raw.size(); i++) {
-    dst[i] = (src[i] >> 8);
-  }
+  cv::Mat image = export_cvmat_copy(img_raw, CV_8UC1);
 
   // detect the tags
   std::vector<AprilTags::TagDetection> detections =
