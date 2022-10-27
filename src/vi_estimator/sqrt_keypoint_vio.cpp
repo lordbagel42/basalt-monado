@@ -33,6 +33,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include <basalt/utils/perfetto_utils.h>
 #include <basalt/vi_estimator/marg_helper.h>
 #include <basalt/vi_estimator/sqrt_keypoint_vio.h>
 
@@ -170,6 +171,7 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_,
 
     while (run) {
       vision_data_queue.pop(curr_frame);
+      TRACE_EVENT_BEGIN("pipeline", "vio.loop");
 
       if (config.vio_enforce_realtime) {
         // drop current frame if another frame is already in the queue.
@@ -265,6 +267,7 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_,
 
       measure(curr_frame, meas);
       prev_frame = curr_frame;
+      TRACE_EVENT_END("pipeline");
     }
 
     if (out_vis_queue) out_vis_queue->push(nullptr);
@@ -313,6 +316,7 @@ template <class Scalar_>
 bool SqrtKeypointVioEstimator<Scalar_>::measure(
     const OpticalFlowResult::Ptr& opt_flow_meas,
     const typename IntegratedImuMeasurement<Scalar>::Ptr& meas) {
+  TRACE_EVENT("pipeline", "vio.measure");
   stats_sums_.add("frame_id", opt_flow_meas->t_ns).format("none");
   Timer t_total;
 
@@ -341,6 +345,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
   prev_opt_flow_res[opt_flow_meas->t_ns] = opt_flow_meas;
 
   // Make new residual for existing keypoints
+  TRACE_EVENT_BEGIN("pipeline", "vio.add_observations");
   int connected0 = 0;
   std::map<int64_t, int> num_points_connected;
   std::unordered_set<int> unconnected_obs0;
@@ -373,6 +378,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
       }
     }
   }
+  TRACE_EVENT_END("pipeline");
 
   if (Scalar(connected0) / (connected0 + unconnected_obs0.size()) <
           Scalar(config.vio_new_kf_keypoints_thresh) &&
@@ -384,6 +390,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
               << unconnected_obs0.size() << std::endl;
   }
 
+  TRACE_EVENT_BEGIN("pipeline", "vio.take_keyframe");
   if (take_kf) {
     // Triangulate new points from one of the observations (with sufficient
     // baseline) and make keyframe for camera 0
@@ -395,6 +402,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
 
     int num_points_added = 0;
     for (int lm_id : unconnected_obs0) {
+      // TRACE_EVENT_BEGIN("pipeline", "vio.find_all_observations");
       // Find all observations
       std::map<TimeCamId, KeypointObservation<Scalar>> kp_obs;
 
@@ -413,13 +421,16 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
           }
         }
       }
+      // TRACE_EVENT_END("pipeline");
 
+      // TRACE_EVENT_BEGIN("pipeline", "vio.triangulate");
       // triangulate
       bool valid_kp = false;
       const Scalar min_triang_distance2 =
           Scalar(config.vio_min_triangulation_dist *
                  config.vio_min_triangulation_dist);
       for (const auto& kv_obs : kp_obs) {
+        // TRACE_EVENT("pipeline", "vio.triangulate_loop");
         if (valid_kp) break;
         TimeCamId tcido = kv_obs.first;
 
@@ -450,6 +461,8 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
 
         if (p0_triangulated.array().isFinite().all() &&
             p0_triangulated[3] > 0 && p0_triangulated[3] < 3.0) {
+          // TRACE_EVENT("pipeline", "vio.add_landmark");
+
           Keypoint<Scalar> kpt_pos;
           kpt_pos.host_kf_id = tcidl;
           kpt_pos.direction =
@@ -461,8 +474,10 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
           valid_kp = true;
         }
       }
+      // TRACE_EVENT_END("pipeline");
 
       if (valid_kp) {
+        // TRACE_EVENT("pipeline", "vio.add_observation");
         for (const auto& kv_obs : kp_obs) {
           lmdb.addObservation(kv_obs.first, kv_obs.second);
         }
@@ -473,9 +488,11 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
   } else {
     frames_after_kf++;
   }
+  TRACE_EVENT_END("pipeline");
 
   std::unordered_set<KeypointId> lost_landmaks;
   if (config.vio_marg_lost_landmarks) {
+    // TRACE_EVENT("pipeline", "vio.fill_lost_landmarks");
     for (const auto& kv : lmdb.getLandmarks()) {
       bool connected = false;
       for (size_t i = 0; i < opt_flow_meas->observations.size(); i++) {
@@ -605,6 +622,7 @@ template <class Scalar_>
 void SqrtKeypointVioEstimator<Scalar_>::marginalize(
     const std::map<int64_t, int>& num_points_connected,
     const std::unordered_set<KeypointId>& lost_landmaks) {
+  TRACE_EVENT("pipeline", "vio.marginalize");
   if (!opt_started) return;
 
   Timer t_total;
@@ -1063,6 +1081,7 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(
 
 template <class Scalar_>
 void SqrtKeypointVioEstimator<Scalar_>::optimize() {
+  TRACE_EVENT("pipeline", "vio.optimize");
   if (config.vio_debug) {
     std::cout << "=================================" << std::endl;
   }
@@ -1148,6 +1167,7 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
     int it = 0;
     int it_rejected = 0;
     for (; it <= config.vio_max_iterations && !terminated;) {
+      TRACE_EVENT("pipeline", "vio.iteration");
       if (it > 0) {
         timer_iteration.reset();
       }
@@ -1156,6 +1176,7 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
       VecX Jp_column_norm2;
 
       {
+        TRACE_EVENT("pipeline", "vio.linearize");
         // TODO: execution could be done staged
 
         Timer t;
@@ -1210,6 +1231,7 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
       // inner loop for backtracking in LM (still count as main iteration
       // though)
       for (int j = 0; it <= config.vio_max_iterations && !terminated; j++) {
+        TRACE_EVENT("pipeline", "vio.bt_iteration");
         if (j > 0) {
           timer_iteration.reset();
           if (config.vio_debug) {
@@ -1247,6 +1269,7 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
 
         VecX inc;
         {
+          TRACE_EVENT("pipeline", "vio.solve");
           Timer t;
 
           // get dense reduced camera system
@@ -1291,6 +1314,7 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
         // backsubstitute (with scaled pose increment)
         Scalar l_diff = 0;
         {
+          TRACE_EVENT("pipeline", "vio.backsub");
           // negate pose increment before point update
           inc = -inc;
 
@@ -1323,6 +1347,7 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
         Scalar after_update_vision_and_inertial_error = 0;
 
         {
+          TRACE_EVENT("pipeline", "vio.calc_error");
           Timer t;
           computeError(after_update_vision_and_inertial_error);
           computeMargPriorError(marg_data, after_update_marg_prior_error);

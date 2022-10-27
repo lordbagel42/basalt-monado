@@ -38,6 +38,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/image/image.h>
 #include <basalt/image/opencv_interop.h>
 #include <basalt/utils/keypoints.h>
+#include <basalt/utils/perfetto_utils.h>
 
 #include <opencv2/features2d/features2d.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -157,6 +158,8 @@ void detectKeypoints(
     const basalt::Image& img_raw, KeypointsData& kd, int PATCH_SIZE,
     int num_points_cell,
     const Eigen::aligned_vector<Eigen::Vector2d>& current_points) {
+  TRACE_EVENT("pipeline", "f2f.detectKeypoints");
+
   kd.corners.clear();
   kd.corner_angles.clear();
   kd.corner_descriptors.clear();

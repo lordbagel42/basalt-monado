@@ -48,6 +48,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <basalt/image/image_pyr.h>
 #include <basalt/utils/keypoints.h>
+#include <basalt/utils/perfetto_utils.h>
 
 namespace basalt {
 
@@ -113,6 +114,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
   }
 
   void processFrame(int64_t curr_t_ns, OpticalFlowInput::Ptr& new_img_vec) {
+    TRACE_EVENT("pipeline", "f2f.processFrame");
     for (const auto& v : new_img_vec->img_data) {
       if (!v.img.get()) return;
     }
@@ -127,6 +129,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       pyramid.reset(new std::vector<basalt::ManagedImagePyr>);
       pyramid->resize(calib.intrinsics.size());
 
+      TRACE_EVENT_BEGIN("other", "Creating pyramid for detection");
       tbb::parallel_for(tbb::blocked_range<size_t>(0, calib.intrinsics.size()),
                         [&](const tbb::blocked_range<size_t>& r) {
                           for (size_t i = r.begin(); i != r.end(); ++i) {
@@ -135,6 +138,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
                                 config.optical_flow_levels);
                           }
                         });
+      TRACE_EVENT_END("other");
 
       transforms->input_images = new_img_vec;
 
@@ -146,6 +150,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
       old_pyramid = pyramid;
 
+      TRACE_EVENT_BEGIN("other", "Creating pyramid for tracking");
       pyramid.reset(new std::vector<basalt::ManagedImagePyr>);
       pyramid->resize(calib.intrinsics.size());
       tbb::parallel_for(tbb::blocked_range<size_t>(0, calib.intrinsics.size()),
@@ -156,6 +161,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
                                 config.optical_flow_levels);
                           }
                         });
+      TRACE_EVENT_END("other");
 
       OpticalFlowResult::Ptr new_transforms;
       new_transforms.reset(new OpticalFlowResult);
@@ -190,6 +196,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
           transform_map_1,
       Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>& transform_map_2,
       bool matching = false) const {
+    TRACE_EVENT("pipeline", "f2f.trackPoints");
+
     size_t num_points = transform_map_1.size();
 
     std::vector<KeypointId> ids;
@@ -326,6 +334,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
   }
 
   void addPoints() {
+    TRACE_EVENT("pipeline", "f2f.addPoints");
+
     Eigen::aligned_vector<Eigen::Vector2d> pts0;
 
     for (const auto& kv : transforms->observations.at(0)) {
@@ -361,6 +371,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
   }
 
   void filterPoints() {
+    TRACE_EVENT("pipeline", "f2f.filterPoints");
     if (calib.intrinsics.size() < 2) return;
 
     std::set<KeypointId> lm_to_remove;

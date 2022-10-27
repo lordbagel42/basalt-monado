@@ -3,6 +3,8 @@
 #include "slam_tracker.hpp"
 #include "slam_tracker_ui.hpp"
 
+#include <basalt/utils/perfetto_utils.h>
+
 #include <pangolin/display/image_view.h>
 #include <pangolin/pangolin.h>
 
@@ -129,6 +131,23 @@ struct slam_tracker::implementation {
 
  public:
   implementation(const slam_config &config) {
+    perfetto::TracingInitArgs args;
+
+    // The backends determine where trace events are recorded. You may select one
+    // or more of:
+
+    // 1) The in-process backend only records within the app itself.
+    args.backends |= perfetto::kInProcessBackend;
+
+    // 2) The system backend writes events into a system Perfetto daemon,
+    //    allowing merging app and system events (e.g., ftrace) on the same
+    //    timeline. Requires the Perfetto `traced` daemon to be running (e.g.,
+    //    on Android Pie and newer).
+    args.backends |= perfetto::kSystemBackend;
+
+    perfetto::Tracing::Initialize(args);
+    perfetto::TrackEvent::Register();
+
     show_gui = config.show_ui;
 
     if (!config.config_file) {
@@ -340,6 +359,7 @@ struct slam_tracker::implementation {
 
  public:
   void push_frame(const img_sample &s) {
+    TRACE_EVENT("pipeline", "push_frame", "timestamp", s.timestamp);
     ASSERT(expecting_left_frame == s.is_left, "Unexpected %s frame", s.is_left ? "left" : "right");
     expecting_left_frame = !expecting_left_frame;
 
