@@ -273,6 +273,9 @@ set_property(TARGET basalt::opencv PROPERTY INTERFACE_LINK_LIBRARIES ${OpenCV_LI
 find_package(fmt REQUIRED)
 message(STATUS "Found {fmt} ${fmt_VERSION} in: ${fmt_DIR}")
 
+include_directories(/home/mateo/Documents/apps/oxrdeps/perfetto/sdk)
+add_library(perfetto STATIC /home/mateo/Documents/apps/oxrdeps/perfetto/sdk/perfetto.cc)
+
 add_subdirectory(thirdparty)
 
 # custom scoped monado target
@@ -334,6 +337,7 @@ target_sources(basalt_internal
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/utils/filesystem.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/utils/format.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/utils/imu_types.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/utils/perfetto_utils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/utils/keypoints.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/utils/nfr.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/utils/sim_utils.h
@@ -367,6 +371,7 @@ target_sources(basalt_internal
     ${CMAKE_CURRENT_SOURCE_DIR}/src/optical_flow/optical_flow.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/keypoints.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/system_utils.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/perfetto_utils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/time_utils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/utils/vio_config.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/vi_estimator/ba_base.cpp
@@ -382,7 +387,7 @@ target_sources(basalt_internal
 
 target_link_libraries(basalt_internal
   PUBLIC ${STD_CXX_FS} basalt::opencv basalt::basalt-headers TBB::tbb pangolin basalt::cli11 basalt::monado
-  PRIVATE basalt::magic_enum rosbag apriltag opengv nlohmann::json fmt::fmt)
+  PRIVATE basalt::magic_enum rosbag apriltag opengv nlohmann::json fmt::fmt perfetto ${CMAKE_THREAD_LIBS_INIT})
 target_include_directories(basalt_internal PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_definitions(basalt_internal PUBLIC ${BASALT_COMPILE_DEFINITIONS})
 #target_compile_definitions(basalt_internal PUBLIC BASALT_DISABLE_ASSERTS)
