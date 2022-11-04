@@ -160,7 +160,7 @@ void detectKeypointsMapping(const basalt::Image<const uint16_t>& img_raw,
 
 void detectKeypoints(
     const basalt::Image<const uint16_t>& img_raw, KeypointsData& kd,
-    int PATCH_SIZE, int num_points_cell,
+    int PATCH_SIZE, int num_points_cell, const Masks& masks,
     const Eigen::aligned_vector<Eigen::Vector2d>& current_points) {
   kd.corners.clear();
   kd.corner_angles.clear();
@@ -222,12 +222,16 @@ void detectKeypoints(
         //                  << threshold << std::endl;
 
         for (size_t i = 0; i < points.size() && points_added < num_points_cell;
-             i++)
-          if (img_raw.InBounds(x + points[i].pt.x, y + points[i].pt.y,
-                               EDGE_THRESHOLD)) {
-            kd.corners.emplace_back(x + points[i].pt.x, y + points[i].pt.y);
-            points_added++;
-          }
+             i++) {
+          float full_x = x + points[i].pt.x;
+          float full_y = y + points[i].pt.y;
+
+          if (masks.inBounds(full_x, full_y)) continue;
+          if (!img_raw.InBounds(full_x, full_y, EDGE_THRESHOLD)) continue;
+
+          kd.corners.emplace_back(x + points[i].pt.x, y + points[i].pt.y);
+          points_added++;
+        }
 
         threshold /= 2;
       }

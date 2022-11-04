@@ -34,6 +34,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 #pragma once
 
+#include <algorithm>
 #include <bitset>
 #include <set>
 
@@ -45,17 +46,34 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <basalt/utils/common_types.h>
 #include <basalt/camera/generic_camera.hpp>
+#include <utility>
 
 namespace basalt {
 
 typedef std::bitset<256> Descriptor;
+
+struct Rect {
+  float x, y, w, h;
+  bool inBounds(float xx, float yy) const {
+    return xx >= x && xx < x + w && yy >= y && yy < y + h;
+  }
+};
+
+struct Masks {
+  std::vector<Rect> masks{};
+  bool inBounds(float x, float y) const {
+    return std::any_of(masks.cbegin(), masks.cend(), [x, y](const Rect& mask) {
+      return mask.inBounds(x, y);
+    });
+  }
+};
 
 void detectKeypointsMapping(const basalt::Image<const uint16_t>& img_raw,
                             KeypointsData& kd, int num_features);
 
 void detectKeypoints(
     const basalt::Image<const uint16_t>& img_raw, KeypointsData& kd,
-    int PATCH_SIZE = 32, int num_points_cell = 1,
+    int PATCH_SIZE = 32, int num_points_cell = 1, const Masks& masks = {},
     const Eigen::aligned_vector<Eigen::Vector2d>& current_points =
         Eigen::aligned_vector<Eigen::Vector2d>());
 

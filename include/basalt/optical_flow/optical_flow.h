@@ -45,6 +45,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/calibration/calibration.hpp>
 #include <basalt/camera/stereographic_param.hpp>
 #include <basalt/utils/sophus_utils.hpp>
+#include <basalt/utils/keypoints.h>
 #include <slam_tracker.hpp>
 
 #include <tbb/concurrent_queue.h>
@@ -61,6 +62,7 @@ struct OpticalFlowInput {
   std::vector<ImageData> img_data;
 
   double depth_guess = -1;
+  std::vector<Masks> masks;  //!< Regions of the image to ignore
 
   timestats stats;  //!< Keeps track of internal metrics for this t_ns
   void addTime(const char* name, int64_t custom_ts = INT64_MIN) {

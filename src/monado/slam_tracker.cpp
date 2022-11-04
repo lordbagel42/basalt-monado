@@ -347,6 +347,7 @@ struct slam_tracker::implementation {
       partial_frame = make_shared<OpticalFlowInput>();
 
       partial_frame->img_data.resize(NUM_CAMS);
+      partial_frame->masks.resize(NUM_CAMS);
       partial_frame->t_ns = s.timestamp;
 
       // Initialize stats
@@ -375,6 +376,13 @@ struct slam_tracker::implementation {
     // Forced to use uint16_t here, in place because of cameras with 12-bit grayscale support
     auto &mimg = partial_frame->img_data[i].img;
     mimg.reset(new ManagedImage<uint16_t>(width, height));
+
+    // TODO@mateosss: use a dynamic feature for filling these
+    partial_frame->masks[i].masks.resize(s.masks.size());
+    for (size_t j = 0; j < s.masks.size(); j++) {
+      auto &r = s.masks[j];
+      partial_frame->masks[i].masks[j] = Rect{r.x, r.y, r.w, r.h};
+    }
 
     // TODO: We could avoid this copy. Maybe by writing a custom
     // allocator for ManagedImage that ties the OpenCV allocator

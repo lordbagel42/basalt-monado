@@ -1,8 +1,8 @@
 #pragma once
 
-#include "pangolin/display/display.h"
 #include <pangolin/display/image_view.h>
 #include <pangolin/pangolin.h>
+#include "pangolin/display/display.h"
 
 #include <CLI/CLI.hpp>
 
@@ -13,11 +13,13 @@
 #include <thread>
 #include "basalt/optical_flow/optical_flow.h"
 #include "basalt/utils/vio_config.h"
+#include "pangolin/gl/gldraw.h"
 #include "sophus/se3.hpp"
 
 #include <basalt/io/marg_data_io.h>
 #include <basalt/serialization/headers_serialization.h>
 #include <basalt/vi_estimator/vio_estimator.h>
+#include "basalt/utils/keypoints.h"
 #include "basalt/utils/vis_utils.h"
 
 #define ASSERT(cond, ...)                                      \
@@ -353,6 +355,25 @@ class slam_tracker_ui {
 
         glColor3f(1.0, 0.0, 0.0);
         pangolin::GlFont::I().Text("Tracked %d points", points.size()).Draw(5, 20);
+      }
+    }
+
+    if (!curr_vis_data || !curr_vis_data->opt_flow_res || !curr_vis_data->opt_flow_res->input_images) {
+      return;
+    }
+
+    glColor4f(0.0, 1.0, 1.0, 0.15);
+    for (const Rect &m : curr_vis_data->opt_flow_res->input_images->masks[cam_id].masks) {
+      pangolin::glDrawRect(m.x, m.y, m.x + m.w, m.y + m.h);
+    }
+
+    glColor4f(1.0, 0.0, 1.0, 0.75);
+    int patch_size = config.optical_flow_detection_grid_size;
+    int w = curr_vis_data->opt_flow_res->input_images->img_data[0].img->w;
+    int h = curr_vis_data->opt_flow_res->input_images->img_data[0].img->h;
+    for (int x = 0; x < w; x += patch_size) {
+      for (int y = 0; y < h; y += patch_size) {
+        pangolin::glDrawRectPerimeter(x, y, x + patch_size, y + patch_size);
       }
     }
   }

@@ -165,7 +165,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       for (size_t i = 0; i < calib.intrinsics.size(); i++) {
         trackPoints(old_pyramid->at(i), pyramid->at(i),
                     transforms->observations[i],
-                    new_transforms->observations[i]);
+                    new_transforms->observations[i], new_img_vec->masks[i]);
       }
 
       transforms = new_transforms;
@@ -189,7 +189,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       const Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>&
           transform_map_1,
       Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f>& transform_map_2,
-      bool matching = false) const {
+      const Masks& masks = {}, bool matching = false) const {
     size_t num_points = transform_map_1.size();
 
     std::vector<KeypointId> ids;
@@ -216,6 +216,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
         auto t1 = transform_1.translation();
         auto t2 = transform_2.translation();
+
+        if (masks.inBounds(t1.x(), t1.y())) continue;
 
         Eigen::Vector2f off{0, 0};
         MatchingGuessType guess_type = config.optical_flow_matching_guess_type;
@@ -336,7 +338,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     KeypointsData kd;
 
     detectKeypoints(pyramid->at(0).lvl(0), kd,
-                    config.optical_flow_detection_grid_size, 1, pts0);
+                    config.optical_flow_detection_grid_size, 1,
+                    transforms->input_images->masks[0], pts0);
 
     Eigen::aligned_map<KeypointId, Eigen::AffineCompact2f> new_poses0,
         new_poses1;
@@ -353,7 +356,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     }
 
     if (calib.intrinsics.size() > 1) {
-      trackPoints(pyramid->at(0), pyramid->at(1), new_poses0, new_poses1, true);
+      trackPoints(pyramid->at(0), pyramid->at(1), new_poses0, new_poses1,
+                  transforms->input_images->masks[0], true);
 
       for (const auto& kv : new_poses1) {
         transforms->observations.at(1).emplace(kv);
