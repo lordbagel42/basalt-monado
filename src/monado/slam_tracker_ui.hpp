@@ -362,20 +362,20 @@ class slam_tracker_ui {
       return;
     }
 
-    glColor4f(0.0, 1.0, 1.0, 0.15);
+    glColor4f(0.0, 1.0, 1.0, 0.5);
     for (const Rect &m : curr_vis_data->opt_flow_res->input_images->masks[cam_id].masks) {
-      pangolin::glDrawRect(m.x, m.y, m.x + m.w, m.y + m.h);
+      pangolin::glDrawRectPerimeter(m.x, m.y, m.x + m.w, m.y + m.h);
     }
 
-    glColor4f(1.0, 0.0, 1.0, 0.75);
-    int patch_size = config.optical_flow_detection_grid_size;
-    int w = curr_vis_data->opt_flow_res->input_images->img_data[0].img->w;
-    int h = curr_vis_data->opt_flow_res->input_images->img_data[0].img->h;
-    for (int x = 0; x < w; x += patch_size) {
-      for (int y = 0; y < h; y += patch_size) {
-        pangolin::glDrawRectPerimeter(x, y, x + patch_size, y + patch_size);
-      }
-    }
+    // glColor4f(1.0, 0.0, 1.0, 0.75);
+    // int patch_size = config.optical_flow_detection_grid_size;
+    // int w = curr_vis_data->opt_flow_res->input_images->img_data[0].img->w;
+    // int h = curr_vis_data->opt_flow_res->input_images->img_data[0].img->h;
+    // for (int x = 0; x < w; x += patch_size) {
+    //   for (int y = 0; y < h; y += patch_size) {
+    //     pangolin::glDrawRectPerimeter(x, y, x + patch_size, y + patch_size);
+    //   }
+    // }
   }
 
   void draw_scene() {
