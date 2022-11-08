@@ -152,7 +152,10 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(
 template <class Scalar_>
 void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_,
                                                    const Eigen::Vector3d& ba_) {
-  auto proc_func = [&, bg = bg_.cast<Scalar>(), ba = ba_.cast<Scalar>()] {
+  Vec3 bg = bg_.cast<Scalar>();
+  Vec3 ba = ba_.cast<Scalar>();
+
+  auto proc_func = [&, bg, ba] {
     OpticalFlowResult::Ptr prev_frame, curr_frame;
     typename IntegratedImuMeasurement<Scalar>::Ptr meas;
 
