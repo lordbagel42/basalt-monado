@@ -98,6 +98,7 @@ pangolin::Plotter* plotter;
 pangolin::Var<int> show_frame("ui.show_frame", 0, 0, 1500);
 
 pangolin::Var<bool> show_flow("ui.show_flow", false, false, true);
+pangolin::Var<bool> show_optflow("ui.show_optflow", false, false, true);
 pangolin::Var<bool> show_obs("ui.show_obs", true, false, true);
 pangolin::Var<bool> show_ids("ui.show_ids", false, false, true);
 pangolin::Var<bool> show_invdist{"ui.show_invdist", false, false, true};
@@ -745,7 +746,7 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
           const float radius = 6.5;
 
           float r, g, b;
-          getcolor(c[2] - min_id, max_id - min_id, b, g, r);
+          getcolor(1.0 / c[2], r, g, b);
           glColor3f(r, g, b);
 
           pangolin::glDrawCirclePerimeter(c[0], c[1], radius);
@@ -866,6 +867,50 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
         .Text("%d opt_flow patches", kp_map.size())
         .Draw(5, 20);
   }
+
+  if (show_optflow) {
+    size_t frame_id = show_frame;
+    if (frame_id < 1) goto out_show_optflow;
+
+    int64_t now_ts = vio_dataset->get_image_timestamps().at(frame_id);
+    int64_t prev_ts = vio_dataset->get_image_timestamps().at(frame_id - 1);
+
+    auto now_it = vis_map.find(now_ts);
+    auto prev_it = vis_map.find(prev_ts);
+
+    auto end_it = vis_map.end();
+    if (now_it == end_it || prev_it == end_it) goto out_show_optflow;
+
+    auto now_obs = now_it->second->opt_flow_res->observations;
+    auto prev_obs = prev_it->second->opt_flow_res->observations;
+
+    std::vector<Vector2f> of_lines;
+
+    float radius = 3.0f;
+
+    glColor4f(0.61, 0.35, 0.03, 0.5);
+    for (auto& [kpid, affine] : prev_obs[cam_id]) {
+      auto t = affine.translation();
+      pangolin::glDrawCirclePerimeter(t.x(), t.y(), radius);
+
+      if (now_obs[cam_id].count(kpid) > 0) {
+        auto s = now_obs[cam_id].at(kpid).translation();
+        of_lines.emplace_back(t.x(), t.y());
+        of_lines.emplace_back(s.x(), s.y());
+      }
+    }
+
+    glColor4f(1.0, 0.98, 0.36, 0.9);
+    pangolin::glDrawLines(of_lines);
+
+    glColor4f(1.0, 0.98, 0.36, 0.5);
+    for (auto& [kpid, affine] : now_obs[cam_id]) {
+      auto t = affine.translation();
+      pangolin::glDrawCirclePerimeter(t.x(), t.y(), radius);
+    }
+  }
+
+out_show_optflow:
 
   if (!curr_vis_data || !curr_vis_data->opt_flow_res ||
       !curr_vis_data->opt_flow_res->input_images) {

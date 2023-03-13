@@ -291,7 +291,7 @@ class slam_tracker_ui {
             float r;
             float g;
             float b;
-            getcolor(c[2] - min_id, max_id - min_id, b, g, r);
+            getcolor(1.0 / c[2], r, g, b);
             glColor3f(r, g, b);
 
             pangolin::glDrawCirclePerimeter(c[0], c[1], radius);

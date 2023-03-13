@@ -214,6 +214,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     MatchingGuessType guess_type = config.optical_flow_matching_guess_type;
     bool guess_requires_depth = guess_type != MatchingGuessType::SAME_PIXEL;
     const bool use_depth = matching && guess_requires_depth;
+    const bool tracking = !matching;
 
     auto compute_func = [&](const tbb::blocked_range<size_t>& range) {
       for (size_t r = range.begin(); r != range.end(); ++r) {
@@ -221,6 +222,17 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
         const Eigen::AffineCompact2f& transform_1 = init_vec[r];
         Eigen::AffineCompact2f transform_2 = transform_1;
+        if (tracking) {
+          Vec3 t1 = {t1.x, t1.y, depth_guess};
+          Pose T_i0 = last_pose;
+          Pose T_i1 = last_pose + imu_preintegration;
+
+          Pose T_c0 = T_i0 * T_i_c0;
+          Pose T_c1 = T_i1 * T_i_c1;
+
+          // Vec3 P1 = project
+          transform_2 = project();
+        }
 
         auto t1 = transform_1.translation();
         auto t2 = transform_2.translation();

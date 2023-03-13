@@ -104,3 +104,24 @@ inline void getcolor(float p, float np, float& r, float& g, float& b) {
   else if (5 <= x && x <= 6)
     b = 1.0f - (x - 5);
 }
+
+inline void getcolor(float depth, float& r, float& g, float& b) {
+  float max = 5;
+  float min = 0.5;
+  depth = std::clamp(depth, min, max);
+  float t = (depth - min) / (max - min);
+
+  // Blue
+  float rmin = 0.271;
+  float gmin = 0.792;
+  float bmin = 1;
+
+  // Pink
+  float rmax = 1;
+  float gmax = 0.106;
+  float bmax = 0.42;
+
+  r = rmin + t * (rmax - rmin);
+  g = gmin + t * (gmax - gmin);
+  b = bmin + t * (bmax - bmin);
+}
