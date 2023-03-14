@@ -38,7 +38,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <thread>
 
 #include <sophus/se2.hpp>
+#include "basalt/imu/imu_types.h"
+#include "basalt/imu/preintegration.h"
 #include "basalt/utils/common_types.h"
+#include "basalt/utils/imu_types.h"
 #include "sophus/se3.hpp"
 
 #include <tbb/blocked_range.h>
@@ -77,6 +80,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
                           const basalt::Calibration<double>& calib)
       : t_ns(-1), frame_counter(0), last_keypoint_id(0), config(config) {
     input_queue.set_capacity(10);
+    input_imu_queue.set_capacity(300);
 
     this->calib = calib.cast<Scalar>();
 
@@ -96,6 +100,22 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
   ~FrameToFrameOpticalFlow() { processing_thread->join(); }
 
+  typename ImuData<Scalar>::Ptr popFromImuDataQueue() {
+    ImuData<double>::Ptr data;
+    input_imu_queue.pop(data);
+
+    if constexpr (std::is_same_v<Scalar, double>) {
+      return data;
+    } else {
+      typename ImuData<Scalar>::Ptr data2;
+      if (data) {
+        data2.reset(new ImuData<Scalar>);
+        *data2 = data->cast<Scalar>();
+      }
+      return data2;
+    }
+  }
+
   void processingLoop() {
     OpticalFlowInput::Ptr input_ptr;
 
@@ -110,7 +130,49 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       }
       input_ptr->addTime("frames_received");
 
+      processImu(input_ptr->t_ns, input_ptr);
       processFrame(input_ptr->t_ns, input_ptr);
+    }
+  }
+
+  void processImu(int64_t curr_t_ns, OpticalFlowInput::Ptr& new_img_vec) {
+    if (input_imu_queue.empty()) {
+      return;
+    }
+
+    int64_t prev_t_ns = t_ns;
+
+    using Vec3 = Eigen::Matrix<Scalar, 3, 1>;
+    const Vec3 accel_cov =
+        calib.dicrete_time_accel_noise_std().array().square();
+    const Vec3 gyro_cov = calib.dicrete_time_gyro_noise_std().array().square();
+
+    meas = std::make_shared<IntegratedImuMeasurement<Scalar>>(
+        prev_t_ns, new_img_vec->last_state.bias_gyro.cast<Scalar>(),
+        new_img_vec->last_state.bias_accel.cast<Scalar>());
+
+    typename ImuData<Scalar>::Ptr data = popFromImuDataQueue();
+    while (data->t_ns <= prev_t_ns) {
+      data = popFromImuDataQueue();
+      if (!data) break;
+      data->accel = calib.calib_accel_bias.getCalibrated(data->accel);
+      data->gyro = calib.calib_gyro_bias.getCalibrated(data->gyro);
+    }
+
+    while (data->t_ns <= curr_t_ns) {
+      meas->integrate(*data, accel_cov, gyro_cov);
+      data = popFromImuDataQueue();
+      if (!data) break;
+      data->accel = calib.calib_accel_bias.getCalibrated(data->accel);
+      data->gyro = calib.calib_gyro_bias.getCalibrated(data->gyro);
+    }
+
+    if (meas->get_start_t_ns() + meas->get_dt_ns() < curr_t_ns) {
+      if (!data.get()) return;
+      int64_t tmp = data->t_ns;
+      data->t_ns = curr_t_ns;
+      meas->integrate(*data, accel_cov, gyro_cov);
+      data->t_ns = tmp;
     }
   }
 
@@ -226,7 +288,30 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     using SE3 = Sophus::SE3<Scalar>;
     using Vec2 = Eigen::Matrix<Scalar, 2, 1>;
     const SE3 last_imu_pose =
-        transforms->input_images->last_pose.cast<Scalar>();
+        transforms->input_images->last_state.T_w_i.cast<Scalar>();
+
+    SE3 T_i1 = last_imu_pose;
+#if 1
+    SE3 T_i2 = last_imu_pose;
+    if (meas) {
+      PoseVelBiasState<Scalar> last_state =
+          transforms->input_images->last_state.cast<Scalar>();
+      PoseVelBiasState<Scalar> next_state = last_state;
+      meas->predictState(last_state, Eigen::Vector3f{0, 0, -9.81}, next_state);
+      T_i2 = next_state.T_w_i;
+    }
+#else
+    SE3 T_i2 = T_i1;
+    // SE3 T_i2 = SE3::exp(1.05 * T_i1.log());
+    T_i2.translation().x() += 0.05;
+    T_i2.translation().y() += 0.05;
+    T_i2.translation().z() += 0.05;
+#endif
+
+    // TODO@mateosss: I feel I can generalize this, cam1==cam2 here
+    SE3 T_c1 = T_i1 * calib.T_i_c[cam1];
+    SE3 T_c2 = T_i2 * calib.T_i_c[cam2];
+    const SE3 T_c1_c2 = T_c1.inverse() * T_c2;
 
     // TODO@mateosss: be careful with the use of external non-const data in this
     // parallel function
@@ -247,22 +332,6 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
         Eigen::Vector2f off{0, 0};
 
         if (tracking) {
-          SE3 T_i1 = last_imu_pose;
-#if 0
-          SE3 T_i2 = last_imu_pose + imu_preintegration;
-#else
-          SE3 T_i2 = T_i1;
-          // SE3 T_i2 = SE3::exp(1.05 * T_i1.log());
-          T_i2.translation().x() += 0.05;
-          T_i2.translation().y() += 0.05;
-          T_i2.translation().z() += 0.05;
-#endif
-
-          // TODO@mateosss: I feel I can generalize this, cam1==cam2 here
-          SE3 T_c1 = T_i1 * calib.T_i_c[cam1];
-          SE3 T_c2 = T_i2 * calib.T_i_c[cam2];
-          SE3 T_c1_c2 = T_c1.inverse() * T_c2;
-
           Vec2 uv1 = t1;
           Scalar d1 = depth;
           Vec2 uv2 = {};
@@ -543,6 +612,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
   Matrix4 E;
 
   std::shared_ptr<std::thread> processing_thread;
+  typename IntegratedImuMeasurement<Scalar>::Ptr meas;
 };
 
 }  // namespace basalt

@@ -48,6 +48,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/utils/sophus_utils.hpp>
 #include <slam_tracker.hpp>
 #include <utility>
+#include <basalt/imu/imu_types.h>
 #include "sophus/se3.hpp"
 
 #include <tbb/concurrent_queue.h>
@@ -60,6 +61,7 @@ using xrt::auxiliary::tracking::slam::timestats;
 
 struct OpticalFlowInput {
   using Ptr = std::shared_ptr<OpticalFlowInput>;
+  using Vec3 = Eigen::Matrix<double, 3, 1>;
 
   OpticalFlowInput(int NUM_CAMS) {
     img_data.resize(NUM_CAMS);
@@ -70,7 +72,8 @@ struct OpticalFlowInput {
   std::vector<ImageData> img_data;
 
   double depth_guess = -1;
-  Sophus::SE3d last_pose;    //!< Last IMU pose estimated by the system
+  PoseVelBiasState<double> last_state;
+
   std::vector<Masks> masks;  //!< Regions of the image to ignore
 
   timestats stats;  //!< Keeps track of internal metrics for this t_ns
@@ -96,6 +99,7 @@ class OpticalFlowBase {
   using Ptr = std::shared_ptr<OpticalFlowBase>;
 
   tbb::concurrent_bounded_queue<OpticalFlowInput::Ptr> input_queue;
+  tbb::concurrent_bounded_queue<ImuData<double>::Ptr> input_imu_queue;
   tbb::concurrent_queue<double> input_depth_queue;
   tbb::concurrent_bounded_queue<OpticalFlowResult::Ptr>* output_queue = nullptr;
 

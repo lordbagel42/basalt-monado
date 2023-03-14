@@ -70,6 +70,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/utils/vis_utils.h>
 #include <basalt/utils/format.hpp>
 #include <basalt/utils/time_utils.hpp>
+#include "basalt/utils/imu_types.h"
 
 // enable the "..."_format(...) string literal
 using namespace basalt::literals;
@@ -157,6 +158,7 @@ tbb::concurrent_bounded_queue<basalt::PoseVelBiasState<double>::Ptr>
 std::vector<int64_t> vio_t_ns;
 Eigen::aligned_vector<Eigen::Vector3d> vio_t_w_i;
 Eigen::aligned_vector<Sophus::SE3d> vio_T_w_i;
+Eigen::aligned_vector<basalt::PoseVelBiasState<double>> vio_states;
 
 std::vector<int64_t> gt_t_ns;
 Eigen::aligned_vector<Eigen::Vector3d> gt_t_w_i;
@@ -204,10 +206,10 @@ void feed_images() {
 
     timestamp_to_id[data->t_ns] = i;
 
-    BASALT_ASSERT(vio_T_w_i.size() == i);
-    if (!vio_t_ns.empty()) {
-      BASALT_ASSERT(vio_T_w_i.size() == vio_t_ns.size());
-      data->last_pose = vio_T_w_i.back();
+    BASALT_ASSERT(vio_states.size() == i);
+    if (!vio_states.empty()) {
+      BASALT_ASSERT(vio_states.size() == vio_t_ns.size());
+      data->last_state = vio_states.back();
     }
 
     opt_flow_ptr->input_queue.push(data);
@@ -232,8 +234,10 @@ void feed_imu() {
     data->gyro = vio_dataset->get_gyro_data()[i].data;
 
     vio->imu_data_queue.push(data);
+    opt_flow_ptr->input_imu_queue.push(data);
   }
   vio->imu_data_queue.push(nullptr);
+  opt_flow_ptr->input_imu_queue.push(nullptr);
 }
 
 int main(int argc, char** argv) {
@@ -407,6 +411,7 @@ int main(int argc, char** argv) {
       vio_t_ns.emplace_back(data->t_ns);
       vio_t_w_i.emplace_back(T_w_i.translation());
       vio_T_w_i.emplace_back(T_w_i);
+      vio_states.emplace_back(*data);
 
       if (show_gui) {
         std::vector<float> vals;
@@ -895,7 +900,7 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
 
     float radius = 3.0f;
 
-    glColor4f(0.9, 0.8, 0.03, 0.5);
+    glColor4f(0.66, 0.69, 1, 0.5);  // Pale blue
     for (auto& [kpid, affine] : prev_obs[cam_id]) {
       auto t = affine.translation();
       pangolin::glDrawCirclePerimeter(t.x(), t.y(), radius);
@@ -907,11 +912,10 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
       }
     }
 
-    glColor4f(0.9, 0.8, 0.03, 0.9);
     pangolin::glDrawLines(of_lines);
     of_lines.clear();
 
-    glColor4f(0.27, 0.79, 1, 0.5);
+    glColor4f(0.92, 0.62, 1, 0.5);  // Pale magenta
     for (auto& [kpid, affine] : guess_obs[cam_id]) {
       auto t = affine.translation();
       pangolin::glDrawCirclePerimeter(t.x(), t.y(), radius);
@@ -923,10 +927,10 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
       }
     }
 
-    glColor4f(0.27, 0.79, 1, 0.9);
     pangolin::glDrawLines(of_lines);
+    of_lines.clear();
 
-    glColor4f(1.0, 0.98, 0.36, 0.5);
+    glColor4f(0.51, 1, 0.78, 0.9);  // Lime green
     for (auto& [kpid, affine] : now_obs[cam_id]) {
       auto t = affine.translation();
       pangolin::glDrawCirclePerimeter(t.x(), t.y(), radius);
