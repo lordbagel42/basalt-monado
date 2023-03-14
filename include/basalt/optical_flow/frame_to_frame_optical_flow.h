@@ -39,6 +39,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <sophus/se2.hpp>
 #include "basalt/utils/common_types.h"
+#include "sophus/se3.hpp"
 
 #include <tbb/blocked_range.h>
 #include <tbb/concurrent_unordered_map.h>
@@ -123,6 +124,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
       transforms.reset(new OpticalFlowResult);
       transforms->observations.resize(calib.intrinsics.size());
+      transforms->observations_initial_guesses.resize(calib.intrinsics.size());
       transforms->t_ns = t_ns;
 
       pyramid.reset(new std::vector<basalt::ManagedImagePyr<uint16_t>>);
@@ -161,13 +163,16 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       OpticalFlowResult::Ptr new_transforms;
       new_transforms.reset(new OpticalFlowResult);
       new_transforms->observations.resize(calib.intrinsics.size());
+      new_transforms->observations_initial_guesses.resize(
+          calib.intrinsics.size());
       new_transforms->t_ns = t_ns;
 
       for (size_t i = 0; i < calib.intrinsics.size(); i++) {
         trackPoints(old_pyramid->at(i), pyramid->at(i),
                     transforms->observations[i],
-                    new_transforms->observations[i], new_img_vec->masks.at(i),
-                    new_img_vec->masks.at(i), i, i);
+                    new_transforms->observations[i],
+                    new_transforms->observations_initial_guesses[i],
+                    new_img_vec->masks.at(i), new_img_vec->masks.at(i), i, i);
       }
 
       transforms = new_transforms;
@@ -188,7 +193,9 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
   void trackPoints(const basalt::ManagedImagePyr<uint16_t>& pyr_1,
                    const basalt::ManagedImagePyr<uint16_t>& pyr_2,
                    const Keypoints& transform_map_1, Keypoints& transform_map_2,
-                   const Masks& masks1, const Masks& masks2,  //
+                   Keypoints& transform_map_2_initial_guesses,
+                   const Masks& masks1,
+                   const Masks& masks2,  //
                    size_t cam1, size_t cam2) const {
     size_t num_points = transform_map_1.size();
 
@@ -205,7 +212,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
     tbb::concurrent_unordered_map<KeypointId, Eigen::AffineCompact2f,
                                   std::hash<KeypointId>>
-        result;
+        result, guesses;
 
     double depth = depth_guess;
     transforms->input_images->depth_guess = depth;  // Store guess for UI
@@ -213,41 +220,72 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     bool matching = cam1 != cam2;
     MatchingGuessType guess_type = config.optical_flow_matching_guess_type;
     bool guess_requires_depth = guess_type != MatchingGuessType::SAME_PIXEL;
+    // TODO@mateosss: use_depth meaning should be revised
     const bool use_depth = matching && guess_requires_depth;
     const bool tracking = !matching;
+    using SE3 = Sophus::SE3<Scalar>;
+    using Vec2 = Eigen::Matrix<Scalar, 2, 1>;
+    const SE3 last_imu_pose =
+        transforms->input_images->last_pose.cast<Scalar>();
 
+    // TODO@mateosss: be careful with the use of external non-const data in this
+    // parallel function
     auto compute_func = [&](const tbb::blocked_range<size_t>& range) {
       for (size_t r = range.begin(); r != range.end(); ++r) {
         const KeypointId id = ids[r];
 
         const Eigen::AffineCompact2f& transform_1 = init_vec[r];
         Eigen::AffineCompact2f transform_2 = transform_1;
-        if (tracking) {
-          Vec3 t1 = {t1.x, t1.y, depth_guess};
-          Pose T_i0 = last_pose;
-          Pose T_i1 = last_pose + imu_preintegration;
-
-          Pose T_c0 = T_i0 * T_i_c0;
-          Pose T_c1 = T_i1 * T_i_c1;
-
-          // Vec3 P1 = project
-          transform_2 = project();
-        }
 
         auto t1 = transform_1.translation();
         auto t2 = transform_2.translation();
 
         if (masks1.inBounds(t1.x(), t1.y())) continue;
 
+        bool valid = true;
+
         Eigen::Vector2f off{0, 0};
-        if (use_depth) {
+
+        if (tracking) {
+          SE3 T_i1 = last_imu_pose;
+#if 0
+          SE3 T_i2 = last_imu_pose + imu_preintegration;
+#else
+          SE3 T_i2 = T_i1;
+          // SE3 T_i2 = SE3::exp(1.05 * T_i1.log());
+          T_i2.translation().x() += 0.05;
+          T_i2.translation().y() += 0.05;
+          T_i2.translation().z() += 0.05;
+#endif
+
+          // TODO@mateosss: I feel I can generalize this, cam1==cam2 here
+          SE3 T_c1 = T_i1 * calib.T_i_c[cam1];
+          SE3 T_c2 = T_i2 * calib.T_i_c[cam2];
+          SE3 T_c1_c2 = T_c1.inverse() * T_c2;
+
+          Vec2 uv1 = t1;
+          Scalar d1 = depth;
+          Vec2 uv2 = {};
+          Scalar d2 = {};
+          valid =
+              calib.projectBetweenCams(uv1, d1, uv2, d2, T_c1_c2, cam1, cam2);
+          if (!valid) {
+            printf(">>> Problem projecting\n");  // TODO@mateosss: remove print
+            continue;
+          }
+
+          off = t2 - uv2;
+        } else if (use_depth) {
           off = calib.viewOffset(t1, depth, cam1, cam2);
         }
 
         t2 -= off;  // This modifies transform_2
+        if (tracking) {
+          guesses[id] = transform_2;
+        }
 
-        bool valid = t2(0) >= 0 && t2(1) >= 0 && t2(0) < pyr_2.lvl(0).w &&
-                     t2(1) < pyr_2.lvl(0).h;
+        valid = t2(0) >= 0 && t2(1) >= 0 && t2(0) < pyr_2.lvl(0).w &&
+                t2(1) < pyr_2.lvl(0).h;
         if (!valid) continue;
 
         valid = trackPoint(pyr_1, pyr_2, transform_1, transform_2);
@@ -278,6 +316,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
     transform_map_2.clear();
     transform_map_2.insert(result.begin(), result.end());
+    transform_map_2_initial_guesses.clear();
+    transform_map_2_initial_guesses.insert(guesses.begin(), guesses.end());
   }
 
   inline bool trackPoint(const basalt::ManagedImagePyr<uint16_t>& old_pyr,
@@ -425,7 +465,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
       // Match features on areas that overlap with cam0 using optical flow
       Keypoints kps;
-      trackPoints(pyramid->at(0), pyramid->at(i), kps0, kps, ms0, ms, 0, i);
+      trackPoints(pyramid->at(0), pyramid->at(i), kps0, kps, kps, ms0, ms, 0,
+                  i);
       transforms->observations.at(i).insert(kps.begin(), kps.end());
 
       // Update masks and detect features on area not overlapping with cam0

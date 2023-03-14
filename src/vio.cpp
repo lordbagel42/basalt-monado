@@ -168,7 +168,7 @@ tbb::concurrent_unordered_map<int64_t, int, std::hash<int64_t>> timestamp_to_id;
 
 std::mutex m;
 std::condition_variable cvar;
-bool step_by_step = false;
+bool step_by_step = true;
 size_t max_frames = 0;
 
 std::atomic<bool> terminate = false;
@@ -203,6 +203,12 @@ void feed_images() {
     data->img_data = vio_dataset->get_image_data(data->t_ns);
 
     timestamp_to_id[data->t_ns] = i;
+
+    BASALT_ASSERT(vio_T_w_i.size() == i);
+    if (!vio_t_ns.empty()) {
+      BASALT_ASSERT(vio_T_w_i.size() == vio_t_ns.size());
+      data->last_pose = vio_T_w_i.back();
+    }
 
     opt_flow_ptr->input_queue.push(data);
   }
@@ -883,12 +889,13 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
 
     auto now_obs = now_it->second->opt_flow_res->observations;
     auto prev_obs = prev_it->second->opt_flow_res->observations;
+    auto guess_obs = now_it->second->opt_flow_res->observations_initial_guesses;
 
     std::vector<Vector2f> of_lines;
 
     float radius = 3.0f;
 
-    glColor4f(0.61, 0.35, 0.03, 0.5);
+    glColor4f(0.9, 0.8, 0.03, 0.5);
     for (auto& [kpid, affine] : prev_obs[cam_id]) {
       auto t = affine.translation();
       pangolin::glDrawCirclePerimeter(t.x(), t.y(), radius);
@@ -900,7 +907,23 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
       }
     }
 
-    glColor4f(1.0, 0.98, 0.36, 0.9);
+    glColor4f(0.9, 0.8, 0.03, 0.9);
+    pangolin::glDrawLines(of_lines);
+    of_lines.clear();
+
+    glColor4f(0.27, 0.79, 1, 0.5);
+    for (auto& [kpid, affine] : guess_obs[cam_id]) {
+      auto t = affine.translation();
+      pangolin::glDrawCirclePerimeter(t.x(), t.y(), radius);
+
+      if (now_obs[cam_id].count(kpid) > 0) {
+        auto s = now_obs[cam_id].at(kpid).translation();
+        of_lines.emplace_back(t.x(), t.y());
+        of_lines.emplace_back(s.x(), s.y());
+      }
+    }
+
+    glColor4f(0.27, 0.79, 1, 0.9);
     pangolin::glDrawLines(of_lines);
 
     glColor4f(1.0, 0.98, 0.36, 0.5);

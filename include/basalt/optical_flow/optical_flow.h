@@ -47,6 +47,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/camera/stereographic_param.hpp>
 #include <basalt/utils/sophus_utils.hpp>
 #include <slam_tracker.hpp>
+#include <utility>
+#include "sophus/se3.hpp"
 
 #include <tbb/concurrent_queue.h>
 
@@ -68,6 +70,7 @@ struct OpticalFlowInput {
   std::vector<ImageData> img_data;
 
   double depth_guess = -1;
+  Sophus::SE3d last_pose;    //!< Last IMU pose estimated by the system
   std::vector<Masks> masks;  //!< Regions of the image to ignore
 
   timestats stats;  //!< Keeps track of internal metrics for this t_ns
@@ -81,6 +84,7 @@ struct OpticalFlowResult {
 
   int64_t t_ns;
   std::vector<Keypoints> observations;
+  std::vector<Keypoints> observations_initial_guesses;
 
   std::vector<std::map<KeypointId, size_t>> pyramid_levels;
 
