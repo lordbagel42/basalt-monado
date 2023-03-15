@@ -86,6 +86,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
     patch_coord = PatchT::pattern2.template cast<float>();
     depth_guess = config.optical_flow_matching_default_depth;
+    latest_state = PoseVelBiasState<double>();
 
     if (calib.intrinsics.size() > 1) {
       Eigen::Matrix4d Ed;
@@ -100,27 +101,20 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
   ~FrameToFrameOpticalFlow() { processing_thread->join(); }
 
-  typename ImuData<Scalar>::Ptr popFromImuDataQueue() {
-    ImuData<double>::Ptr data;
-    input_imu_queue.pop(data);
-
-    if constexpr (std::is_same_v<Scalar, double>) {
-      return data;
-    } else {
-      typename ImuData<Scalar>::Ptr data2;
-      if (data) {
-        data2.reset(new ImuData<Scalar>);
-        *data2 = data->cast<Scalar>();
-      }
-      return data2;
-    }
-  }
-
   void processingLoop() {
     OpticalFlowInput::Ptr input_ptr;
 
     while (true) {
       while (input_depth_queue.try_pop(depth_guess)) continue;
+
+      bool new_state = input_state_queue.try_pop(latest_state);
+      if (new_state) {
+        while (input_state_queue.try_pop(latest_state)) continue;  // Flush
+      } else {
+        latest_state = predicted_state;
+      }
+      auto pim = processImu(input_ptr->t_ns);
+      pim.predictState(latest_state, constants::g, predicted_state);
 
       input_queue.pop(input_ptr);
 
@@ -130,50 +124,61 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       }
       input_ptr->addTime("frames_received");
 
-      processImu(input_ptr->t_ns, input_ptr);
       processFrame(input_ptr->t_ns, input_ptr);
     }
   }
 
-  void processImu(int64_t curr_t_ns, OpticalFlowInput::Ptr& new_img_vec) {
-    if (input_imu_queue.empty()) {
-      return;
-    }
+  IntegratedImuMeasurement<double> processImu(int64_t curr_t_ns) {
+    using Vec3 = Eigen::Matrix<double, 3, 1>;
+    // TODO@mateosss: initialize once at start
+    Vec3 accel_cov = calib.dicrete_time_accel_noise_std()
+                         .template cast<double>()
+                         .array()
+                         .square();
+    Vec3 gyro_cov = calib.dicrete_time_gyro_noise_std()
+                        .template cast<double>()
+                        .array()
+                        .square();
 
     int64_t prev_t_ns = t_ns;
+    Vec3 bg = latest_state.bias_gyro;
+    Vec3 ba = latest_state.bias_accel;
+    IntegratedImuMeasurement<double> pim{prev_t_ns, bg, ba};
 
-    using Vec3 = Eigen::Matrix<Scalar, 3, 1>;
-    const Vec3 accel_cov =
-        calib.dicrete_time_accel_noise_std().array().square();
-    const Vec3 gyro_cov = calib.dicrete_time_gyro_noise_std().array().square();
+    if (input_imu_queue.empty()) return pim;
 
-    meas = std::make_shared<IntegratedImuMeasurement<Scalar>>(
-        prev_t_ns, new_img_vec->last_state.bias_gyro.cast<Scalar>(),
-        new_img_vec->last_state.bias_accel.cast<Scalar>());
+    auto pop_imu = [&](ImuData<double>::Ptr data) -> bool {
+      input_imu_queue.pop(data);  // Blocking pop
+      if (data) {                 // Calibrate sample
+        data->accel =
+            calib.calib_accel_bias.getCalibrated(data->accel.cast<Scalar>())
+                .template cast<double>();
+        data->gyro =
+            calib.calib_gyro_bias.getCalibrated(data->gyro.cast<Scalar>())
+                .template cast<double>();
+      }
+      return data != nullptr;
+    };
 
-    typename ImuData<Scalar>::Ptr data = popFromImuDataQueue();
+    typename ImuData<double>::Ptr data = nullptr;
+    if (!pop_imu(data)) return pim;
+
     while (data->t_ns <= prev_t_ns) {
-      data = popFromImuDataQueue();
-      if (!data) break;
-      data->accel = calib.calib_accel_bias.getCalibrated(data->accel);
-      data->gyro = calib.calib_gyro_bias.getCalibrated(data->gyro);
+      if (!pop_imu(data)) return pim;
     }
 
     while (data->t_ns <= curr_t_ns) {
-      meas->integrate(*data, accel_cov, gyro_cov);
-      data = popFromImuDataQueue();
-      if (!data) break;
-      data->accel = calib.calib_accel_bias.getCalibrated(data->accel);
-      data->gyro = calib.calib_gyro_bias.getCalibrated(data->gyro);
+      pim.integrate(*data, accel_cov, gyro_cov);
+      if (!pop_imu(data)) return pim;
     }
 
-    if (meas->get_start_t_ns() + meas->get_dt_ns() < curr_t_ns) {
-      if (!data.get()) return;
-      int64_t tmp = data->t_ns;
+    // Pretend last IMU sample before "now" happened now
+    if (pim.get_start_t_ns() + pim.get_dt_ns() < curr_t_ns) {
       data->t_ns = curr_t_ns;
-      meas->integrate(*data, accel_cov, gyro_cov);
-      data->t_ns = tmp;
+      pim.integrate(*data, accel_cov, gyro_cov);
     }
+
+    return pim;
   }
 
   void processFrame(int64_t curr_t_ns, OpticalFlowInput::Ptr& new_img_vec) {
@@ -259,6 +264,10 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
                    const Masks& masks1,
                    const Masks& masks2,  //
                    size_t cam1, size_t cam2) const {
+    using SE3 = Sophus::SE3<Scalar>;
+    using Vec2 = Eigen::Matrix<Scalar, 2, 1>;
+    using Vec3 = Eigen::Matrix<Scalar, 3, 1>;
+
     size_t num_points = transform_map_1.size();
 
     std::vector<KeypointId> ids;
@@ -276,8 +285,11 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
                                   std::hash<KeypointId>>
         result, guesses;
 
-    double depth = depth_guess;
-    transforms->input_images->depth_guess = depth;  // Store guess for UI
+    const double depth = depth_guess;
+
+    // Store values for UI playback
+    transforms->input_images->depth_guess = depth;
+    transforms->input_images->latest_state = latest_state;
 
     bool matching = cam1 != cam2;
     MatchingGuessType guess_type = config.optical_flow_matching_guess_type;
@@ -285,33 +297,14 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     // TODO@mateosss: use_depth meaning should be revised
     const bool use_depth = matching && guess_requires_depth;
     const bool tracking = !matching;
-    using SE3 = Sophus::SE3<Scalar>;
-    using Vec2 = Eigen::Matrix<Scalar, 2, 1>;
-    const SE3 last_imu_pose =
-        transforms->input_images->last_state.T_w_i.cast<Scalar>();
 
-    SE3 T_i1 = last_imu_pose;
-#if 1
-    SE3 T_i2 = last_imu_pose;
-    if (meas) {
-      PoseVelBiasState<Scalar> last_state =
-          transforms->input_images->last_state.cast<Scalar>();
-      PoseVelBiasState<Scalar> next_state = last_state;
-      meas->predictState(last_state, Eigen::Vector3f{0, 0, -9.81}, next_state);
-      T_i2 = next_state.T_w_i;
-    }
-#else
-    SE3 T_i2 = T_i1;
-    // SE3 T_i2 = SE3::exp(1.05 * T_i1.log());
-    T_i2.translation().x() += 0.05;
-    T_i2.translation().y() += 0.05;
-    T_i2.translation().z() += 0.05;
-#endif
+    SE3 T_i1 = latest_state.T_w_i.cast<Scalar>();
+    SE3 T_i2 = predicted_state.T_w_i.cast<Scalar>();
 
     // TODO@mateosss: I feel I can generalize this, cam1==cam2 here
     SE3 T_c1 = T_i1 * calib.T_i_c[cam1];
     SE3 T_c2 = T_i2 * calib.T_i_c[cam2];
-    const SE3 T_c1_c2 = T_c1.inverse() * T_c2;
+    SE3 T_c1_c2 = T_c1.inverse() * T_c2;
 
     // TODO@mateosss: be careful with the use of external non-const data in this
     // parallel function
@@ -332,20 +325,21 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
         Eigen::Vector2f off{0, 0};
 
         if (tracking) {
-          Vec2 uv1 = t1;
-          Scalar d1 = depth;
-          Vec2 uv2 = {};
-          Scalar d2 = {};
-          valid =
-              calib.projectBetweenCams(uv1, d1, uv2, d2, T_c1_c2, cam1, cam2);
+          Vec2 t2_guess;
+          Scalar _;
+          valid = calib.projectBetweenCams(t1, depth, t2_guess, _, T_c1_c2,
+                                           cam1, cam2);
           if (!valid) {
             printf(">>> Problem projecting\n");  // TODO@mateosss: remove print
             continue;
           }
 
-          off = t2 - uv2;
+          off = t2 - t2_guess;
         } else if (use_depth) {
-          off = calib.viewOffset(t1, depth, cam1, cam2);
+          Vec2 t2_guess;
+          Scalar _;
+          valid = calib.projectBetweenCams(t1, depth, t2_guess, _, cam1, cam2);
+          off = t2 - t2_guess;
         }
 
         t2 -= off;  // This modifies transform_2
@@ -612,7 +606,6 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
   Matrix4 E;
 
   std::shared_ptr<std::thread> processing_thread;
-  typename IntegratedImuMeasurement<Scalar>::Ptr meas;
 };
 
 }  // namespace basalt

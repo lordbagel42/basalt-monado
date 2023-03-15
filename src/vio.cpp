@@ -170,7 +170,7 @@ tbb::concurrent_unordered_map<int64_t, int, std::hash<int64_t>> timestamp_to_id;
 
 std::mutex m;
 std::condition_variable cvar;
-bool step_by_step = true;
+bool step_by_step = false;
 size_t max_frames = 0;
 
 std::atomic<bool> terminate = false;
@@ -213,6 +213,9 @@ void feed_images() {
     }
 
     opt_flow_ptr->input_queue.push(data);
+
+    std::this_thread::sleep_for(
+        std::chrono::duration(std::chrono::milliseconds(33)));
   }
 
   // Indicate the end of the sequence

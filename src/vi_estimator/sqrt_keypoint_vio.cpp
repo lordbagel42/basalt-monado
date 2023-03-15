@@ -554,6 +554,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(
       }
     }
     out_state_queue->push(data);
+    optflow_state_queue->push(data);
   }
 
   if (out_vis_queue) {

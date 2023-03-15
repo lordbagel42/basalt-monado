@@ -41,6 +41,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <basalt/utils/vio_config.h>
 
+#include <basalt/imu/imu_types.h>
 #include <basalt/io/dataset_io.h>
 #include <basalt/utils/keypoints.h>
 #include <basalt/calibration/calibration.hpp>
@@ -48,7 +49,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/utils/sophus_utils.hpp>
 #include <slam_tracker.hpp>
 #include <utility>
-#include <basalt/imu/imu_types.h>
 #include "sophus/se3.hpp"
 
 #include <tbb/concurrent_queue.h>
@@ -71,8 +71,9 @@ struct OpticalFlowInput {
   int64_t t_ns;
   std::vector<ImageData> img_data;
 
+  // Recorded internal pipeline values for UI playback
   double depth_guess = -1;
-  PoseVelBiasState<double> last_state;
+  PoseVelBiasState<double> latest_state;
 
   std::vector<Masks> masks;  //!< Regions of the image to ignore
 
@@ -101,10 +102,14 @@ class OpticalFlowBase {
   tbb::concurrent_bounded_queue<OpticalFlowInput::Ptr> input_queue;
   tbb::concurrent_bounded_queue<ImuData<double>::Ptr> input_imu_queue;
   tbb::concurrent_queue<double> input_depth_queue;
+  tbb::concurrent_queue<PoseVelBiasState<double>> input_state_queue;
   tbb::concurrent_bounded_queue<OpticalFlowResult::Ptr>* output_queue = nullptr;
 
   Eigen::MatrixXf patch_coord;
   double depth_guess = -1;
+  PoseVelBiasState<double> latest_state;
+  PoseVelBiasState<double> predicted_state;
+  // TODO@mateosss: maybe use StateWithLin?
 };
 
 class OpticalFlowFactory {

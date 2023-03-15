@@ -230,6 +230,10 @@ class PatchOpticalFlow : public OpticalFlowBase {
 
         const Eigen::aligned_vector<PatchT>& patch_vec = patches.at(id);
 
+        // TODO@mateosss: I think we can make this optflow module work again and
+        // have less drift with the optflow-imu modification. I think tracks
+        // were shorter due to the fact that pixel distance from the original
+        // track increases as time goes by and thus the initial guess gets bad.
         valid = trackPoint(pyr_2, patch_vec, transform_2);
         if (!valid) continue;
 
