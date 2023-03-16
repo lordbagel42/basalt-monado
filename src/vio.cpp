@@ -70,7 +70,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/utils/vis_utils.h>
 #include <basalt/utils/format.hpp>
 #include <basalt/utils/time_utils.hpp>
-#include "basalt/utils/imu_types.h"
+// #include "basalt/utils/imu_types.h"
 
 // enable the "..."_format(...) string literal
 using namespace basalt::literals;
@@ -158,7 +158,6 @@ tbb::concurrent_bounded_queue<basalt::PoseVelBiasState<double>::Ptr>
 std::vector<int64_t> vio_t_ns;
 Eigen::aligned_vector<Eigen::Vector3d> vio_t_w_i;
 Eigen::aligned_vector<Sophus::SE3d> vio_T_w_i;
-Eigen::aligned_vector<basalt::PoseVelBiasState<double>> vio_states;
 
 std::vector<int64_t> gt_t_ns;
 Eigen::aligned_vector<Eigen::Vector3d> gt_t_w_i;
@@ -187,6 +186,9 @@ basalt::VioEstimatorBase::Ptr vio;
 void feed_images() {
   std::cout << "Started input_data thread " << std::endl;
 
+  std::this_thread::sleep_for(
+      std::chrono::duration(std::chrono::milliseconds(33)));
+
   int NUM_CAMS = calib.intrinsics.size();
   for (size_t i = 0; i < vio_dataset->get_image_timestamps().size(); i++) {
     if (vio->finished || terminate || (max_frames > 0 && i >= max_frames)) {
@@ -205,12 +207,6 @@ void feed_images() {
     data->img_data = vio_dataset->get_image_data(data->t_ns);
 
     timestamp_to_id[data->t_ns] = i;
-
-    BASALT_ASSERT(vio_states.size() == i);
-    if (!vio_states.empty()) {
-      BASALT_ASSERT(vio_states.size() == vio_t_ns.size());
-      data->last_state = vio_states.back();
-    }
 
     opt_flow_ptr->input_queue.push(data);
 
@@ -349,6 +345,7 @@ int main(int argc, char** argv) {
     if (show_gui) vio->out_vis_queue = &out_vis_queue;
     vio->out_state_queue = &out_state_queue;
     vio->opt_flow_depth_guess_queue = &opt_flow_ptr->input_depth_queue;
+    vio->opt_flow_state_queue = &opt_flow_ptr->input_state_queue;
   }
 
   basalt::MargDataSaver::Ptr marg_data_saver;
@@ -414,7 +411,6 @@ int main(int argc, char** argv) {
       vio_t_ns.emplace_back(data->t_ns);
       vio_t_w_i.emplace_back(T_w_i.translation());
       vio_T_w_i.emplace_back(T_w_i);
-      vio_states.emplace_back(*data);
 
       if (show_gui) {
         std::vector<float> vals;

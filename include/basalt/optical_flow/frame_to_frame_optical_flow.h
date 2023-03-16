@@ -86,7 +86,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
     patch_coord = PatchT::pattern2.template cast<float>();
     depth_guess = config.optical_flow_matching_default_depth;
-    latest_state = PoseVelBiasState<double>();
+    latest_state = std::make_shared<PoseVelBiasState<double>>();
+    predicted_state = std::make_shared<PoseVelBiasState<double>>();
 
     if (calib.intrinsics.size() > 1) {
       Eigen::Matrix4d Ed;
@@ -105,59 +106,58 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     OpticalFlowInput::Ptr input_ptr;
 
     while (true) {
+      input_queue.pop(input_ptr);
+
+      if (input_ptr == nullptr) {
+        if (output_queue) output_queue->push(nullptr);
+        break;
+      }
+      input_ptr->addTime("frames_received");
+
       while (input_depth_queue.try_pop(depth_guess)) continue;
 
-      bool new_state = input_state_queue.try_pop(latest_state);
-      if (new_state) {
+      if (!input_state_queue.empty()) {
         while (input_state_queue.try_pop(latest_state)) continue;  // Flush
       } else {
         latest_state = predicted_state;
       }
       auto pim = processImu(input_ptr->t_ns);
-      pim.predictState(latest_state, constants::g, predicted_state);
-
-      input_queue.pop(input_ptr);
-
-      if (!input_ptr.get()) {
-        if (output_queue) output_queue->push(nullptr);
-        break;
-      }
-      input_ptr->addTime("frames_received");
+      pim.predictState(*latest_state, constants::g, *predicted_state);
 
       processFrame(input_ptr->t_ns, input_ptr);
     }
   }
 
   IntegratedImuMeasurement<double> processImu(int64_t curr_t_ns) {
-    using Vec3 = Eigen::Matrix<double, 3, 1>;
+    using Vec3d = Eigen::Matrix<double, 3, 1>;
+    using Vec3 = Eigen::Matrix<Scalar, 3, 1>;
     // TODO@mateosss: initialize once at start
-    Vec3 accel_cov = calib.dicrete_time_accel_noise_std()
+    Vec3d accel_cov = calib.dicrete_time_accel_noise_std()
+                          .template cast<double>()
+                          .array()
+                          .square();
+    Vec3d gyro_cov = calib.dicrete_time_gyro_noise_std()
                          .template cast<double>()
                          .array()
                          .square();
-    Vec3 gyro_cov = calib.dicrete_time_gyro_noise_std()
-                        .template cast<double>()
-                        .array()
-                        .square();
 
     int64_t prev_t_ns = t_ns;
-    Vec3 bg = latest_state.bias_gyro;
-    Vec3 ba = latest_state.bias_accel;
+    Vec3d bg = latest_state->bias_gyro;
+    Vec3d ba = latest_state->bias_accel;
     IntegratedImuMeasurement<double> pim{prev_t_ns, bg, ba};
 
     if (input_imu_queue.empty()) return pim;
 
-    auto pop_imu = [&](ImuData<double>::Ptr data) -> bool {
+    auto pop_imu = [&](ImuData<double>::Ptr& data) -> bool {
       input_imu_queue.pop(data);  // Blocking pop
-      if (data) {                 // Calibrate sample
-        data->accel =
-            calib.calib_accel_bias.getCalibrated(data->accel.cast<Scalar>())
-                .template cast<double>();
-        data->gyro =
-            calib.calib_gyro_bias.getCalibrated(data->gyro.cast<Scalar>())
-                .template cast<double>();
-      }
-      return data != nullptr;
+      if (data == nullptr) return false;
+
+      // Calibrate sample
+      Vec3 a = calib.calib_accel_bias.getCalibrated(data->accel.cast<Scalar>());
+      Vec3 g = calib.calib_gyro_bias.getCalibrated(data->gyro.cast<Scalar>());
+      data->accel = a.template cast<double>();
+      data->gyro = g.template cast<double>();
+      return true;
     };
 
     typename ImuData<double>::Ptr data = nullptr;
@@ -266,7 +266,6 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
                    size_t cam1, size_t cam2) const {
     using SE3 = Sophus::SE3<Scalar>;
     using Vec2 = Eigen::Matrix<Scalar, 2, 1>;
-    using Vec3 = Eigen::Matrix<Scalar, 3, 1>;
 
     size_t num_points = transform_map_1.size();
 
@@ -298,8 +297,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     const bool use_depth = matching && guess_requires_depth;
     const bool tracking = !matching;
 
-    SE3 T_i1 = latest_state.T_w_i.cast<Scalar>();
-    SE3 T_i2 = predicted_state.T_w_i.cast<Scalar>();
+    SE3 T_i1 = latest_state->T_w_i.cast<Scalar>();
+    SE3 T_i2 = predicted_state->T_w_i.cast<Scalar>();
 
     // TODO@mateosss: I feel I can generalize this, cam1==cam2 here
     SE3 T_c1 = T_i1 * calib.T_i_c[cam1];

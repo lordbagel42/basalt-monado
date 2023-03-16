@@ -73,7 +73,7 @@ struct OpticalFlowInput {
 
   // Recorded internal pipeline values for UI playback
   double depth_guess = -1;
-  PoseVelBiasState<double> latest_state;
+  PoseVelBiasState<double>::Ptr latest_state;
 
   std::vector<Masks> masks;  //!< Regions of the image to ignore
 
@@ -102,13 +102,13 @@ class OpticalFlowBase {
   tbb::concurrent_bounded_queue<OpticalFlowInput::Ptr> input_queue;
   tbb::concurrent_bounded_queue<ImuData<double>::Ptr> input_imu_queue;
   tbb::concurrent_queue<double> input_depth_queue;
-  tbb::concurrent_queue<PoseVelBiasState<double>> input_state_queue;
+  tbb::concurrent_queue<PoseVelBiasState<double>::Ptr> input_state_queue;
   tbb::concurrent_bounded_queue<OpticalFlowResult::Ptr>* output_queue = nullptr;
 
   Eigen::MatrixXf patch_coord;
   double depth_guess = -1;
-  PoseVelBiasState<double> latest_state;
-  PoseVelBiasState<double> predicted_state;
+  PoseVelBiasState<double>::Ptr latest_state = nullptr;
+  PoseVelBiasState<double>::Ptr predicted_state = nullptr;
   // TODO@mateosss: maybe use StateWithLin?
 };
 
