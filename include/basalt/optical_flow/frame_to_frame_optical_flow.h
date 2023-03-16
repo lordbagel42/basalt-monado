@@ -527,8 +527,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
       // Match features on areas that overlap with cam0 using optical flow
       Keypoints kps;
-      trackPoints(pyramid->at(0), pyramid->at(i), kps0, kps, kps, ms0, ms, 0,
-                  i);
+      Keypoints _;
+      trackPoints(pyramid->at(0), pyramid->at(i), kps0, kps, _, ms0, ms, 0, i);
       transforms->observations.at(i).insert(kps.begin(), kps.end());
 
       // Update masks and detect features on area not overlapping with cam0
