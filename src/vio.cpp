@@ -186,9 +186,6 @@ basalt::VioEstimatorBase::Ptr vio;
 void feed_images() {
   std::cout << "Started input_data thread " << std::endl;
 
-  std::this_thread::sleep_for(
-      std::chrono::duration(std::chrono::milliseconds(33)));
-
   int NUM_CAMS = calib.intrinsics.size();
   for (size_t i = 0; i < vio_dataset->get_image_timestamps().size(); i++) {
     if (vio->finished || terminate || (max_frames > 0 && i >= max_frames)) {
@@ -209,9 +206,6 @@ void feed_images() {
     timestamp_to_id[data->t_ns] = i;
 
     opt_flow_ptr->input_queue.push(data);
-
-    std::this_thread::sleep_for(
-        std::chrono::duration(std::chrono::milliseconds(33)));
   }
 
   // Indicate the end of the sequence

@@ -110,8 +110,10 @@ class OpticalFlowBase {
   Eigen::MatrixXf patch_coord;
   double depth_guess = -1;
   PoseVelBiasState<double>::Ptr latest_state = nullptr;
-  PoseVelBiasState<double>::Ptr predicted_state = nullptr;
   // TODO@mateosss: maybe use StateWithLin?
+  PoseVelBiasState<double>::Ptr predicted_state = nullptr;
+
+  bool first_state_arrived = false;
 };
 
 class OpticalFlowFactory {

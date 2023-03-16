@@ -35,6 +35,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
+#include <memory>
 #include <thread>
 
 #include <sophus/se2.hpp>
@@ -103,6 +104,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
   ~FrameToFrameOpticalFlow() { processing_thread->join(); }
 
   void processingLoop() {
+    using std::make_shared;
     OpticalFlowInput::Ptr input_ptr;
 
     while (true) {
@@ -118,11 +120,15 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
       if (!input_state_queue.empty()) {
         while (input_state_queue.try_pop(latest_state)) continue;  // Flush
-      } else {
-        latest_state = predicted_state;
+        first_state_arrived = true;
+      } else if (first_state_arrived) {
+        latest_state = make_shared<PoseVelBiasState<double>>(*predicted_state);
       }
-      auto pim = processImu(input_ptr->t_ns);
-      pim.predictState(*latest_state, constants::g, *predicted_state);
+
+      if (first_state_arrived) {
+        auto pim = processImu(input_ptr->t_ns);
+        pim.predictState(*latest_state, constants::g, *predicted_state);
+      }
 
       processFrame(input_ptr->t_ns, input_ptr);
     }
