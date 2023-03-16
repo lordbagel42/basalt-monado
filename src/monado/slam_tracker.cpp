@@ -316,6 +316,7 @@ struct slam_tracker::implementation {
     running = false;
     image_data_queue->push(nullptr);
     imu_data_queue->push(nullptr);
+    opt_flow_ptr->input_imu_queue.push(nullptr);
 
     if (print_queue) queues_printer_thread.join();
     state_consumer_thread.join();
@@ -342,6 +343,7 @@ struct slam_tracker::implementation {
     data->accel = {s.ax, s.ay, s.az};
     data->gyro = {s.wx, s.wy, s.wz};
     imu_data_queue->push(data);
+    opt_flow_ptr->input_imu_queue.push(data);
   }
 
  private:

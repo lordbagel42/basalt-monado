@@ -51,6 +51,7 @@ class slam_tracker_ui {
 
  private:
   VioVisualizationData::Ptr curr_vis_data = nullptr;
+  VioVisualizationData::Ptr prev_vis_data = nullptr;
   pangolin::DataLog vio_data_log;
   thread vis_thread;
   thread ui_runner_thread;
@@ -86,9 +87,11 @@ class slam_tracker_ui {
   void start_visualization_thread() {
     vis_thread = thread([&]() {
       while (true) {
+        auto curr = curr_vis_data;
         out_vis_queue.pop(curr_vis_data);
         show_frame = show_frame + 1;
         if (curr_vis_data.get() == nullptr) break;
+        prev_vis_data = curr;
       }
       cout << "Finished vis_thread\n";
     });
@@ -241,6 +244,7 @@ class slam_tracker_ui {
 
   pangolin::Var<int> show_frame{"ui.show_frame", 0, pangolin::META_FLAG_READONLY};
   pangolin::Var<bool> show_flow{"ui.show_flow", false, false, true};
+  pangolin::Var<bool> show_optflow{"ui.show_optflow", false, false, true};
   pangolin::Var<bool> show_obs{"ui.show_obs", true, false, true};
   pangolin::Var<bool> show_ids{"ui.show_ids", false, false, true};
   pangolin::Var<bool> show_invdist{"ui.show_invdist", false, false, true};
@@ -396,6 +400,57 @@ class slam_tracker_ui {
         pangolin::GlFont::I().Text("Detected %d keypoints", kp_map.size()).Draw(5, 40);
       }
     }
+
+    if (show_optflow) {
+      size_t frame_id = show_frame;
+      if (frame_id < 1) goto out_show_optflow;
+
+      auto now_obs = curr_vis_data->opt_flow_res->observations;
+      auto prev_obs = prev_vis_data->opt_flow_res->observations;
+      auto guess_obs = curr_vis_data->opt_flow_res->observations_initial_guesses;
+
+      std::vector<Vector2f> of_lines;
+
+      float radius = 3.0f;
+
+      glColor4f(0.66, 0.69, 1, 0.5);  // Pale blue
+      for (auto &[kpid, affine] : prev_obs[cam_id]) {
+        if (now_obs[cam_id].count(kpid) > 0) {
+          auto t = affine.translation();
+          pangolin::glDrawCirclePerimeter(t.x(), t.y(), radius);
+
+          auto s = now_obs[cam_id].at(kpid).translation();
+          of_lines.emplace_back(t.x(), t.y());
+          of_lines.emplace_back(s.x(), s.y());
+        }
+      }
+
+      pangolin::glDrawLines(of_lines);
+      of_lines.clear();
+
+      glColor4f(0.92, 0.62, 1, 0.5);  // Pale magenta
+      for (auto &[kpid, affine] : guess_obs[cam_id]) {
+        if (now_obs[cam_id].count(kpid) > 0) {
+          auto t = affine.translation();
+          pangolin::glDrawCirclePerimeter(t.x(), t.y(), radius);
+
+          auto s = now_obs[cam_id].at(kpid).translation();
+          of_lines.emplace_back(t.x(), t.y());
+          of_lines.emplace_back(s.x(), s.y());
+        }
+      }
+
+      pangolin::glDrawLines(of_lines);
+      of_lines.clear();
+
+      glColor4f(0.51, 1, 0.78, 0.9);  // Lime green
+      for (auto &[kpid, affine] : now_obs[cam_id]) {
+        auto t = affine.translation();
+        pangolin::glDrawCirclePerimeter(t.x(), t.y(), radius);
+      }
+    }
+
+  out_show_optflow:
 
     if (!curr_vis_data || !curr_vis_data->opt_flow_res || !curr_vis_data->opt_flow_res->input_images) {
       return;

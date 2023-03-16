@@ -70,7 +70,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/utils/vis_utils.h>
 #include <basalt/utils/format.hpp>
 #include <basalt/utils/time_utils.hpp>
-// #include "basalt/utils/imu_types.h"
 
 // enable the "..."_format(...) string literal
 using namespace basalt::literals;
