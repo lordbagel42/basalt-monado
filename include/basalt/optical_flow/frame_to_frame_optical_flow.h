@@ -76,6 +76,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
   typedef Eigen::Matrix<Scalar, 4, 4> Matrix4;
 
   typedef Sophus::SE2<Scalar> SE2;
+  typedef Sophus::SE3<Scalar> SE3;
 
   FrameToFrameOpticalFlow(const VioConfig& config,
                           const basalt::Calibration<double>& calib)
@@ -117,6 +118,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       input_ptr->addTime("frames_received");
 
       while (input_depth_queue.try_pop(depth_guess)) continue;
+      // TODO@mateosss: optional save for UI
+      input_ptr->depth_guess = depth_guess;  // Save for UI
 
       if (!input_state_queue.empty()) {
         while (input_state_queue.try_pop(latest_state)) continue;  // Flush
@@ -129,27 +132,28 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
         auto pim = processImu(input_ptr->t_ns);
         pim.predictState(*latest_state, constants::g, *predicted_state);
       }
+      // TODO@mateosss: optional save for UI
+      input_ptr->latest_state = latest_state;  // Save for UI
 
       processFrame(input_ptr->t_ns, input_ptr);
     }
   }
 
   IntegratedImuMeasurement<double> processImu(int64_t curr_t_ns) {
-    using Vec3d = Eigen::Matrix<double, 3, 1>;
-    using Vec3 = Eigen::Matrix<Scalar, 3, 1>;
+    using Vector3d = Eigen::Matrix<double, 3, 1>;
     // TODO@mateosss: initialize once at start
-    Vec3d accel_cov = calib.dicrete_time_accel_noise_std()
-                          .template cast<double>()
-                          .array()
-                          .square();
-    Vec3d gyro_cov = calib.dicrete_time_gyro_noise_std()
-                         .template cast<double>()
-                         .array()
-                         .square();
+    Vector3d accel_cov = calib.dicrete_time_accel_noise_std()
+                             .template cast<double>()
+                             .array()
+                             .square();
+    Vector3d gyro_cov = calib.dicrete_time_gyro_noise_std()
+                            .template cast<double>()
+                            .array()
+                            .square();
 
     int64_t prev_t_ns = t_ns;
-    Vec3d bg = latest_state->bias_gyro;
-    Vec3d ba = latest_state->bias_accel;
+    Vector3d bg = latest_state->bias_gyro;
+    Vector3d ba = latest_state->bias_accel;
     IntegratedImuMeasurement<double> pim{prev_t_ns, bg, ba};
 
     if (input_imu_queue.empty()) return pim;
@@ -159,8 +163,10 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       if (data == nullptr) return false;
 
       // Calibrate sample
-      Vec3 a = calib.calib_accel_bias.getCalibrated(data->accel.cast<Scalar>());
-      Vec3 g = calib.calib_gyro_bias.getCalibrated(data->gyro.cast<Scalar>());
+      Vector3 a =
+          calib.calib_accel_bias.getCalibrated(data->accel.cast<Scalar>());
+      Vector3 g =
+          calib.calib_gyro_bias.getCalibrated(data->gyro.cast<Scalar>());
       data->accel = a.template cast<double>();
       data->gyro = g.template cast<double>();
       return true;
@@ -240,12 +246,17 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
           calib.intrinsics.size());
       new_transforms->t_ns = t_ns;
 
+      SE3 T_i1 = latest_state->T_w_i.cast<Scalar>();
+      SE3 T_i2 = predicted_state->T_w_i.cast<Scalar>();
       for (size_t i = 0; i < calib.intrinsics.size(); i++) {
-        trackPoints(old_pyramid->at(i), pyramid->at(i),
-                    transforms->observations[i],
-                    new_transforms->observations[i],
-                    new_transforms->observations_initial_guesses[i],
-                    new_img_vec->masks.at(i), new_img_vec->masks.at(i), i, i);
+        SE3 T_c1 = T_i1 * calib.T_i_c[i];
+        SE3 T_c2 = T_i2 * calib.T_i_c[i];
+        SE3 T_c1_c2 = T_c1.inverse() * T_c2;
+        trackPoints(
+            old_pyramid->at(i), pyramid->at(i), transforms->observations[i],
+            new_transforms->observations[i],
+            new_transforms->observations_initial_guesses[i],
+            new_img_vec->masks.at(i), new_img_vec->masks.at(i), T_c1_c2, i, i);
       }
 
       transforms = new_transforms;
@@ -269,10 +280,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
                    Keypoints& transform_map_2_initial_guesses,
                    const Masks& masks1,
                    const Masks& masks2,  //
-                   size_t cam1, size_t cam2) const {
-    using SE3 = Sophus::SE3<Scalar>;
-    using Vec2 = Eigen::Matrix<Scalar, 2, 1>;
-
+                   const SE3& T_c1_c2, size_t cam1, size_t cam2) const {
     size_t num_points = transform_map_1.size();
 
     std::vector<KeypointId> ids;
@@ -290,29 +298,13 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
                                   std::hash<KeypointId>>
         result, guesses;
 
-    const double depth = depth_guess;
-
-    // Store values for UI playback
-    transforms->input_images->depth_guess = depth;
-    transforms->input_images->latest_state = latest_state;
-
+    bool tracking = cam1 == cam2;
     bool matching = cam1 != cam2;
     MatchingGuessType guess_type = config.optical_flow_matching_guess_type;
-    bool guess_requires_depth = guess_type != MatchingGuessType::SAME_PIXEL;
-    // TODO@mateosss: use_depth meaning should be revised
-    const bool use_depth = matching && guess_requires_depth;
-    const bool tracking = !matching;
+    bool match_guess_uses_depth = guess_type != MatchingGuessType::SAME_PIXEL;
+    const bool use_depth = tracking || (matching && match_guess_uses_depth);
+    const double depth = depth_guess;
 
-    SE3 T_i1 = latest_state->T_w_i.cast<Scalar>();
-    SE3 T_i2 = predicted_state->T_w_i.cast<Scalar>();
-
-    // TODO@mateosss: I feel I can generalize this, cam1==cam2 here
-    SE3 T_c1 = T_i1 * calib.T_i_c[cam1];
-    SE3 T_c2 = T_i2 * calib.T_i_c[cam2];
-    SE3 T_c1_c2 = T_c1.inverse() * T_c2;
-
-    // TODO@mateosss: be careful with the use of external non-const data in this
-    // parallel function
     auto compute_func = [&](const tbb::blocked_range<size_t>& range) {
       for (size_t r = range.begin(); r != range.end(); ++r) {
         const KeypointId id = ids[r];
@@ -329,26 +321,17 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
         Eigen::Vector2f off{0, 0};
 
-        if (tracking) {
-          Vec2 t2_guess;
+        if (use_depth) {
+          Vector2 t2_guess;
           Scalar _;
-          valid = calib.projectBetweenCams(t1, depth, t2_guess, _, T_c1_c2,
-                                           cam1, cam2);
-          if (!valid) {
-            printf(">>> Problem projecting\n");  // TODO@mateosss: remove print
-            continue;
-          }
-
-          off = t2 - t2_guess;
-        } else if (use_depth) {
-          Vec2 t2_guess;
-          Scalar _;
-          valid = calib.projectBetweenCams(t1, depth, t2_guess, _, cam1, cam2);
+          calib.projectBetweenCams(t1, depth, t2_guess, _, T_c1_c2, cam1, cam2);
           off = t2 - t2_guess;
         }
 
         t2 -= off;  // This modifies transform_2
-        if (tracking) {
+
+        bool store_guesses = true;  // TODO@mateosss: enable when UI is on
+        if (store_guesses) {
           guesses[id] = transform_2;
         }
 
@@ -532,9 +515,12 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       Masks& ms = transforms->input_images->masks.at(i);
 
       // Match features on areas that overlap with cam0 using optical flow
+      auto& pyr0 = pyramid->at(0);
+      auto& pyri = pyramid->at(i);
       Keypoints kps;
-      Keypoints _;
-      trackPoints(pyramid->at(0), pyramid->at(i), kps0, kps, _, ms0, ms, 0, i);
+      Keypoints _;  // TODO@mateosss: use for matching debugging
+      SE3 T_c0_ci = calib.T_i_c[0].inverse() * calib.T_i_c[i];
+      trackPoints(pyr0, pyri, kps0, kps, _, ms0, ms, T_c0_ci, 0, i);
       transforms->observations.at(i).insert(kps.begin(), kps.end());
 
       // Update masks and detect features on area not overlapping with cam0
