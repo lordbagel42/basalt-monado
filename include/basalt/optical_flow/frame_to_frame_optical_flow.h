@@ -198,18 +198,21 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       if (!v.img.get()) return;
     }
 
+    size_t NUM_CAMS = calib.intrinsics.size();
+
     if (t_ns < 0) {
       t_ns = curr_t_ns;
 
       transforms.reset(new OpticalFlowResult);
-      transforms->observations.resize(calib.intrinsics.size());
-      transforms->observations_initial_guesses.resize(calib.intrinsics.size());
+      transforms->observations.resize(NUM_CAMS);
+      transforms->tracking_guesses.resize(NUM_CAMS);
+      transforms->matching_guesses.resize(NUM_CAMS);
       transforms->t_ns = t_ns;
 
       pyramid.reset(new std::vector<basalt::ManagedImagePyr<uint16_t>>);
-      pyramid->resize(calib.intrinsics.size());
+      pyramid->resize(NUM_CAMS);
 
-      tbb::parallel_for(tbb::blocked_range<size_t>(0, calib.intrinsics.size()),
+      tbb::parallel_for(tbb::blocked_range<size_t>(0, NUM_CAMS),
                         [&](const tbb::blocked_range<size_t>& r) {
                           for (size_t i = r.begin(); i != r.end(); ++i) {
                             pyramid->at(i).setFromImage(
@@ -222,15 +225,14 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
       addPoints();
       filterPoints();
-
     } else {
       t_ns = curr_t_ns;
 
       old_pyramid = pyramid;
 
       pyramid.reset(new std::vector<basalt::ManagedImagePyr<uint16_t>>);
-      pyramid->resize(calib.intrinsics.size());
-      tbb::parallel_for(tbb::blocked_range<size_t>(0, calib.intrinsics.size()),
+      pyramid->resize(NUM_CAMS);
+      tbb::parallel_for(tbb::blocked_range<size_t>(0, NUM_CAMS),
                         [&](const tbb::blocked_range<size_t>& r) {
                           for (size_t i = r.begin(); i != r.end(); ++i) {
                             pyramid->at(i).setFromImage(
@@ -241,21 +243,21 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
       OpticalFlowResult::Ptr new_transforms;
       new_transforms.reset(new OpticalFlowResult);
-      new_transforms->observations.resize(calib.intrinsics.size());
-      new_transforms->observations_initial_guesses.resize(
-          calib.intrinsics.size());
+      new_transforms->observations.resize(NUM_CAMS);
+      new_transforms->tracking_guesses.resize(NUM_CAMS);
+      new_transforms->matching_guesses.resize(NUM_CAMS);
       new_transforms->t_ns = t_ns;
 
       SE3 T_i1 = latest_state->T_w_i.cast<Scalar>();
       SE3 T_i2 = predicted_state->T_w_i.cast<Scalar>();
-      for (size_t i = 0; i < calib.intrinsics.size(); i++) {
+      for (size_t i = 0; i < NUM_CAMS; i++) {
         SE3 T_c1 = T_i1 * calib.T_i_c[i];
         SE3 T_c2 = T_i2 * calib.T_i_c[i];
         SE3 T_c1_c2 = T_c1.inverse() * T_c2;
         trackPoints(
-            old_pyramid->at(i), pyramid->at(i), transforms->observations[i],
-            new_transforms->observations[i],
-            new_transforms->observations_initial_guesses[i],
+            old_pyramid->at(i), pyramid->at(i),  //
+            transforms->observations[i], new_transforms->observations[i],
+            new_transforms->tracking_guesses[i],  //
             new_img_vec->masks.at(i), new_img_vec->masks.at(i), T_c1_c2, i, i);
       }
 
@@ -277,9 +279,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
   void trackPoints(const basalt::ManagedImagePyr<uint16_t>& pyr_1,
                    const basalt::ManagedImagePyr<uint16_t>& pyr_2,
                    const Keypoints& transform_map_1, Keypoints& transform_map_2,
-                   Keypoints& transform_map_2_initial_guesses,
-                   const Masks& masks1,
-                   const Masks& masks2,  //
+                   Keypoints& guesses, const Masks& masks1, const Masks& masks2,
                    const SE3& T_c1_c2, size_t cam1, size_t cam2) const {
     size_t num_points = transform_map_1.size();
 
@@ -296,7 +296,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
     tbb::concurrent_unordered_map<KeypointId, Eigen::AffineCompact2f,
                                   std::hash<KeypointId>>
-        result, guesses;
+        result, guesses_tbb;
 
     bool tracking = cam1 == cam2;
     bool matching = cam1 != cam2;
@@ -332,7 +332,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
         bool store_guesses = true;  // TODO@mateosss: enable when UI is on
         if (store_guesses) {
-          guesses[id] = transform_2;
+          guesses_tbb[id] = transform_2;
         }
 
         valid = t2(0) >= 0 && t2(1) >= 0 && t2(0) < pyr_2.lvl(0).w &&
@@ -361,14 +361,12 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     };
 
     tbb::blocked_range<size_t> range(0, num_points);
-
     tbb::parallel_for(range, compute_func);
-    // compute_func(range);
 
     transform_map_2.clear();
     transform_map_2.insert(result.begin(), result.end());
-    transform_map_2_initial_guesses.clear();
-    transform_map_2_initial_guesses.insert(guesses.begin(), guesses.end());
+    guesses.clear();
+    guesses.insert(guesses_tbb.begin(), guesses_tbb.end());
   }
 
   inline bool trackPoint(const basalt::ManagedImagePyr<uint16_t>& old_pyr,
@@ -513,14 +511,14 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
     const int NUM_CAMS = calib.intrinsics.size();
     for (int i = 1; i < NUM_CAMS; i++) {
       Masks& ms = transforms->input_images->masks.at(i);
+      Keypoints& mgs = transforms->matching_guesses.at(i);
 
       // Match features on areas that overlap with cam0 using optical flow
       auto& pyr0 = pyramid->at(0);
       auto& pyri = pyramid->at(i);
       Keypoints kps;
-      Keypoints _;  // TODO@mateosss: use for matching debugging
       SE3 T_c0_ci = calib.T_i_c[0].inverse() * calib.T_i_c[i];
-      trackPoints(pyr0, pyri, kps0, kps, _, ms0, ms, T_c0_ci, 0, i);
+      trackPoints(pyr0, pyri, kps0, kps, mgs, ms0, ms, T_c0_ci, 0, i);
       transforms->observations.at(i).insert(kps.begin(), kps.end());
 
       // Update masks and detect features on area not overlapping with cam0

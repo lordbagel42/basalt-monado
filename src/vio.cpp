@@ -98,7 +98,10 @@ pangolin::Plotter* plotter;
 pangolin::Var<int> show_frame("ui.show_frame", 0, 0, 1500);
 
 pangolin::Var<bool> show_flow("ui.show_flow", false, false, true);
-pangolin::Var<bool> show_optflow("ui.show_optflow", false, false, true);
+pangolin::Var<bool> show_tracking_guess("ui.show_tracking_guess", false, false,
+                                        true);
+pangolin::Var<bool> show_matching_guess("ui.show_matching_guess", false, false,
+                                        true);
 pangolin::Var<bool> show_obs("ui.show_obs", true, false, true);
 pangolin::Var<bool> show_ids("ui.show_ids", false, false, true);
 pangolin::Var<bool> show_invdist{"ui.show_invdist", false, false, true};
@@ -871,9 +874,9 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
         .Draw(5, 20);
   }
 
-  if (show_optflow) {
+  if (show_tracking_guess) {
     size_t frame_id = show_frame;
-    if (frame_id < 1) goto out_show_optflow;
+    if (frame_id < 1) goto out_show_tracking_guess;
 
     int64_t now_ts = vio_dataset->get_image_timestamps().at(frame_id);
     int64_t prev_ts = vio_dataset->get_image_timestamps().at(frame_id - 1);
@@ -882,58 +885,114 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
     auto prev_it = vis_map.find(prev_ts);
 
     auto end_it = vis_map.end();
-    if (now_it == end_it || prev_it == end_it) goto out_show_optflow;
+    if (now_it == end_it || prev_it == end_it) goto out_show_tracking_guess;
 
-    auto now_obs = now_it->second->opt_flow_res->observations;
-    auto prev_obs = prev_it->second->opt_flow_res->observations;
-    auto guess_obs = now_it->second->opt_flow_res->observations_initial_guesses;
+    auto now_obs = now_it->second->opt_flow_res->observations[cam_id];
+    auto prev_obs = prev_it->second->opt_flow_res->observations[cam_id];
+    auto guess_obs = now_it->second->opt_flow_res->tracking_guesses[cam_id];
 
-    std::vector<Vector2f> of_lines;
+    std::vector<Vector2f> prev_lines;
+    std::vector<Vector2f> prev_points;
+    std::vector<Vector2f> guess_lines;
+    std::vector<Vector2f> guess_points;
+    std::vector<Vector2f> now_points;
+
+    prev_lines.reserve(now_obs.size());
+    prev_points.reserve(now_obs.size());
+    guess_lines.reserve(now_obs.size());
+    guess_points.reserve(now_obs.size());
+    now_points.reserve(now_obs.size());
 
     float radius = 3.0f;
 
-    glColor4f(0.66, 0.69, 1, 0.5);  // Pale blue
-    for (auto& [kpid, affine] : prev_obs[cam_id]) {
-      auto t = affine.translation();
-      pangolin::glDrawCirclePerimeter(t.x(), t.y(), radius);
+    // Draw tracked features in previous frame
+    for (auto& [kpid, affine] : now_obs) {
+      if (prev_obs.count(kpid) == 0) continue;
+      if (guess_obs.count(kpid) == 0) continue;
 
-      if (now_obs[cam_id].count(kpid) > 0) {
-        auto s = now_obs[cam_id].at(kpid).translation();
-        of_lines.emplace_back(t.x(), t.y());
-        of_lines.emplace_back(s.x(), s.y());
-      }
+      auto n = affine.translation();
+      auto p = prev_obs.at(kpid).translation();
+      auto g = guess_obs.at(kpid).translation();
+
+      now_points.emplace_back(n);
+
+      prev_lines.emplace_back(p);
+      prev_lines.emplace_back(n);
+      prev_points.emplace_back(p);
+
+      guess_lines.emplace_back(g);
+      guess_lines.emplace_back(n);
+      guess_points.emplace_back(g);
     }
 
-    pangolin::glDrawLines(of_lines);
-    of_lines.clear();
+    glColor4f(1, 0.59, 0, 0.9);
+    glDrawCirclePerimeters(now_points, radius);
 
-    glColor4f(0.92, 0.62, 1, 0.5);  // Pale magenta
-    for (auto& [kpid, affine] : guess_obs[cam_id]) {
-      auto t = affine.translation();
-      pangolin::glDrawCirclePerimeter(t.x(), t.y(), radius);
+    glColor4f(0.93, 0.42, 0, 0.3);
+    pangolin::glDrawLines(prev_lines);
+    glDrawCirclePerimeters(prev_points, radius);
 
-      if (now_obs[cam_id].count(kpid) > 0) {
-        auto s = now_obs[cam_id].at(kpid).translation();
-        of_lines.emplace_back(t.x(), t.y());
-        of_lines.emplace_back(s.x(), s.y());
-      }
-    }
-
-    pangolin::glDrawLines(of_lines);
-    of_lines.clear();
-
-    glColor4f(0.51, 1, 0.78, 0.9);  // Lime green
-    for (auto& [kpid, affine] : now_obs[cam_id]) {
-      auto t = affine.translation();
-      pangolin::glDrawCirclePerimeter(t.x(), t.y(), radius);
-    }
+    glColor4f(1, 0.59, 0, 0.5);
+    pangolin::glDrawLines(guess_lines);
+    glDrawCirclePerimeters(guess_points, radius);
   }
 
-out_show_optflow:
+out_show_tracking_guess:
 
   if (!curr_vis_data || !curr_vis_data->opt_flow_res ||
       !curr_vis_data->opt_flow_res->input_images) {
     return;
+  }
+
+  if (show_matching_guess) {
+    auto now_obs = curr_vis_data->opt_flow_res->observations[cam_id];
+    auto cam0_obs = curr_vis_data->opt_flow_res->observations[0];
+    auto guess_obs = curr_vis_data->opt_flow_res->matching_guesses[cam_id];
+
+    std::vector<Vector2f> cam0_lines;
+    std::vector<Vector2f> cam0_points;
+    std::vector<Vector2f> guess_lines;
+    std::vector<Vector2f> guess_points;
+    std::vector<Vector2f> now_points;
+
+    cam0_lines.reserve(now_obs.size());
+    cam0_points.reserve(now_obs.size());
+    guess_lines.reserve(now_obs.size());
+    guess_points.reserve(now_obs.size());
+    now_points.reserve(now_obs.size());
+
+    float radius = 3.0f;
+
+    // Draw tracked features in previous frame
+    for (auto& [kpid, affine] : now_obs) {
+      if (cam0_obs.count(kpid) == 0) continue;
+      if (guess_obs.count(kpid) == 0) continue;
+
+      auto n = affine.translation();
+      auto c = cam0_obs.at(kpid).translation();
+      auto g = guess_obs.at(kpid).translation();
+
+      now_points.emplace_back(n);
+
+      cam0_lines.emplace_back(c);
+      cam0_lines.emplace_back(n);
+      cam0_points.emplace_back(c);
+
+      guess_lines.emplace_back(g);
+      guess_lines.emplace_back(n);
+      guess_points.emplace_back(g);
+    }
+
+    glColor4f(0.12, 0.58, 0.95, 0.9);
+    glDrawCirclePerimeters(now_points, radius);
+
+    glColor4f(0, 0.73, 0.83, 0.5);
+    pangolin::glDrawLines(cam0_lines);
+    glDrawCirclePerimeters(cam0_points, radius);
+
+    glColor4f(0.12, 0.58, 0.95, 0.5);
+    pangolin::glDrawLines(guess_lines);
+    glDrawCirclePerimeters(guess_points, radius);
   }
 
   if (show_masks) {

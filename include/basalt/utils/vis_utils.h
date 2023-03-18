@@ -125,3 +125,13 @@ inline void getcolor(float depth, float& r, float& g, float& b) {
   g = gmin + t * (gmax - gmin);
   b = bmin + t * (bmax - bmin);
 }
+
+template <typename P, int N, class Allocator>
+void glDrawCirclePerimeters(
+    const std::vector<Eigen::Matrix<P, N, 1>, Allocator>& points,
+    float radius = 5.0) {
+  for (auto& p : points) {
+    pangolin::glDrawCirclePerimeter((GLfloat)p(0), (GLfloat)p(1),
+                                    (GLfloat)radius);
+  }
+}

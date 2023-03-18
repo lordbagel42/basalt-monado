@@ -88,9 +88,8 @@ struct OpticalFlowResult {
 
   int64_t t_ns;
   std::vector<Keypoints> observations;
-  std::vector<Keypoints> observations_initial_guesses;
-  // TODO@mateosss?: do this instead of replicating code in UI
-  // std::vector<Keypoints> observations_matching_guesses;
+  std::vector<Keypoints> tracking_guesses;
+  std::vector<Keypoints> matching_guesses;
 
   std::vector<std::map<KeypointId, size_t>> pyramid_levels;
 
