@@ -70,6 +70,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
   typedef Eigen::Matrix<Scalar, 2, 2> Matrix2;
 
   typedef Eigen::Matrix<Scalar, 3, 1> Vector3;
+  typedef Eigen::Matrix<double, 3, 1> Vector3d;
   typedef Eigen::Matrix<Scalar, 3, 3> Matrix3;
 
   typedef Eigen::Matrix<Scalar, 4, 1> Vector4;
@@ -80,7 +81,18 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
   FrameToFrameOpticalFlow(const VioConfig& config,
                           const basalt::Calibration<double>& calib)
-      : t_ns(-1), frame_counter(0), last_keypoint_id(0), config(config) {
+      : t_ns(-1),
+        frame_counter(0),
+        last_keypoint_id(0),
+        config(config),
+        accel_cov(calib.dicrete_time_accel_noise_std()
+                      .template cast<double>()
+                      .array()
+                      .square()),
+        gyro_cov(calib.dicrete_time_gyro_noise_std()
+                     .template cast<double>()
+                     .array()
+                     .square()) {
     input_queue.set_capacity(10);
     input_imu_queue.set_capacity(300);
 
@@ -118,8 +130,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       input_ptr->addTime("frames_received");
 
       while (input_depth_queue.try_pop(depth_guess)) continue;
-      // TODO@mateosss: optional save for UI
-      input_ptr->depth_guess = depth_guess;  // Save for UI
+      if (show_gui) input_ptr->depth_guess = depth_guess;
 
       if (!input_state_queue.empty()) {
         while (input_state_queue.try_pop(latest_state)) continue;  // Flush
@@ -132,8 +143,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
         auto pim = processImu(input_ptr->t_ns);
         pim.predictState(*latest_state, constants::g, *predicted_state);
       }
-      // TODO@mateosss: optional save for UI
-      input_ptr->latest_state = latest_state;  // Save for UI
+      if (show_gui) input_ptr->latest_state = latest_state;
 
       processFrame(input_ptr->t_ns, input_ptr);
     }
@@ -141,15 +151,6 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
   IntegratedImuMeasurement<double> processImu(int64_t curr_t_ns) {
     using Vector3d = Eigen::Matrix<double, 3, 1>;
-    // TODO@mateosss: initialize once at start
-    Vector3d accel_cov = calib.dicrete_time_accel_noise_std()
-                             .template cast<double>()
-                             .array()
-                             .square();
-    Vector3d gyro_cov = calib.dicrete_time_gyro_noise_std()
-                            .template cast<double>()
-                            .array()
-                            .square();
 
     int64_t prev_t_ns = t_ns;
     Vector3d bg = latest_state->bias_gyro;
@@ -330,8 +331,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
 
         t2 -= off;  // This modifies transform_2
 
-        bool store_guesses = true;  // TODO@mateosss: enable when UI is on
-        if (store_guesses) {
+        if (show_gui) {
           guesses_tbb[id] = transform_2;
         }
 
@@ -593,6 +593,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       pyramid;
 
   Matrix4 E;
+  const Vector3d gyro_cov;
+  const Vector3d accel_cov;
 
   std::shared_ptr<std::thread> processing_thread;
 };

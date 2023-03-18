@@ -59,6 +59,9 @@ namespace basalt {
 /// initially created. Should result in more consistent tracks (less drift over
 /// time) than frame-to-frame tracking, but it results in shorter tracks in
 /// practice.
+/// UPDATE: It was likely due to the pixel distance increasing between the
+/// original patch and the new point. Applying the same `latest_state` idea we
+/// used in frame_to_frame_optical_flow should improve things.
 template <typename Scalar, template <typename> typename Pattern>
 class PatchOpticalFlow : public OpticalFlowBase {
  public:
@@ -230,10 +233,6 @@ class PatchOpticalFlow : public OpticalFlowBase {
 
         const Eigen::aligned_vector<PatchT>& patch_vec = patches.at(id);
 
-        // TODO@mateosss: I think we can make this optflow module work again and
-        // have less drift with the optflow-imu modification. I think tracks
-        // were shorter due to the fact that pixel distance from the original
-        // track increases as time goes by and thus the initial guess gets bad.
         valid = trackPoint(pyr_2, patch_vec, transform_2);
         if (!valid) continue;
 

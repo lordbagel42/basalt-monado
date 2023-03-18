@@ -289,6 +289,7 @@ struct slam_tracker::implementation {
     ASSERT_(imu_data_queue != nullptr);
 
     opt_flow_ptr->output_queue = &vio->vision_data_queue;
+    opt_flow_ptr->show_gui = show_gui;
     if (show_gui) {
       ui.initialize(cam_count);
       vio->out_vis_queue = &ui.out_vis_queue;
