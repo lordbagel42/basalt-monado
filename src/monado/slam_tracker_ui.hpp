@@ -291,7 +291,7 @@ class slam_tracker_ui {
           }
 
           for (const auto &c : points) {
-            const float radius = 6.5;
+            double radius = c[2] * 6.5;
 
             float r;
             float g;

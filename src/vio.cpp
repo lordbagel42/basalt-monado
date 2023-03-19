@@ -750,7 +750,7 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
           }
 
         for (const auto& c : points) {
-          const float radius = 6.5;
+          const float radius = c[2] * 6.5;
 
           float r, g, b;
           getcolor(1.0 / c[2], r, g, b);
