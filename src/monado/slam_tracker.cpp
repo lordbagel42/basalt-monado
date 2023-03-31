@@ -224,11 +224,12 @@ struct slam_tracker::implementation {
 
   void state_consumer() {
     PoseVelBiasState<double>::Ptr data;
+    PoseVelBiasState<double>::Ptr _;
 
     while (true) {
       out_state_queue.pop(data);
       if (data.get() == nullptr) {
-        monado_out_state_queue.push(nullptr);
+        while (!monado_out_state_queue.try_push(nullptr)) monado_out_state_queue.pop(_);
         break;
       }
       data->input_images->addTime("tracker_consumer_received");
@@ -236,7 +237,8 @@ struct slam_tracker::implementation {
       if (show_gui) ui.log_vio_data(data);
 
       data->input_images->addTime("tracker_consumer_pushed");
-      monado_out_state_queue.push(data);
+      data->input_images->img_data.clear();  // Free images before queueing
+      while (!monado_out_state_queue.try_push(data)) monado_out_state_queue.pop(_);
     }
 
     cout << "Finished state_consumer\n";
@@ -278,6 +280,8 @@ struct slam_tracker::implementation {
     for (size_t i = 0; i < calib_data_ready.cam.size(); i++) {
       ASSERT(calib_data_ready.cam.at(i), "Missing cam%zu calibration", i);
     }
+
+    monado_out_state_queue.set_capacity(1000);
 
     // NOTE: This factory also starts the optical flow
     opt_flow_ptr = OpticalFlowFactory::getOpticalFlow(vio_config, calib);
