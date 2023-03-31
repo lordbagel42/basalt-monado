@@ -142,6 +142,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       if (first_state_arrived) {
         auto pim = processImu(input_ptr->t_ns);
         pim.predictState(*latest_state, constants::g, *predicted_state);
+        latest_state->input_images = nullptr;  // Avoid shared_ptr chain leak
       }
       if (show_gui) input_ptr->latest_state = latest_state;
 

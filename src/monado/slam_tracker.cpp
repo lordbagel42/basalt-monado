@@ -237,7 +237,6 @@ struct slam_tracker::implementation {
       if (show_gui) ui.log_vio_data(data);
 
       data->input_images->addTime("tracker_consumer_pushed");
-      data->input_images->img_data.clear();  // Free images before queueing
       while (!monado_out_state_queue.try_push(data)) monado_out_state_queue.pop(_);
     }
 
@@ -246,12 +245,15 @@ struct slam_tracker::implementation {
 
   void queues_printer() {
     while (running) {
-      cout << "[in] frames: " << image_data_queue->size() << "/" << image_data_queue->capacity() << " \t"
-           << "[in] imu: " << imu_data_queue->size() << "/" << imu_data_queue->capacity() << " \t"
-           << "[in] depth: " << opt_flow_ptr->input_depth_queue.unsafe_size() << "/-- \t"
+      cout << "[in] frames: " << image_data_queue->size() << "/" << image_data_queue->capacity() << " \n"
+           << "[in] imu: " << imu_data_queue->size() << "/" << imu_data_queue->capacity() << " \n"
+           << "[in] depth: " << opt_flow_ptr->input_depth_queue.unsafe_size() << "/-- \n"
            << "[mid] keypoints: " << opt_flow_ptr->output_queue->size() << "/" << opt_flow_ptr->output_queue->capacity()
-           << " \t"
-           << "[out] pose: " << out_state_queue.size() << "/" << out_state_queue.capacity() << "\n";
+           << " \n"
+           << "[mid] pose: " << out_state_queue.size() << "/" << out_state_queue.capacity() << "\n"
+           << "[out] monado queue: " << monado_out_state_queue.size() << "/" << monado_out_state_queue.capacity()
+           << "\n"
+           << "[out] ui: " << vio->out_vis_queue->size() << "/" << vio->out_vis_queue->capacity() << "\n";
       std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
     cout << "Finished queues_printer\n";
@@ -281,7 +283,7 @@ struct slam_tracker::implementation {
       ASSERT(calib_data_ready.cam.at(i), "Missing cam%zu calibration", i);
     }
 
-    monado_out_state_queue.set_capacity(1000);
+    monado_out_state_queue.set_capacity(32);
 
     // NOTE: This factory also starts the optical flow
     opt_flow_ptr = OpticalFlowFactory::getOpticalFlow(vio_config, calib);
