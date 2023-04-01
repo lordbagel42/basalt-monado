@@ -104,7 +104,7 @@ pangolin::Var<bool> show_matching_guess("ui.show_matching_guess", false, false,
                                         true);
 pangolin::Var<bool> show_obs("ui.show_obs", true, false, true);
 pangolin::Var<bool> show_ids("ui.show_ids", false, false, true);
-pangolin::Var<bool> show_invdist{"ui.show_invdist", false, false, true};
+pangolin::Var<bool> show_depth{"ui.show_depth", false, false, true};
 
 pangolin::Var<bool> show_grid{"ui.show_grid", false, false, true};
 pangolin::Var<bool> show_cam0_proj{"ui.show_cam0_proj", false, false, true};
@@ -750,18 +750,41 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
           }
 
         for (const auto& c : points) {
-          const float radius = c[2] * 6.5;
+          double u = c[0];
+          double v = c[1];
+          double depth = c[2] != 0.0 ? 1.0 / c[2]
+                                     : std::numeric_limits<double>::infinity();
+          int id = c[3];
 
-          float r, g, b;
-          getcolor(1.0 / c[2], r, g, b);
-          glColor3f(r, g, b);
+          double unit_radius = 6.5;
+          double radius = unit_radius / depth;
 
-          pangolin::glDrawCirclePerimeter(c[0], c[1], radius);
+          float r;
+          float g;
+          float b;
+          float a = 1;
+          getcolor(depth, r, g, b);
 
-          if (show_ids)
-            pangolin::GlFont::I().Text("%d", int(c[3])).Draw(c[0], c[1]);
-          if (show_invdist)
-            pangolin::GlFont::I().Text("%.3lf", c[2]).Draw(c[0], c[1] + 5);
+          double min_depth = 1.0 / 3;  // 1/3 comes from how valid_kp is
+                                       // computed in sqrt_keypoint_vio.cpp
+          double max_depth = 10;       // And this is arbitrary
+          double big_radius = unit_radius / min_depth;
+
+          if (depth < min_depth || depth > max_depth) {
+            // Mark very far or very close points in red/blue these are usually
+            // wrong points
+            a = 0.5;
+            radius = big_radius;
+            glColor4f(r, g, b, a);
+            pangolin::glDrawCircle(u, v, radius);
+          } else {
+            glColor4f(r, g, b, a);
+            pangolin::glDrawCirclePerimeter(u, v, radius);
+          }
+
+          if (show_ids) pangolin::GlFont::I().Text("%d", id).Draw(u, v);
+          if (show_depth)
+            pangolin::GlFont::I().Text("%.3lf m", depth).Draw(u, v + 5);
         }
       }
 
