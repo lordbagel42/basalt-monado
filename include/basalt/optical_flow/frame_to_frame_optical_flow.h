@@ -142,9 +142,9 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       if (first_state_arrived) {
         auto pim = processImu(input_ptr->t_ns);
         pim.predictState(*latest_state, constants::g, *predicted_state);
-        latest_state->input_images = nullptr;  // Avoid shared_ptr chain leak
+        // latest_state->input_images = nullptr;  // Avoid shared_ptr chain leak
       }
-      if (show_gui) input_ptr->latest_state = latest_state;
+      // if (show_gui) input_ptr->latest_state = latest_state;
 
       processFrame(input_ptr->t_ns, input_ptr);
     }
@@ -594,8 +594,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowBase {
       pyramid;
 
   Matrix4 E;
-  const Vector3d gyro_cov;
   const Vector3d accel_cov;
+  const Vector3d gyro_cov;
 
   std::shared_ptr<std::thread> processing_thread;
 };

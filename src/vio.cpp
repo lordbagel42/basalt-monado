@@ -36,7 +36,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <algorithm>
 #include <chrono>
 #include <condition_variable>
+#include <cstdio>
 #include <iostream>
+#include <numeric>
 #include <thread>
 
 #include <fmt/format.h>
@@ -113,6 +115,8 @@ pangolin::Var<bool> show_masks{"ui.show_masks", false, false, true};
 pangolin::Var<bool> show_guesses{"ui.Show matching guesses", false, false,
                                  true};
 pangolin::Var<bool> show_same_pixel_guess{"ui.SAME_PIXEL", true, false, true};
+pangolin::Var<bool> show_reproj_med_depth_guess{"ui.REPROJ_MED_DEPTH", true,
+                                                false, true};
 pangolin::Var<bool> show_reproj_avg_depth_guess{"ui.REPROJ_AVG_DEPTH", true,
                                                 false, true};
 pangolin::Var<bool> show_reproj_fix_depth_guess{"ui.REPROJ_FIX_DEPTH", true,
@@ -792,15 +796,36 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
         const auto keypoints0 = curr_vis_data->projections->at(0);
         const auto keypoints1 = curr_vis_data->projections->at(cam_id);
 
-        double avg_invdepth = 0;
-        double num_features = 0;
-        for (const auto& cam_projs : *curr_vis_data->projections) {
-          for (const Vector4d& v : cam_projs) avg_invdepth += v.z();
-          num_features += cam_projs.size();
+        std::vector<double> depths;
+        const auto& projs = curr_vis_data->projections;
+        for (const auto& cam_projs : *projs) {
+          depths.reserve(depths.size() + cam_projs.size());
+          for (const Vector4d& v : cam_projs) depths.push_back(v.z());
         }
-        bool valid = avg_invdepth > 0 && num_features > 0;
+
         float default_depth = vio_config.optical_flow_matching_default_depth;
-        double avg_depth = valid ? num_features / avg_invdepth : default_depth;
+        double avg_depth = default_depth;
+        double med_depth = default_depth;
+
+        size_t n = depths.size();
+        if (n > 0) {
+          double avg_invdepth = std::reduce(depths.begin(), depths.end()) / n;
+          avg_depth = avg_invdepth > 0 ? 1.0 / avg_invdepth : avg_depth;
+
+          std::sort(depths.begin(), depths.end());
+          med_depth = n % 2 == 1 ? depths[n / 2]
+                                 : (depths[n / 2] + depths[n / 2 - 1]) / 2;
+          med_depth = 1.0 / med_depth;
+
+          printf(">>> sorted depths = ");
+          for (double e : depths) printf("%lf, ", e);
+          printf("\n");
+          printf(">>> med_depth=%lf\n", med_depth);
+          printf(">>> avg_depth=%lf\n", avg_depth);
+
+        } else {
+          printf(">>> n is not greater than 0\n");
+        }
 
         for (const Vector4d kp1 : keypoints1) {
           double u1 = kp1.x();
@@ -842,6 +867,13 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
             if (show_reproj_avg_depth_guess) {
               glColor3f(1, 0, 1);  // Magenta
               auto off = calib.viewOffset({u0, v0}, avg_depth, 0, cam_id);
+              pangolin::glDrawLine(u1, v1, u0 - off.x(), v0 - off.y());
+            }
+
+            // Guess if we were using REPROJ_AVG_DEPTH
+            if (show_reproj_med_depth_guess) {
+              glColor3f(0, 1, 0);  // Green
+              auto off = calib.viewOffset({u0, v0}, med_depth, 0, cam_id);
               pangolin::glDrawLine(u1, v1, u0 - off.x(), v0 - off.y());
             }
 
