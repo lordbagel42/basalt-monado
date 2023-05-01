@@ -66,6 +66,7 @@ SqrtKeypointVioEstimator<Scalar_>::SqrtKeypointVioEstimator(
       frames_after_kf(0),
       g(g_.cast<Scalar>()),
       initialized(false),
+      schedule_reset(false),
       config(config_),
       lambda(config_.vio_lm_lambda_initial),
       min_lambda(config_.vio_lm_lambda_min),
@@ -126,6 +127,11 @@ SqrtKeypointVioEstimator<Scalar_>::SqrtKeypointVioEstimator(
   imu_data_queue.set_capacity(300);
 }
 
+template <class Scalar>
+void SqrtKeypointVioEstimator<Scalar>::resetState() {
+  schedule_reset = true;
+}
+
 template <class Scalar_>
 void SqrtKeypointVioEstimator<Scalar_>::initialize(
     int64_t t_ns, const Sophus::SE3d& T_w_i, const Eigen::Vector3d& vel_w_i,
@@ -172,6 +178,79 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_,
     }
 
     while (run) {
+      if (schedule_reset) {
+        meas = nullptr;
+        typename ImuData<Scalar>::Ptr data = popFromImuDataQueue();
+        if (data == nullptr) break;
+        data->accel = calib.calib_accel_bias.getCalibrated(data->accel);
+        data->gyro = calib.calib_gyro_bias.getCalibrated(data->gyro);
+
+        initialized = false;
+        last_processed_t_ns = 0;
+        // drain_input_queues();
+        frame_states.clear();
+        frame_poses.clear();
+        lmdb.clear();
+
+        take_kf = true;
+        frames_after_kf = 0;
+        kf_ids.clear();
+        imu_meas.clear();
+        prev_opt_flow_res.clear();
+        num_points_kf.clear();
+
+        // Setup marginalization
+        marg_data.is_sqrt = config.vio_sqrt_marg;
+        marg_data.order.abs_order_map.clear();
+        marg_data.order.items = 0;
+        marg_data.order.total_size = 0;
+        marg_data.H.setZero(POSE_VEL_BIAS_SIZE, POSE_VEL_BIAS_SIZE);
+        marg_data.b.setZero(POSE_VEL_BIAS_SIZE);
+
+        // Version without prior
+        nullspace_marg_data.is_sqrt = marg_data.is_sqrt;
+        nullspace_marg_data.order.abs_order_map.clear();
+        nullspace_marg_data.order.items = 0;
+        nullspace_marg_data.order.total_size = 0;
+        nullspace_marg_data.H.setZero(POSE_VEL_BIAS_SIZE, POSE_VEL_BIAS_SIZE);
+        nullspace_marg_data.b.setZero(POSE_VEL_BIAS_SIZE);
+
+        if (marg_data.is_sqrt) {
+          // prior on position
+          marg_data.H.diagonal().template head<3>().setConstant(
+              std::sqrt(Scalar(config.vio_init_pose_weight)));
+          // prior on yaw
+          marg_data.H(5, 5) = std::sqrt(Scalar(config.vio_init_pose_weight));
+
+          // small prior to avoid jumps in bias
+          marg_data.H.diagonal().template segment<3>(9).array() =
+              std::sqrt(Scalar(config.vio_init_ba_weight));
+          marg_data.H.diagonal().template segment<3>(12).array() =
+              std::sqrt(Scalar(config.vio_init_bg_weight));
+        } else {
+          // prior on position
+          marg_data.H.diagonal().template head<3>().setConstant(
+              Scalar(config.vio_init_pose_weight));
+          // prior on yaw
+          marg_data.H(5, 5) = Scalar(config.vio_init_pose_weight);
+
+          // small prior to avoid jumps in bias
+          marg_data.H.diagonal().template segment<3>(9).array() =
+              Scalar(config.vio_init_ba_weight);
+          marg_data.H.diagonal().template segment<3>(12).array() =
+              Scalar(config.vio_init_bg_weight);
+        }
+
+        std::cout << "marg_H (sqrt:" << marg_data.is_sqrt << ")\n"
+                  << marg_data.H << std::endl;
+
+        opt_started = false;
+
+        curr_frame = nullptr;
+        prev_frame = nullptr;
+        schedule_reset = false;
+      }
+
       vision_data_queue.pop(curr_frame);
 
       if (config.vio_enforce_realtime) {
@@ -199,6 +278,7 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_,
         Vec3 vel_w_i_init;
         vel_w_i_init.setZero();
 
+        T_w_i_init.translation().setZero();
         T_w_i_init.setQuaternion(Eigen::Quaternion<Scalar>::FromTwoVectors(
             data->accel, Vec3::UnitZ()));
 

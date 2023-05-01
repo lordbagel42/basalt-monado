@@ -97,6 +97,8 @@ class SqrtKeypointVioEstimator : public VioEstimatorBase,
                   const Eigen::Vector3d& vel_w_i, const Eigen::Vector3d& bg,
                   const Eigen::Vector3d& ba) override;
 
+  void resetState() override;
+
   void initialize(const Eigen::Vector3d& bg,
                   const Eigen::Vector3d& ba) override;
 
@@ -246,6 +248,7 @@ class SqrtKeypointVioEstimator : public VioEstimatorBase,
 
   bool initialized;
   bool opt_started;
+  bool schedule_reset;
 
   VioConfig config;
 
