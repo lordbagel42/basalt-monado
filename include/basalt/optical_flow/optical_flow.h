@@ -76,6 +76,8 @@ struct OpticalFlowInput {
   // Recorded internal pipeline values for UI playback
   double depth_guess = -1;
 
+  bool state_reset = false;
+
   std::vector<Masks> masks;  //!< Regions of the image to ignore
 
   timestats stats;  //!< Keeps track of internal metrics for this t_ns

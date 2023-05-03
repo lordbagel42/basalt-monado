@@ -178,6 +178,7 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_,
     }
 
     while (run) {
+      bool reset_performed = schedule_reset;
       if (schedule_reset) {
         meas = nullptr;
         typename ImuData<Scalar>::Ptr data = popFromImuDataQueue();
@@ -262,6 +263,7 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_,
         break;
       }
       curr_frame->input_images->addTime("vio_start");
+      curr_frame->input_images->state_reset = reset_performed;
 
       // Correct camera time offset
       // curr_frame->t_ns += calib.cam_time_offset_ns;
