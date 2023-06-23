@@ -57,15 +57,15 @@ void show_flow(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, co
   const Keypoints& kp_map = keypoints[cam_id];
 
   for (const auto& kv : kp_map) {
-    MatrixXf transformed_patch = kv.second.linear() * opt_flow->patch_coord;
-    transformed_patch.colwise() += kv.second.translation();
+    MatrixXf transformed_patch = kv.second.pose.linear() * opt_flow->patch_coord;
+    transformed_patch.colwise() += kv.second.pose.translation();
 
     for (int i = 0; i < transformed_patch.cols(); i++) {
       const Vector2f c = transformed_patch.col(i);
       pangolin::glDrawCirclePerimeter(c[0], c[1], 0.5F);
     }
 
-    const Vector2f c = kv.second.translation();
+    const Vector2f c = kv.second.pose.translation();
 
     if (show_ids) pangolin::GlFont::I().Text("%d", kv.first).Draw(5 + c[0], 5 + c[1]);
   }
@@ -100,8 +100,8 @@ void show_tracking_guess(size_t cam_id, size_t frame_id, const VioVisualizationD
     if (prev_kpts.count(kpid) == 0) continue;
     if (guess_obs.count(kpid) == 0) continue;
 
-    auto n = kpt.translation();
-    auto p = prev_kpts.at(kpid).translation();
+    auto n = kpt.pose.translation();
+    auto p = prev_kpts.at(kpid).pose.translation();
     auto g = guess_obs.at(kpid).translation();
 
     now_points.emplace_back(n);
@@ -170,8 +170,8 @@ void show_matching_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_
     if (cam0_kpts.count(kpid) == 0) continue;
     if (guess_obs.count(kpid) == 0) continue;
 
-    auto n = kpt.translation();
-    auto c = cam0_kpts.at(kpid).translation();
+    auto n = kpt.pose.translation();
+    auto c = cam0_kpts.at(kpid).pose.translation();
     auto g = guess_obs.at(kpid).translation();
 
     now_points.emplace_back(n);
