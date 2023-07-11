@@ -105,10 +105,8 @@ struct slam_tracker::implementation {
 
   // slam_tracker features
   unordered_set<int> supported_features{
-      F_ADD_CAMERA_CALIBRATION,
-      F_ADD_IMU_CALIBRATION,
-      F_ENABLE_POSE_EXT_TIMING,
-      F_ENABLE_POSE_EXT_FEATURES,
+      F_ADD_CAMERA_CALIBRATION,   F_ADD_IMU_CALIBRATION, F_ENABLE_POSE_EXT_TIMING,
+      F_ENABLE_POSE_EXT_FEATURES, F_RESET_TRACKER_STATE,
   };
 
   // Additional calibration data
@@ -434,6 +432,8 @@ struct slam_tracker::implementation {
     } else if (feature_id == FID_EPEF) {
       shared_ptr<FPARAMS_EPEF> casted_params = static_pointer_cast<FPARAMS_EPEF>(params);
       enable_pose_ext_features(*casted_params);
+    } else if (feature_id == FID_RS) {
+      reset_tracker_state();
     } else {
       return false;
     }
@@ -548,6 +548,11 @@ struct slam_tracker::implementation {
   }
 
   void enable_pose_ext_features(bool enable) { pose_features_enabled = enable; }
+
+  void reset_tracker_state() {
+    std::cout << "Tracker state reset\n";
+    vio->scheduleResetState();
+  }
 };
 
 EXPORT slam_tracker::slam_tracker(const slam_config &slam_config) {

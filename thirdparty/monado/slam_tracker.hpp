@@ -30,7 +30,7 @@ namespace xrt::auxiliary::tracking::slam {
 // For implementation: same as IMPLEMENTATION_VERSION_*
 // For user: expected IMPLEMENTATION_VERSION_*. Should be checked in runtime.
 constexpr int HEADER_VERSION_MAJOR = 6; //!< API Breakages
-constexpr int HEADER_VERSION_MINOR = 0; //!< Backwards compatible API changes
+constexpr int HEADER_VERSION_MINOR = 1; //!< Backwards compatible API changes
 constexpr int HEADER_VERSION_PATCH = 0; //!< Backw. comp. .h-implemented changes
 
 // Which header version the external system is implementing.
@@ -273,6 +273,13 @@ DEFINE_FEATURE(ENABLE_POSE_EXT_TIMING, EPET, 3, bool, std::vector<std::string>)
  * Enable/disable adding feature information to the estimated poses.
  */
 DEFINE_FEATURE(ENABLE_POSE_EXT_FEATURES, EPEF, 4, bool, void)
+
+/*!
+ * Feature RESET_TRACKER_STATE
+ *
+ * Reset tracker state.
+ */
+DEFINE_FEATURE(RESET_TRACKER_STATE, RS, 5, void, void)
 
 /*
  * Pose extensions
