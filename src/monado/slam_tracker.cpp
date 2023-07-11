@@ -392,6 +392,11 @@ struct slam_tracker::implementation {
     auto &mimg = partial_frame->img_data[i].img;
     mimg.reset(new ManagedImage<uint16_t>(width, height));
 
+    for (size_t j = 0; j < s.masks.size(); j++) {
+      auto &r = s.masks[j];
+      partial_frame->masks[i].masks.emplace_back(r.x, r.y, r.w, r.h);
+    }
+
     // TODO: We could avoid this copy. Maybe by writing a custom
     // allocator for ManagedImage that ties the OpenCV allocator
     size_t full_size = width * height;

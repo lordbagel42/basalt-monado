@@ -29,8 +29,8 @@ namespace xrt::auxiliary::tracking::slam {
 
 // For implementation: same as IMPLEMENTATION_VERSION_*
 // For user: expected IMPLEMENTATION_VERSION_*. Should be checked in runtime.
-constexpr int HEADER_VERSION_MAJOR = 6; //!< API Breakages
-constexpr int HEADER_VERSION_MINOR = 1; //!< Backwards compatible API changes
+constexpr int HEADER_VERSION_MAJOR = 7; //!< API Breakages
+constexpr int HEADER_VERSION_MINOR = 0; //!< Backwards compatible API changes
 constexpr int HEADER_VERSION_PATCH = 0; //!< Backw. comp. .h-implemented changes
 
 // Which header version the external system is implementing.
@@ -61,6 +61,10 @@ struct pose {
   find_pose_extension(pose_ext_type required_type) const;
 };
 
+struct rect {
+  float x, y, w, h;
+};
+
 /*!
  * @brief IMU Sample type to pass around between programs
  */
@@ -82,6 +86,7 @@ struct img_sample {
   std::int64_t timestamp;
   cv::Mat img;
   int cam_index;
+  std::vector<rect> masks{}; //!< Masks to ignore
   img_sample() = default;
   img_sample(std::int64_t timestamp, const cv::Mat &img, int cam_index)
       : timestamp(timestamp), img(img), cam_index(cam_index) {}
