@@ -26,7 +26,7 @@ if(LSB_RELEASE_PROGRAM)
     OUTPUT_STRIP_TRAILING_WHITESPACE)
 
   if(${LSB_RELEASE_ID_SHORT} EQUAL "22.04")
-    set(DEBIAN_DEPENDS "libtbb12, liblz4-1, libbz2-1.0, libboost-filesystem1.74.0, libboost-date-time1.74.0, libboost-program-options1.74.0, libboost-regex1.74.0, libopencv-dev, libglew2.2, libjpeg8, libpng16-16, libuvc0, libfmt8")
+    set(DEBIAN_DEPENDS "liblz4-1, libbz2-1.0, libboost-filesystem1.74.0, libboost-date-time1.74.0, libboost-program-options1.74.0, libboost-regex1.74.0, libopencv-dev, libglew2.2, libjpeg8, libpng16-16, libuvc0, libfmt8")
   endif()
 
 endif(LSB_RELEASE_PROGRAM)
@@ -126,15 +126,6 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "App
       set(BASALT_CXX_FLAGS "${BASALT_CXX_FLAGS} -Wno-error=unused-but-set-variable")
   endif()
 
-  #   - Added TBB_USE_GLIBCXX_VERSION macro to specify the version of GNU
-  #     libstdc++ when it cannot be properly recognized, e.g. when used
-  #     with Clang on Linux* OS. Adopted from https://github.com/wjakob/tbb
-  if(NOT TBB_USE_GLIBCXX_VERSION AND UNIX AND NOT APPLE)
-    if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-      string(REPLACE "." "0" TBB_USE_GLIBCXX_VERSION ${CMAKE_CXX_COMPILER_VERSION})
-    endif()
-    add_definitions(-DTBB_USE_GLIBCXX_VERSION=${TBB_USE_GLIBCXX_VERSION})
-  endif()
 else()
   set(BASALT_CXX_FLAGS "${BASALT_CXX_FLAGS} -Wno-error=maybe-uninitialized -Wno-error=implicit-fallthrough -fdiagnostics-color=always")
 
@@ -272,12 +263,15 @@ if(NOT EIGEN3_INCLUDE_DIR MATCHES "^${EIGEN_ROOT}")
   message(WARNING "Found Eigen headers are outside of specified EIGEN_ROOT '${EIGEN_ROOT}'")
 endif()
 
-find_package(TBB REQUIRED)
-message(STATUS "Found TBB ${TBB_VERSION_MAJOR}.${TBB_VERSION_MINOR} (interface version ${TBB_INTERFACE_VERSION}) headers in: ${TBB_INCLUDE_DIRS}")
-if (TBB_INTERFACE_VERSION LESS 11004)
-  # enable global_control header for earlier TBB versions (Ubuntu 16.04, 18.04)
-  add_definitions(-DTBB_PREVIEW_GLOBAL_CONTROL)
-endif()
+find_library(TBB_LIBRARIES NAMES libtbb.so.2)
+message(">>> YES? 1")
+message(${TBB_LIBRARIES})
+message(">>> YTES? 2")
+# message(STATUS "Found TBB ${TBB_VERSION_MAJOR}.${TBB_VERSION_MINOR} (interface version ${TBB_INTERFACE_VERSION}) headers in: ${TBB_INCLUDE_DIRS}")
+# if (TBB_INTERFACE_VERSION LESS 11004)
+#   # enable global_control header for earlier TBB versions (Ubuntu 16.04, 18.04)
+#   add_definitions(-DTBB_PREVIEW_GLOBAL_CONTROL)
+# endif()
 
 # NOTE: not specifying version, since 2, 3 or 4 is fine
 find_package(OpenCV REQUIRED COMPONENTS core imgproc calib3d highgui)
@@ -388,7 +382,7 @@ target_sources(basalt_internal
 )
 
 target_link_libraries(basalt_internal
-  PUBLIC ${STD_CXX_FS} basalt::opencv basalt::basalt-headers TBB::tbb pangolin basalt::cli11 basalt::monado
+  PUBLIC ${STD_CXX_FS} basalt::opencv basalt::basalt-headers ${TBB_LIBRARIES} pangolin basalt::cli11 basalt::monado
   PRIVATE basalt::magic_enum nlohmann::json fmt::fmt)
 target_include_directories(basalt_internal PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_compile_definitions(basalt_internal PUBLIC ${BASALT_COMPILE_DEFINITIONS})
