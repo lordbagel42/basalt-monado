@@ -51,7 +51,8 @@ void LandmarkDatabase<Scalar_>::addLandmark(LandmarkId lm_id, const Landmark<Sca
 }
 
 template <class Scalar_>
-void LandmarkDatabase<Scalar_>::addLandmarkWithPose(LandmarkId lm_id, const Landmark<Scalar> &lm_pos, int64_t frame_id, const SE3& pos) {
+void LandmarkDatabase<Scalar_>::addLandmarkWithPose(LandmarkId lm_id, const Landmark<Scalar> &lm_pos, int64_t frame_id,
+                                                    const SE3 &pos) {
   std::lock_guard<std::mutex> lock(mutex_);  // Lock the mutex
   auto &kpt = landmarks[lm_id];
   kpt.direction = lm_pos.direction;
@@ -135,7 +136,7 @@ void LandmarkDatabase<Scalar_>::addObservation(const TimeCamId &tcid_target, con
 }
 
 template <class Scalar_>
-void LandmarkDatabase<Scalar_>::addFramePose(int64_t frame_id, const SE3& pos) {
+void LandmarkDatabase<Scalar_>::addFramePose(int64_t frame_id, const SE3 &pos) {
   std::unique_lock<std::mutex> lock(mutex_);  // Lock the mutex
 
   frame_poses_[frame_id] = pos;
@@ -158,8 +159,8 @@ const Landmark<Scalar_> &LandmarkDatabase<Scalar_>::getLandmark(LandmarkId lm_id
 }
 
 template <class Scalar_>
-const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<LandmarkId>>>
-    &LandmarkDatabase<Scalar_>::getObservations() const {
+const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<LandmarkId>>> &
+LandmarkDatabase<Scalar_>::getObservations() const {
   return observations;
 }
 

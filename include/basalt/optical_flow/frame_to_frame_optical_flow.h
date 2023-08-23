@@ -428,10 +428,10 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
    * @param[in] cam_id: The camera id of the current frame.
    * @param[out] landmarks: A reference where landmarks will be returned.
    * @param[out] projections: A reference where the landmark's projections will be returned.
-  */
-  void getProjectedLandmarks(size_t cam_id, Eigen::aligned_unordered_map<LandmarkId, Landmark<float>>& landmarks,  Eigen::aligned_unordered_map<LandmarkId, Vector2>& projections) {
+   */
+  void getProjectedLandmarks(size_t cam_id, Eigen::aligned_unordered_map<LandmarkId, Landmark<float>>& landmarks,
+                             Eigen::aligned_unordered_map<LandmarkId, Vector2>& projections) {
     for (const auto& [lm_id, lm] : lmdb_.getLandmarks()) {
-
       // Skip landmarks that are already tracked by the current frame
       if (transforms->keypoints.at(cam_id).find(lm_id) != transforms->keypoints.at(cam_id).end()) continue;
       // Host camera
@@ -474,40 +474,40 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
    * @param[in] p: 2D point.
    *
    * @return The cell ID.
-  */
+   */
   int getPointCell(Vector2& p) {
-      const basalt::Image<const uint16_t>& img_raw = pyramid->at(0).lvl(0);
+    const basalt::Image<const uint16_t>& img_raw = pyramid->at(0).lvl(0);
 
-      // size of the cell side
-      int size = config.optical_flow_detection_grid_size;
+    // size of the cell side
+    int size = config.optical_flow_detection_grid_size;
 
-      // Determine the number of cells in each row and column.
-      int cellsPerRow = static_cast<int>(img_raw.w / size);
-      int cellsPerCol = static_cast<int>(img_raw.h / size);
+    // Determine the number of cells in each row and column.
+    int cellsPerRow = static_cast<int>(img_raw.w / size);
+    int cellsPerCol = static_cast<int>(img_raw.h / size);
 
-      // Calculate the extra width and height due to the non-multiple of SIZE frame dimensions.
-      // These extra dimensions will be split between the border cells, making the first and last
-      // row and column of cells slightly bigger than the rest.
-      float extraWidth = (img_raw.w - cellsPerRow * size) / 2;
-      float extraHeight = (img_raw.h - cellsPerCol * size) / 2;
+    // Calculate the extra width and height due to the non-multiple of SIZE frame dimensions.
+    // These extra dimensions will be split between the border cells, making the first and last
+    // row and column of cells slightly bigger than the rest.
+    float extraWidth = (img_raw.w - cellsPerRow * size) / 2;
+    float extraHeight = (img_raw.h - cellsPerCol * size) / 2;
 
-      // Calculate the adjusted coordinates of the point to account for the extra border cells.
-      float new_x = p.x() - extraWidth > 0 ? p.x() - extraWidth : 0;
-      float new_y = p.y() - extraHeight > 0 ? p.y() - extraHeight : 0;
+    // Calculate the adjusted coordinates of the point to account for the extra border cells.
+    float new_x = p.x() - extraWidth > 0 ? p.x() - extraWidth : 0;
+    float new_y = p.y() - extraHeight > 0 ? p.y() - extraHeight : 0;
 
-      // Calculate the row and column index of the cell in which the point resides.
-      // If the adjusted coordinates fall outside the last cell, they will be capped to the maximum
-      // row and column index, ensuring the point is assigned to the last cell in such cases.
-      int row = static_cast<int>(new_y / size) > cellsPerCol - 1 ? cellsPerCol - 1 : static_cast<int>(new_y / size);
-      int col = static_cast<int>(new_x / size) > cellsPerRow - 1 ? cellsPerRow - 1 : static_cast<int>(new_x / size);
-      return cellsPerRow * row + col;
+    // Calculate the row and column index of the cell in which the point resides.
+    // If the adjusted coordinates fall outside the last cell, they will be capped to the maximum
+    // row and column index, ensuring the point is assigned to the last cell in such cases.
+    int row = static_cast<int>(new_y / size) > cellsPerCol - 1 ? cellsPerCol - 1 : static_cast<int>(new_y / size);
+    int col = static_cast<int>(new_x / size) > cellsPerRow - 1 ? cellsPerRow - 1 : static_cast<int>(new_x / size);
+    return cellsPerRow * row + col;
   }
 
   /**
    * @brief returns the number of cells of the grid.
    *
    * @return The cell ID.
-  */
+   */
   int getNumCells() {
     const basalt::Image<const uint16_t>& img_raw = pyramid->at(0).lvl(0);
     int size = config.optical_flow_detection_grid_size;
@@ -517,7 +517,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
   }
 
   /**
-   *  @brief Function responsible for matching the new detections with the projections of the landmarks stored in the map.
+   *  @brief Function responsible for matching the new detections with the projections of the landmarks stored in the
+   * map.
    *
    *  Algorithm Steps:
    *  1. Detect keypoints in the new frame using FAST.
@@ -526,7 +527,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
    *  4. Match the descriptors of newly detected points with the descriptor of each landmark.
    *  5. If a match is found, associate the detected keypoint with landmark ID and store the information.
    *
-  */
+   */
   void recallPoints() {
     for (size_t cam_id = 0; cam_id < getNumCams(); cam_id++) {
       std::vector<KeypointId> new_points_index;
@@ -553,7 +554,6 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       // 3. Group the landmark's projections by cells and search for detected points in the their cells.
       // TODO: this could be done in parallel
       for (int cell_id = 0; cell_id < getNumCells(); cell_id++) {
-
         new_points_index.clear();
         new_points_descriptors.clear();
         for (size_t i = 0; i < kd.corners.size(); i++) {
@@ -577,10 +577,11 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
         // 4. Match the descriptors of newly detected points with the descriptor of each landmark.
         matches.clear();
-        matchDescriptors(new_points_descriptors, landmarks_descriptors, matches, config.mapper_max_hamming_distance, config.mapper_second_best_test_ratio);
+        matchDescriptors(new_points_descriptors, landmarks_descriptors, matches, config.mapper_max_hamming_distance,
+                         config.mapper_second_best_test_ratio);
 
         // 5. If a match is found, associate the detected keypoint with landmark ID and store the information.
-        for (auto & match : matches) {
+        for (auto& match : matches) {
           size_t point_idx = new_points_index[match.first];
           size_t lm_id = landmarks_ids[match.second];
 
@@ -589,7 +590,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
           transforms->keypoints.at(cam_id)[lm_id].pose = transform;
           transforms->keypoints.at(cam_id)[lm_id].descriptor = kd.corner_descriptors[point_idx];
           transforms->keypoints.at(cam_id)[lm_id].tracked_by_recall = true;
-          std::tuple<int64_t, Vector2, Vector2> match_pair = std::make_tuple(lm_id, kd.corners[point_idx].cast<Scalar>(), projections.at(lm_id));
+          std::tuple<int64_t, Vector2, Vector2> match_pair =
+              std::make_tuple(lm_id, kd.corners[point_idx].cast<Scalar>(), projections.at(lm_id));
           transforms->recall_matches.at(cam_id).emplace_back(match_pair);
           matches_counter_++;
         }

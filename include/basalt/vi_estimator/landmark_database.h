@@ -36,9 +36,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <basalt/utils/imu_types.h>
 #include <basalt/utils/eigen_utils.hpp>
-#include <mutex>
 #include <condition_variable>
-
+#include <mutex>
 
 namespace basalt {
 
@@ -99,8 +98,8 @@ class LandmarkDatabase {
 
   // TODO: unify
   static LandmarkDatabase<Scalar>& getInstance() {
-      static LandmarkDatabase<Scalar> lmdb;
-      return lmdb;
+    static LandmarkDatabase<Scalar> lmdb;
+    return lmdb;
   }
 
   // The copy constructor and copy assignment operator are deleted to prevent copying of the class.
@@ -128,7 +127,7 @@ class LandmarkDatabase {
 
   Landmark<Scalar>& getLandmark(LandmarkId lm_id);
 
-  SE3 &getFramePose(FrameId frame_id);
+  SE3& getFramePose(FrameId frame_id);
 
   // Const
   const Landmark<Scalar>& getLandmark(LandmarkId lm_id) const;

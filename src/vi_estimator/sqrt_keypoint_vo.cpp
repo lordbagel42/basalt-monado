@@ -339,8 +339,7 @@ bool SqrtKeypointVoEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& opt
           const Vec2 p1 = prev_opt_flow_res[tcido.frame_id]
                               ->keypoints[tcido.cam_id]
                               .at(lm_id)
-                              .pose
-                              .translation()
+                              .pose.translation()
                               .template cast<Scalar>();
 
           Vec4 p0_3d, p1_3d;
