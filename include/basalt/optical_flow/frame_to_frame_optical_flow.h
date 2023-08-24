@@ -579,7 +579,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       // TODO@mateosss: save a new patch from this new perspective? by default it will be updated with new patch in
       // addPoints. transforms->keypoints.at(cam_id)[lm_id].descriptor = curr_pose.descriptor;
       transforms->keypoints.at(cam_id)[lm_id].tracked_by_recall = true;
-      std::tuple<int64_t, Vector2, Vector2> match_pair = std::make_tuple(lm_id, curr_pose, proj_pose);
+      std::tuple<int64_t, Vector2, Vector2> match_pair = std::make_tuple(lm_id, curr_pose.translation(), proj_pose);
       transforms->recall_matches.at(cam_id).emplace_back(match_pair);
       matches_counter_++;
     }
