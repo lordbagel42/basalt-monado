@@ -104,6 +104,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
         gyro_cov(cal.dicrete_time_gyro_noise_std().array().square()) {
     latest_state = std::make_shared<PoseVelBiasState<double>>();
     predicted_state = std::make_shared<PoseVelBiasState<double>>();
+    patches.reserve(3000);
   }
 
   void processingLoop() override {
@@ -516,6 +517,33 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     return cellsPerRow * cellsPerCol;
   }
 
+  inline bool trackPointFromPyrPatch(const ManagedImagePyr<uint16_t>& pyr,
+                                     const Eigen::aligned_vector<PatchT>& patch_vec,
+                                     Eigen::AffineCompact2f& transform) const {
+    bool patch_valid = true;
+
+    //! @note For some reason resetting transform linear part would be wrong only in patch_optical_flow?
+    // transform.linear().setIdentity();
+
+    for (int level = config.optical_flow_levels; level >= 0 && patch_valid; level--) {
+      const Scalar scale = 1 << level;
+
+      transform.translation() /= scale;
+
+      // TODO: maybe we should better check patch validity when creating points
+      const auto& p = patch_vec[level];
+      patch_valid &= p.valid;
+      if (patch_valid) {
+        // Perform tracking on current level
+        patch_valid &= trackPointAtLevel(pyr.lvl(level), p, transform);
+      }
+
+      transform.translation() *= scale;
+    }
+
+    return patch_valid;
+  }
+
   /**
    *  @brief Function responsible for matching the new detections with the projections of the landmarks stored in the
    *  map.
@@ -529,6 +557,34 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
    *
    */
   void recallPoints() {
+    uint64_t cam_id = 0;
+
+    // Project the landmarks from the map into the new frame to obtain their projections.
+    Eigen::aligned_unordered_map<LandmarkId, Landmark<Scalar>> proj_landmarks;
+    Eigen::aligned_unordered_map<LandmarkId, Vector2> projections;
+    getProjectedLandmarks(cam_id, proj_landmarks, projections);
+
+    // TODO@mateosss: Parallelize?
+    for (const auto& [lm_id, lm] : proj_landmarks) {
+      Vector2 proj_pose = projections.at(lm_id);
+      Eigen::aligned_vector<PatchT>& lm_patch = patches.at(lm_id);
+      Eigen::AffineCompact2f curr_pose = Eigen::AffineCompact2f::Identity();
+      curr_pose.translation() = proj_pose;
+
+      bool valid = trackPointFromPyrPatch(pyramid->at(cam_id), lm_patch, curr_pose);
+
+      if (!valid) continue;
+
+      transforms->keypoints.at(cam_id)[lm_id].pose = curr_pose;
+      // TODO@mateosss: save a new patch from this new perspective? by default it will be updated with new patch in
+      // addPoints. transforms->keypoints.at(cam_id)[lm_id].descriptor = curr_pose.descriptor;
+      transforms->keypoints.at(cam_id)[lm_id].tracked_by_recall = true;
+      std::tuple<int64_t, Vector2, Vector2> match_pair = std::make_tuple(lm_id, curr_pose, proj_pose);
+      transforms->recall_matches.at(cam_id).emplace_back(match_pair);
+      matches_counter_++;
+    }
+
+#if 0
     std::vector<KeypointId> new_points_index;
     std::vector<Descriptor> new_points_descriptors;
     std::vector<KeypointId> landmarks_ids;
@@ -595,6 +651,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
         matches_counter_++;
       }
     }
+#endif
   }
 
   Keypoints addPointsForCamera(size_t cam_id) {
@@ -612,6 +669,16 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
     Keypoints new_kpts;
     for (size_t i = 0; i < kd.corners.size(); i++) {  // Set new points as keypoints
+
+      // Save patch
+      Eigen::aligned_vector<PatchT>& p = patches[last_keypoint_id];
+      Vector2 pos = kd.corners[i].cast<Scalar>();
+      for (int l = 0; l <= config.optical_flow_levels; l++) {
+        Scalar scale = 1 << l;
+        Vector2 pos_scaled = pos / scale;
+        p.emplace_back(pyramid->at(0).lvl(l), pos_scaled);
+      }
+
       auto transform = Eigen::AffineCompact2f::Identity();
       transform.translation() = kd.corners[i].cast<Scalar>();
 
@@ -742,6 +809,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
  private:
+  Eigen::aligned_unordered_map<KeypointId, Eigen::aligned_vector<PatchT>> patches;
   const Vector3d accel_cov;
   const Vector3d gyro_cov;
   LandmarkDatabase<Scalar>& lmdb_ = LandmarkDatabase<Scalar>::getInstance();
