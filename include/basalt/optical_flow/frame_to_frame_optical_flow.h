@@ -518,7 +518,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
   /**
    *  @brief Function responsible for matching the new detections with the projections of the landmarks stored in the
-   * map.
+   *  map.
    *
    *  Algorithm Steps:
    *  1. Detect keypoints in the new frame using FAST.
@@ -529,72 +529,70 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
    *
    */
   void recallPoints() {
-    for (size_t cam_id = 0; cam_id < getNumCams(); cam_id++) {
-      std::vector<KeypointId> new_points_index;
-      std::vector<Descriptor> new_points_descriptors;
-      std::vector<KeypointId> landmarks_ids;
-      std::vector<Descriptor> landmarks_descriptors;
+    std::vector<KeypointId> new_points_index;
+    std::vector<Descriptor> new_points_descriptors;
+    std::vector<KeypointId> landmarks_ids;
+    std::vector<Descriptor> landmarks_descriptors;
 
-      std::vector<std::pair<int, int>> matches;
+    std::vector<std::pair<int, int>> matches;
 
-      // 1. Detect keypoints in the new frame using FAST.
-      KeypointsData kd;
-      Eigen::aligned_vector<Eigen::Vector2d> pts;
-      detectKeypoints(pyramid->at(cam_id).lvl(0), kd, config.optical_flow_detection_grid_size,
-                      config.recall_detection_num_points_cell, config.optical_flow_detection_min_threshold,
-                      config.optical_flow_detection_max_threshold, transforms->input_images->masks.at(cam_id), pts);
-      computeAngles(pyramid->at(cam_id).lvl(0), kd, true);
-      computeDescriptors(pyramid->at(cam_id).lvl(0), kd);
+    // 1. Detect keypoints in the new frame using FAST.
+    KeypointsData kd;
+    Eigen::aligned_vector<Eigen::Vector2d> pts;
+    detectKeypoints(pyramid->at(cam_id).lvl(0), kd, config.optical_flow_detection_grid_size,
+                    config.recall_detection_num_points_cell, config.optical_flow_detection_min_threshold,
+                    config.optical_flow_detection_max_threshold, transforms->input_images->masks.at(cam_id), pts);
+    computeAngles(pyramid->at(cam_id).lvl(0), kd, true);
+    computeDescriptors(pyramid->at(cam_id).lvl(0), kd);
 
-      // 2. Project the landmarks from the map into the new frame to obtain their projections.
-      Eigen::aligned_unordered_map<LandmarkId, Landmark<float>> proj_landmarks;
-      Eigen::aligned_unordered_map<LandmarkId, Vector2> projections;
-      getProjectedLandmarks(cam_id, proj_landmarks, projections);
+    // 2. Project the landmarks from the map into the new frame to obtain their projections.
+    Eigen::aligned_unordered_map<LandmarkId, Landmark<float>> proj_landmarks;
+    Eigen::aligned_unordered_map<LandmarkId, Vector2> projections;
+    getProjectedLandmarks(cam_id, proj_landmarks, projections);
 
-      // 3. Group the landmark's projections by cells and search for detected points in the their cells.
-      // TODO: this could be done in parallel
-      for (int cell_id = 0; cell_id < getNumCells(); cell_id++) {
-        new_points_index.clear();
-        new_points_descriptors.clear();
-        for (size_t i = 0; i < kd.corners.size(); i++) {
-          Vector2 pos = kd.corners[i].cast<Scalar>();
-          if (getPointCell(pos) == cell_id) {
-            new_points_index.push_back(i);
-            new_points_descriptors.push_back(kd.corner_descriptors[i]);
-            transforms->new_detections.at(cam_id).emplace_back(pos);
-          }
+    // 3. Group the landmark's projections by cells and search for detected points in the their cells.
+    // TODO: this could be done in parallel
+    for (int cell_id = 0; cell_id < getNumCells(); cell_id++) {
+      new_points_index.clear();
+      new_points_descriptors.clear();
+      for (size_t i = 0; i < kd.corners.size(); i++) {
+        Vector2 pos = kd.corners[i].cast<Scalar>();
+        if (getPointCell(pos) == cell_id) {
+          new_points_index.push_back(i);
+          new_points_descriptors.push_back(kd.corner_descriptors[i]);
+          transforms->new_detections.at(cam_id).emplace_back(pos);
         }
+      }
 
-        landmarks_ids.clear();
-        landmarks_descriptors.clear();
-        for (const auto& [lm_id, lm] : proj_landmarks) {
-          Vector2 pos = projections.at(lm_id);
-          if (getPointCell(pos) == cell_id) {
-            landmarks_ids.push_back(lm_id);
-            landmarks_descriptors.push_back(lm.descriptor);
-          }
+      landmarks_ids.clear();
+      landmarks_descriptors.clear();
+      for (const auto& [lm_id, lm] : proj_landmarks) {
+        Vector2 pos = projections.at(lm_id);
+        if (getPointCell(pos) == cell_id) {
+          landmarks_ids.push_back(lm_id);
+          landmarks_descriptors.push_back(lm.descriptor);
         }
+      }
 
-        // 4. Match the descriptors of newly detected points with the descriptor of each landmark.
-        matches.clear();
-        matchDescriptors(new_points_descriptors, landmarks_descriptors, matches, config.mapper_max_hamming_distance,
-                         config.mapper_second_best_test_ratio);
+      // 4. Match the descriptors of newly detected points with the descriptor of each landmark.
+      matches.clear();
+      matchDescriptors(new_points_descriptors, landmarks_descriptors, matches, config.mapper_max_hamming_distance,
+                       config.mapper_second_best_test_ratio);
 
-        // 5. If a match is found, associate the detected keypoint with landmark ID and store the information.
-        for (auto& match : matches) {
-          size_t point_idx = new_points_index[match.first];
-          size_t lm_id = landmarks_ids[match.second];
+      // 5. If a match is found, associate the detected keypoint with landmark ID and store the information.
+      for (auto& match : matches) {
+        size_t point_idx = new_points_index[match.first];
+        size_t lm_id = landmarks_ids[match.second];
 
-          auto transform = Eigen::AffineCompact2f::Identity();
-          transform.translation() = kd.corners[point_idx].cast<Scalar>();
-          transforms->keypoints.at(cam_id)[lm_id].pose = transform;
-          transforms->keypoints.at(cam_id)[lm_id].descriptor = kd.corner_descriptors[point_idx];
-          transforms->keypoints.at(cam_id)[lm_id].tracked_by_recall = true;
-          std::tuple<int64_t, Vector2, Vector2> match_pair =
-              std::make_tuple(lm_id, kd.corners[point_idx].cast<Scalar>(), projections.at(lm_id));
-          transforms->recall_matches.at(cam_id).emplace_back(match_pair);
-          matches_counter_++;
-        }
+        auto transform = Eigen::AffineCompact2f::Identity();
+        transform.translation() = kd.corners[point_idx].cast<Scalar>();
+        transforms->keypoints.at(cam_id)[lm_id].pose = transform;
+        transforms->keypoints.at(cam_id)[lm_id].descriptor = kd.corner_descriptors[point_idx];
+        transforms->keypoints.at(cam_id)[lm_id].tracked_by_recall = true;
+        std::tuple<int64_t, Vector2, Vector2> match_pair =
+            std::make_tuple(lm_id, kd.corners[point_idx].cast<Scalar>(), projections.at(lm_id));
+        transforms->recall_matches.at(cam_id).emplace_back(match_pair);
+        matches_counter_++;
       }
     }
   }
