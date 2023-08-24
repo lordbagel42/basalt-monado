@@ -544,9 +544,46 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     return patch_valid;
   }
 
+  std::pair<int, int> getCellCoordFromImageCoord(const Vector2& img_pos, size_t cam_id) {
+    const int u = img_pos.x();
+    const int v = img_pos.y();
+
+    const int patch_size = config.optical_flow_detection_grid_size;
+    const basalt::Image<const uint16_t>& img = pyramid->at(cam_id).lvl(0);
+    const int width = img.w;
+    const int height = img.h;
+    const int x_start = (width % patch_size) / 2;
+    const int y_start = (height % patch_size) / 2;
+
+    const int x = (u - x_start) / patch_size;
+    const int y = (v - y_start) / patch_size;
+
+    return {x, y};
+  }
+
+  int getNumberOfPointsInCell(const std::pair<int, int>& cell_pos, size_t cam_id) {
+    const int patch_size = config.optical_flow_detection_grid_size;
+    const basalt::Image<const uint16_t>& img = pyramid->at(0).lvl(0);
+
+    const int x_start = (width % patch_size) / 2;
+    x_start +
+
+
+    Eigen::MatrixXi cells;
+    cells.setZero(img.h / patch_size + 1, img.w / patch_size + 1);
+
+    for (const Eigen::Vector2d& p : transforms->keypoints.at(cam_id)) {
+      if (p[0] >= x_start && p[1] >= y_start && p[0] < x_stop + PATCH_SIZE && p[1] < y_stop + PATCH_SIZE) {
+        int x = (p[0] - x_start) / PATCH_SIZE;
+        int y = (p[1] - y_start) / PATCH_SIZE;
+
+        cells(y, x) += 1;
+      }
+    }
+  }
   /**
-   *  @brief Function responsible for matching the new detections with the projections of the landmarks stored in the
-   *  map.
+   *  @brief Function responsible for matching the new detections with the projections of the landmarks stored in
+   * the map.
    *
    *  Algorithm Steps:
    *  1. Detect keypoints in the new frame using FAST.
@@ -567,6 +604,10 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     // TODO@mateosss: Parallelize?
     for (const auto& [lm_id, lm] : proj_landmarks) {
       Vector2 proj_pose = projections.at(lm_id);
+
+      std::pair<int, int> cell_coord = getCellCoordFromImageCoord(proj_pose);
+      if (getNumberOfPointsInCell(cell_coord)) continue;
+
       Eigen::aligned_vector<PatchT>& lm_patch = patches.at(lm_id);
       Eigen::AffineCompact2f curr_pose = Eigen::AffineCompact2f::Identity();
       curr_pose.translation() = proj_pose;
