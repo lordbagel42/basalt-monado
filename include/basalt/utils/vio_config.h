@@ -60,6 +60,7 @@ struct VioConfig {
   int optical_flow_skip_frames;
   MatchingGuessType optical_flow_matching_guess_type;
   float optical_flow_matching_default_depth;
+  bool optical_flow_recall;
   int recall_detection_num_points_cell;
 
   LinearizationType vio_linearization_type;

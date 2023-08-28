@@ -258,7 +258,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       transforms = new_transforms;
       transforms->input_images = new_img_vec;
 
-      recallPoints();
+      if (config.optical_flow_recall) recallPoints();
       addPoints();
       filterPoints();
     }
