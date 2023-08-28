@@ -584,7 +584,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
       float default_depth = config.optical_flow_matching_default_depth;
       double avg_depth = valid ? num_features / avg_invdepth : default_depth;
 
-      opt_flow_depth_guess_queue->push(avg_depth);
+      if (opt_flow_depth_guess_queue) opt_flow_depth_guess_queue->push(avg_depth);
     }
 
     if (features_ext) {
@@ -600,8 +600,8 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
         }
       }
     }
-    out_state_queue->push(data);
-    opt_flow_state_queue->push(data);
+    if (out_state_queue) out_state_queue->push(data);
+    if (opt_flow_state_queue) opt_flow_state_queue->push(data);
   }
 
   if (out_vis_queue) {
