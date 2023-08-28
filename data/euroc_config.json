@@ -40,7 +40,7 @@
         "config.vio_init_pose_weight": 1e8,
         "config.vio_init_ba_weight": 1e1,
         "config.vio_init_bg_weight": 1e2,
-        "config.vio_marg_lost_landmarks": true,
+        "config.vio_marg_lost_landmarks": false,
         "config.vio_kf_marg_feature_ratio": 0.1,
         "config.mapper_obs_std_dev": 0.25,
         "config.mapper_obs_huber_thresh": 1.5,
