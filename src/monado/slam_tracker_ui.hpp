@@ -253,6 +253,10 @@ class slam_tracker_ui {
   pangolin::Var<bool> show_flow{"ui.show_flow", false, false, true};
   pangolin::Var<bool> show_tracking_guess{"ui.show_tracking_guess", false, false, true};
   pangolin::Var<bool> show_matching_guess{"ui.show_matching_guess", false, false, true};
+  pangolin::Var<bool> show_recall_matches{"ui.show_recall_matches", false, false, true};
+  pangolin::Var<bool> show_proj{"ui.show_proj", false, false, true};
+  pangolin::Var<bool> show_proj_ids{"ui.show_proj_ids", false, false, true};
+  pangolin::Var<bool> show_new_detections{"ui.show_new_detections", false, false, true};
   pangolin::Var<bool> show_obs{"ui.show_obs", true, false, true};
   pangolin::Var<bool> show_ids{"ui.show_ids", false, false, true};
   pangolin::Var<bool> show_depth{"ui.show_depth", false, false, true};
@@ -297,6 +301,12 @@ class slam_tracker_ui {
     if (show_cam0_proj) vis::show_cam0_proj(cam_id, depth_guess, config, calib);
 
     if (show_grid) vis::show_grid(config, calib);
+
+    if (show_recall_matches) vis::show_recall_matches(cam_id, curr_vis_data);
+
+    if (show_proj) vis::show_proj(cam_id, curr_vis_data, show_proj_ids);
+
+    if (show_new_detections) vis::show_new_detections(cam_id, curr_vis_data);
   }
 
   void draw_scene() {

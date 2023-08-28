@@ -151,4 +151,10 @@ void show_obs(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, con
               bool show_reproj_avg_depth_guess, bool show_active_guess, double fixed_depth, bool show_ids,
               bool show_depth, bool show_guesses);
 
+void show_recall_matches(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data);
+
+void show_proj(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, bool show_proj_ids);
+
+void show_new_detections(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data);
+
 }  // namespace basalt::vis

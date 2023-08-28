@@ -456,4 +456,49 @@ void show_obs(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, con
   }
 }
 
+void show_recall_matches(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data) {
+  auto matches = curr_vis_data->opt_flow_res->recall_matches[cam_id];
+
+  float radius = 3.0F;
+
+  // Draw tracked features in previous frame
+  for (auto& [kpt_id, kpt_pos, proj_pos] : matches) {
+    auto kpt_pos_d = kpt_pos.cast<double>();
+    auto proj_pos_d = proj_pos.cast<double>();
+    // Draw match
+    glColor4f(255, 0, 0, 0.5);
+    pangolin::glDrawCircle(kpt_pos_d, radius);
+    pangolin::glDrawCirclePerimeter(kpt_pos_d, 5.0F);
+    pangolin::GlFont::I().Text("%d", kpt_id).Draw(kpt_pos_d.x() + 5, kpt_pos_d.y() + 5);
+    // Draw projection matched
+    glColor4f(255, 0, 255, 0.5);
+    pangolin::glDrawCircle(proj_pos_d, radius);
+    // Draw line between both
+    glColor4f(255, 255, 255, 0.5);
+    pangolin::glDrawLine(kpt_pos_d, proj_pos_d);
+  }
+  glColor4f(255, 0, 0, 0.5);
+}
+
+void show_proj(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, bool show_proj_ids) {
+  auto projections = curr_vis_data->opt_flow_res->projections[cam_id];
+  for (auto& [id, proj] : projections) {
+    auto proj_d = proj.cast<double>();
+    glColor4f(255, 0, 255, 0.5);
+    pangolin::glDrawCirclePerimeter(proj_d, 3.0F);
+    if (show_proj_ids) {
+      pangolin::GlFont::I().Text("%d", id).Draw(proj.x() + 5, proj.y() + 5);
+    }
+  }
+}
+
+void show_new_detections(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data) {
+  auto points = curr_vis_data->opt_flow_res->new_detections[cam_id];
+  for (auto& uv : points) {
+    auto uv_d = uv.cast<double>();
+    glColor4f(255, 128, 128, 0.5);
+    pangolin::glDrawCircle(uv_d, 3.0F);
+  }
+}
+
 }  // namespace basalt::vis
