@@ -45,7 +45,7 @@ using Eigen::Vector2f;
 using Eigen::Vector4d;
 
 void show_flow(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const OpticalFlowBase::Ptr& opt_flow,
-               bool show_ids) {
+               bool show_ids, bool show_responses) {
   glLineWidth(1.0);
   glColor3f(1.0, 0.0, 0.0);
   glEnable(GL_BLEND);
@@ -68,6 +68,7 @@ void show_flow(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, co
     const Vector2f c = kv.second.pose.translation();
 
     if (show_ids) pangolin::GlFont::I().Text("%d", kv.first).Draw(5 + c[0], 5 + c[1]);
+    if (show_responses) pangolin::GlFont::I().Text("%.1f", kv.second.response).Draw(5 + c[0], 10 + c[1]);
   }
 
   pangolin::GlFont::I().Text("Detected %d keypoints", kp_map.size()).Draw(5, 40);

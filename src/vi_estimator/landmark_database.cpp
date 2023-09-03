@@ -35,6 +35,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <algorithm>
 #include <iostream>
+#include "basalt/optical_flow/optical_flow.h"
 
 #include <basalt/vi_estimator/landmark_database.h>
 
@@ -115,11 +116,12 @@ std::vector<TimeCamId> LandmarkDatabase<Scalar_>::getHostKfs() const {
 }
 
 template <class Scalar_>
-std::vector<const Landmark<Scalar_> *> LandmarkDatabase<Scalar_>::getLandmarksForHost(const TimeCamId &tcid) const {
-  std::vector<const Landmark<Scalar> *> res;
+std::vector<std::pair<LandmarkId, const Landmark<Scalar_> *>> LandmarkDatabase<Scalar_>::getLandmarksForHost(
+    const TimeCamId &tcid) const {
+  std::vector<std::pair<LandmarkId, const Landmark<Scalar> *>> res;
 
   for (const auto &[k, obs] : observations.at(tcid))
-    for (const auto &v : obs) res.emplace_back(&landmarks.at(v));
+    for (const auto &v : obs) res.emplace_back(v, &landmarks.at(v));
 
   return res;
 }

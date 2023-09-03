@@ -134,7 +134,7 @@ class LandmarkDatabase {
 
   std::vector<TimeCamId> getHostKfs() const;
 
-  std::vector<const Landmark<Scalar>*> getLandmarksForHost(const TimeCamId& tcid) const;
+  std::vector<std::pair<LandmarkId, const Landmark<Scalar>*>> getLandmarksForHost(const TimeCamId& tcid) const;
 
   const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<LandmarkId>>>& getObservations() const;
 

@@ -348,6 +348,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
         if (dist2 < config.optical_flow_max_recovered_dist2) {
           result[id].pose = transform_2;
           result[id].descriptor = init_vec[r].descriptor;
+          result[id].response = init_vec[r].response;
           result[id].tracked_by_opt_flow = true;
         }
       }
@@ -435,7 +436,13 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
                              Eigen::aligned_unordered_map<LandmarkId, Vector2>& projections) {
     for (const auto& [lm_id, lm] : lmdb_.getLandmarks()) {
       // Skip landmarks that are already tracked by the current frame
-      if (transforms->keypoints.at(cam_id).find(lm_id) != transforms->keypoints.at(cam_id).end()) continue;
+      bool already_tracked = transforms->keypoints.at(cam_id).find(lm_id) != transforms->keypoints.at(cam_id).end();
+      if (already_tracked) continue;
+
+      // Skip points that are behind the camera
+      bool in_180deg_fov = lm.direction.norm() <= 1;
+      if (!in_180deg_fov) continue;
+
       // Host camera
       size_t i = lm.host_kf_id.cam_id;
 
@@ -458,15 +465,16 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       Vector2 cj_uv;
       // Project the point to the new frame
       bool valid = calib.intrinsics[cam_id].project(cj_xyz, cj_uv);
+      if (!valid) continue;
 
       // Check if the point is in the bounds of the frame
       const basalt::Image<const uint16_t>& img_raw = pyramid->at(cam_id).lvl(0);
       bool in_bounds = cj_uv.x() >= 0 && cj_uv.x() < img_raw.w && cj_uv.y() >= 0 && cj_uv.y() < img_raw.h;
-      if (valid && in_bounds) {
-        landmarks[lm_id] = lm;
-        projections[lm_id] = cj_uv;
-        transforms->projections.at(cam_id).emplace_back(std::make_tuple(lm_id, cj_uv));
-      }
+      if (!in_bounds) continue;
+
+      landmarks[lm_id] = lm;
+      projections[lm_id] = cj_uv;
+      transforms->projections.at(cam_id).emplace_back(std::make_tuple(lm_id, cj_uv));
     }
   }
 
@@ -603,8 +611,15 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       curr_pose.translation() = proj_pose;
 
       bool valid = trackPointFromPyrPatch(pyramid->at(cam_id), lm_patch, curr_pose);
-
       if (!valid) continue;
+
+      // TODO@mateosss: Update patch viewpoint, see point 2 of the following discussion
+      // https://gitlab.com/VladyslavUsenko/basalt/-/issues/69#note_906947578
+      for (int l = 0; l <= config.optical_flow_levels; l++) {
+        Scalar scale = 1 << l;
+        Vector2 pos_scaled = curr_pose.translation() / scale;
+        lm_patch[l] = PatchT(pyramid->at(0).lvl(l), pos_scaled);
+      }
 
       transforms->keypoints.at(cam_id)[lm_id].pose = curr_pose;
       // TODO@mateosss: save a new patch from this new perspective? by default it will be updated with new patch in
@@ -713,10 +728,12 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       auto transform = Eigen::AffineCompact2f::Identity();
       transform.translation() = kd.corners[i].cast<Scalar>();
 
-      transforms->keypoints.at(cam_id)[last_keypoint_id].pose = transform;
-      transforms->keypoints.at(cam_id)[last_keypoint_id].descriptor = kd.corner_descriptors[i];
-      transforms->keypoints.at(cam_id)[last_keypoint_id].tracked_by_opt_flow = false;
-      new_kpts[last_keypoint_id] = transforms->keypoints.at(cam_id)[last_keypoint_id];
+      Keypoint& kp = transforms->keypoints.at(cam_id)[last_keypoint_id];
+      kp.pose = transform;
+      kp.descriptor = kd.corner_descriptors[i];
+      kp.response = kd.responses[i];
+      kp.tracked_by_opt_flow = false;
+      new_kpts[last_keypoint_id] = kp;
 
       last_keypoint_id++;
     }

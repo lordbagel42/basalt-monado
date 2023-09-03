@@ -1,7 +1,7 @@
 {
     "value0": {
         "config.optical_flow_type": "frame_to_frame",
-        "config.optical_flow_detection_grid_size": 50,
+        "config.optical_flow_detection_grid_size": 320,
         "config.optical_flow_detection_num_points_cell": 1,
         "config.optical_flow_detection_min_threshold": 5,
         "config.optical_flow_detection_max_threshold": 40,
@@ -14,7 +14,7 @@
         "config.optical_flow_skip_frames": 1,
         "config.optical_flow_matching_guess_type": "REPROJ_AVG_DEPTH",
         "config.optical_flow_matching_default_depth": 2.0,
-        "config.optical_flow_recall": false,
+        "config.optical_flow_recall": true,
         "config.recall_detection_num_points_cell": 10,
         "config.vio_linearization_type": "ABS_QR",
         "config.vio_sqrt_marg": true,
@@ -41,7 +41,7 @@
         "config.vio_init_pose_weight": 1e8,
         "config.vio_init_ba_weight": 1e1,
         "config.vio_init_bg_weight": 1e2,
-        "config.vio_marg_lost_landmarks": true,
+        "config.vio_marg_lost_landmarks": false,
         "config.vio_kf_marg_feature_ratio": 0.1,
         "config.mapper_obs_std_dev": 0.25,
         "config.mapper_obs_huber_thresh": 1.5,

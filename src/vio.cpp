@@ -98,6 +98,7 @@ pangolin::Plotter* plotter;
 pangolin::Var<int> show_frame("ui.show_frame", 0, 0, 1500);
 
 pangolin::Var<bool> show_flow("ui.show_flow", false, false, true);
+pangolin::Var<bool> show_responses("ui.show_responses", false, false, true);
 pangolin::Var<bool> show_tracking_guess("ui.show_tracking_guess", false, false, true);
 pangolin::Var<bool> show_matching_guess("ui.show_matching_guess", false, false, true);
 pangolin::Var<bool> show_recall_matches("ui.show_recall_matches", false, false, true);
@@ -133,7 +134,7 @@ Button next_step_btn("ui.next_step", &next_step);
 Button prev_step_btn("ui.prev_step", &prev_step);
 
 pangolin::Var<bool> continue_btn("ui.continue", false, false, true);
-pangolin::Var<bool> continue_fast("ui.continue_fast", false, false, true);
+pangolin::Var<bool> continue_fast("ui.continue_fast", true, false, true);
 
 Button align_se3_btn("ui.align_se3", &alignButton);
 
@@ -704,7 +705,7 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
                   show_reproj_avg_depth_guess, show_active_guess, fixed_depth, show_ids, show_depth, show_guesses);
   }
 
-  if (show_flow) vis::show_flow(cam_id, curr_vis_data, opt_flow_ptr, show_ids);
+  if (show_flow) vis::show_flow(cam_id, curr_vis_data, opt_flow_ptr, show_ids, show_responses);
 
   if (show_tracking_guess) vis::show_tracking_guess_vio(cam_id, show_frame, vio_dataset, vis_map);
 
@@ -763,11 +764,24 @@ void draw_scene(pangolin::View& view) {
       for (size_t i = 0; i < calib.T_i_c.size(); i++)
         render_camera((p * calib.T_i_c[i]).matrix(), 2.0f, pose_color, 0.1f);
 
-    glColor3ubv(pose_color);
+    glColor3ubv(state_color);
     pangolin::glDrawPoints(it->second->points);
+
+    for (size_t i = 0; i < it->second->points.size(); i++) {
+      Vector3d pos = it->second->points.at(i);
+      int id = it->second->point_ids.at(i);
+      pangolin::GlFont::I().Text("%d", id).Draw(pos.x(), pos.y(), pos.z());
+    }
+
     if (show_map_3D) {
-      glColor3ubv(state_color);
+      glColor3ubv(pose_color);
       pangolin::glDrawPoints(it->second->landmarks);
+
+      for (size_t i = 0; i < it->second->landmarks.size(); i++) {
+        Vector3d pos = it->second->landmarks.at(i);
+        int id = it->second->landmark_ids.at(i);
+        pangolin::GlFont::I().Text("%d", id).Draw(pos.x(), pos.y(), pos.z());
+      }
     }
   }
 
