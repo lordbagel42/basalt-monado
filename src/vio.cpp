@@ -194,11 +194,6 @@ void feed_images() {
       break;
     }
 
-    if (step_by_step) {
-      std::unique_lock<std::mutex> lk(m);
-      cvar.wait(lk);
-    }
-
     basalt::OpticalFlowInput::Ptr img(new basalt::OpticalFlowInput(NUM_CAMS));
 
     img->t_ns = vio_dataset->get_image_timestamps()[i];
@@ -207,6 +202,11 @@ void feed_images() {
     timestamp_to_id[img->t_ns] = i;
 
     opt_flow_ptr->input_img_queue.push(img);
+
+    if (step_by_step) {
+      std::unique_lock<std::mutex> lk(m);
+      cvar.wait(lk);
+    }
   }
 
   // Indicate the end of the sequence
@@ -380,6 +380,11 @@ int main(int argc, char** argv) {
 
     while (true) {
       out_state_queue.pop(data);
+      if (show_frame < int(vio_dataset->get_image_timestamps().size()) - 1) {
+        cvar.notify_one();
+        show_frame = show_frame + 1;
+        show_frame.Meta().gui_changed = true;
+      }
 
       if (!data.get()) break;
 
