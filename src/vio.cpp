@@ -37,6 +37,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <chrono>
 #include <condition_variable>
 #include <iostream>
+#include <string>
 #include <thread>
 
 #include <fmt/format.h>
@@ -108,6 +109,7 @@ pangolin::Var<bool> show_new_detections("ui.show_new_detections", false, false, 
 pangolin::Var<bool> show_map_3D("ui.show_map_3D", false, false, true);
 pangolin::Var<bool> show_obs("ui.show_obs", true, false, true);
 pangolin::Var<bool> show_ids("ui.show_ids", false, false, true);
+pangolin::Var<std::string> show_feature("ui.show_feature", "42");
 pangolin::Var<bool> show_depth{"ui.show_depth", false, false, true};
 
 pangolin::Var<bool> show_grid{"ui.show_grid", false, false, true};
@@ -707,7 +709,8 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
 
   if (show_obs) {
     vis::show_obs(cam_id, curr_vis_data, vio_config, calib, show_same_pixel_guess, show_reproj_fix_depth_guess,
-                  show_reproj_avg_depth_guess, show_active_guess, fixed_depth, show_ids, show_depth, show_guesses);
+                  show_reproj_avg_depth_guess, show_active_guess, fixed_depth, show_ids, show_depth, show_guesses,
+                  show_feature);
   }
 
   if (show_flow) vis::show_flow(cam_id, curr_vis_data, opt_flow_ptr, show_ids, show_responses);

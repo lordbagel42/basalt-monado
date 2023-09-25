@@ -36,6 +36,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/optical_flow/optical_flow.h>
 #include <basalt/utils/vis_utils.h>
 #include <pangolin/gl/glfont.h>
+#include <string>
 
 namespace basalt::vis {
 
@@ -391,13 +392,14 @@ void show_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data,
 void show_obs(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const VioConfig& config,
               const Calibration<double>& calib, bool show_same_pixel_guess, bool show_reproj_fix_depth_guess,
               bool show_reproj_avg_depth_guess, bool show_active_guess, double fixed_depth, bool show_ids,
-              bool show_depth, bool show_guesses) {
+              bool show_depth, bool show_guesses, std::string show_feature) {
   glLineWidth(1.0);
   glColor3f(1.0, 0.0, 0.0);
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
   size_t num_cams = calib.resolution.size();
+  int selected = std::stoi(show_feature);
   if (cam_id < num_cams) {
     const auto& points = curr_vis_data->projections->at(cam_id);
 
@@ -440,6 +442,11 @@ void show_obs(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, con
         } else {
           glColor4f(r, g, b, 1);
           pangolin::glDrawCirclePerimeter(u, v, cradius);
+        }
+
+        if (id == selected) {
+          glColor4f(0, 1, 0, 1); // Green
+          pangolin::glDrawCirclePerimeter(u, v, unit_radius);
         }
 
         if (show_ids) pangolin::GlFont::I().Text("%d", id).Draw(u, v);

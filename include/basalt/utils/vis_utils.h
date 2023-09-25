@@ -149,7 +149,7 @@ void show_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data,
 void show_obs(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const VioConfig& config,
               const Calibration<double>& calib, bool show_same_pixel_guess, bool show_reproj_fix_depth_guess,
               bool show_reproj_avg_depth_guess, bool show_active_guess, double fixed_depth, bool show_ids,
-              bool show_depth, bool show_guesses);
+              bool show_depth, bool show_guesses, std::string show_feature = "-1");
 
 void show_recall_matches(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data);
 
