@@ -114,7 +114,7 @@ class LandmarkDatabase {
   void removeFrame(const FrameId& frame);
 
   void clear() {
-    kpts.clear();
+    landmarks.clear();
     observations.clear();
   }
 

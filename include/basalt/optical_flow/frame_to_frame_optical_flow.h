@@ -593,7 +593,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
    *
    */
   void recallPoints() {
-    uint64_t cam_id = 0;
+    uint64_t cam_id = 0; // TODO@mateosss: recall in all cameras
 
     // Project the landmarks from the map into the new frame to obtain their projections.
     Eigen::aligned_unordered_map<LandmarkId, Landmark<Scalar>> proj_landmarks;
