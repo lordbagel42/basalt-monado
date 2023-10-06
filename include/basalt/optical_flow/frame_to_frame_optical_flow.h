@@ -52,6 +52,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/optical_flow/patch.h>
 
 #include <basalt/utils/keypoints.h>
+#include <basalt/vi_estimator/landmark_database.h>
 
 namespace basalt {
 
@@ -84,8 +85,10 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
   using OpticalFlowBase::input_depth_queue;
   using OpticalFlowBase::input_img_queue;
   using OpticalFlowBase::input_imu_queue;
+  using OpticalFlowBase::input_lm_bundle_queue;
   using OpticalFlowBase::input_state_queue;
   using OpticalFlowBase::last_keypoint_id;
+  using OpticalFlowBase::latest_lm_bundle;
   using OpticalFlowBase::latest_state;
   using OpticalFlowBase::old_pyramid;
   using OpticalFlowBase::output_queue;
@@ -103,6 +106,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
         gyro_cov(cal.dicrete_time_gyro_noise_std().array().square()) {
     latest_state = std::make_shared<PoseVelBiasState<double>>();
     predicted_state = std::make_shared<PoseVelBiasState<double>>();
+    patches.reserve(3000);
   }
 
   void processingLoop() override {
@@ -120,6 +124,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
       while (input_depth_queue.try_pop(depth_guess)) continue;
       if (show_gui) img->depth_guess = depth_guess;
+
+      while (input_lm_bundle_queue.try_pop(latest_lm_bundle)) continue;
 
       if (!input_state_queue.empty()) {
         while (input_state_queue.try_pop(latest_state)) continue;  // Flush
@@ -247,6 +253,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       transforms = new_transforms;
       transforms->input_images = new_img_vec;
 
+      if (config.optical_flow_enable_recall) recallPoints();
       addPoints();
       filterPoints();
     }
@@ -407,6 +414,135 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     return patch_valid;
   }
 
+  inline bool trackPointFromPyrPatch(const ManagedImagePyr<uint16_t>& pyr,
+                                     const Eigen::aligned_vector<PatchT>& patch_vec,
+                                     Eigen::AffineCompact2f& transform) const {
+    bool patch_valid = true;
+
+    //! @note For some reason resetting transform linear part would be wrong only in patch_optical_flow?
+    // transform.linear().setIdentity();
+
+    for (int level = config.optical_flow_levels; level >= 0 && patch_valid; level--) {
+      const Scalar scale = 1 << level;
+
+      transform.translation() /= scale;
+
+      // TODO: maybe we should better check patch validity when creating points
+      const auto& p = patch_vec[level];
+      patch_valid &= p.valid;
+      if (patch_valid) {
+        // Perform tracking on current level
+        patch_valid &= trackPointAtLevel(pyr.lvl(level), p, transform);
+      }
+
+      transform.translation() *= scale;
+    }
+
+    return patch_valid;
+  }
+
+  /**
+   * @brief Project the landmarks into the current frame.
+   * Returns the landmarks that are in the frame along with their corresponding 2D projections.
+   *
+   * @param[in] cam_id: The camera id of the current frame.
+   * @param[out] landmarks: A reference where landmarks will be returned.
+   * @param[out] projections: A reference where the landmark's projections will be returned.
+   */
+  void getProjectedLandmarks(size_t cam_id, Eigen::aligned_unordered_map<LandmarkId, Vector2>& projections) {
+    for (const auto& [lm_id, lm_pos] : latest_lm_bundle->landmarks) {
+      // Skip landmarks that are already tracked by the current frame
+      bool already_tracked = transforms->keypoints.at(cam_id).count(lm_id) > 0;
+      if (already_tracked) continue;
+
+      // Skip points that are behind the camera
+      // TODO@mateosss: dot product between latest-predicted-state forward-vector and relative vector to landmark from latest-predicted-state
+
+      // Project landmark to current frame
+      SE3 T_i1 = predicted_state->T_w_i.template cast<Scalar>();
+      SE3 T_i_cj = calib.T_i_c[cam_id];
+      SE3 T_cj = T_i1 * T_i_cj;
+      Vector3 cj_xyz = T_cj.inverse() * lm_pos;
+      Vector2 cj_uv;
+      bool valid = calib.intrinsics[cam_id].project(cj_xyz, cj_uv);
+      if (!valid) continue;
+
+      // Check if the point is in the bounds of the frame
+      const basalt::Image<const uint16_t>& img_raw = pyramid->at(cam_id).lvl(0);
+      bool in_bounds = cj_uv.x() >= 0 && cj_uv.x() < img_raw.w && cj_uv.y() >= 0 && cj_uv.y() < img_raw.h;
+      if (!in_bounds) continue;
+
+      projections[lm_id] = cj_uv;
+    }
+  }
+
+  //! Number of points that are in the same grid cell as img_pos
+  int getNeighborPointsInCell(const Vector2& img_pos, size_t cam_id) {
+    const int C = config.optical_flow_detection_grid_size;
+    int w = transforms->input_images->img_data.at(cam_id).img->w;
+    int h = transforms->input_images->img_data.at(cam_id).img->h;
+    int x_pad = (w % C) / 2;
+    int y_pad = (h % C) / 2;
+
+    const int u = img_pos.x();
+    const int v = img_pos.y();
+    const int cell_x = (u - x_pad) / C;
+    const int cell_y = (v - y_pad) / C;
+
+    int left = x_pad + C * cell_x;
+    int top = y_pad + C * cell_y;
+
+    int right = left + C;
+    int bottom = top + C;
+
+    int neighbors = 0;
+    for (const auto& [kpid, affine] : transforms->keypoints.at(cam_id)) {
+      float x = affine.translation().x();
+      float y = affine.translation().y();
+      if (x >= left && x < right && y >= top && y < bottom) neighbors++;
+    }
+
+    return neighbors;
+  }
+
+  //! Recover tracks from older landmarks into the current frame
+  void recallPoints() {
+    uint64_t cam_id = 0;  // TODO@mateosss: recall in all cameras
+
+    // Project the landmarks from the map into the new frame to obtain their projections.
+    Eigen::aligned_unordered_map<LandmarkId, Vector2> projections;
+    getProjectedLandmarks(cam_id, projections);
+
+    // TODO@mateosss: Parallelize?
+    for (const auto& [lm_id, lm_pos] : latest_lm_bundle->landmarks) {
+      Vector2 proj_pos = projections.at(lm_id);
+
+      if (getNeighborPointsInCell(proj_pos, cam_id) > config.optical_flow_detection_num_points_cell) continue;
+
+      Eigen::aligned_vector<PatchT>& lm_patch = patches.at(lm_id);
+      Eigen::AffineCompact2f curr_pose = Eigen::AffineCompact2f::Identity();
+      curr_pose.translation() = proj_pos;
+
+      bool valid = trackPointFromPyrPatch(pyramid->at(cam_id), lm_patch, curr_pose);
+      if (!valid) continue;
+
+#if 0
+      // TODO@mateosss: check that this improves things
+      // Update patch viewpoint, see point 2 of the following discussion
+      // https://gitlab.com/VladyslavUsenko/basalt/-/issues/69#note_906947578
+      for (int l = 0; l <= config.optical_flow_levels; l++) {
+        Scalar scale = 1 << l;
+        Vector2 pos_scaled = curr_pose.translation() / scale;
+        lm_patch[l] = PatchT(pyramid->at(0).lvl(l), pos_scaled);
+      }
+
+      // TODO@mateosss: Maybe I should store all patches that see this landmark and look in all of them
+#endif
+
+      transforms->keypoints.at(cam_id).at(lm_id) = curr_pose;
+    }
+  }
+
   Keypoints addPointsForCamera(size_t cam_id) {
     Eigen::aligned_vector<Eigen::Vector2d> pts;  // Current points
     for (const auto& [kpid, affine] : transforms->keypoints.at(cam_id)) {
@@ -420,6 +556,17 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
     Keypoints new_kpts;
     for (auto& corner : kd.corners) {  // Set new points as keypoints
+
+      // Save patch
+      Eigen::aligned_vector<PatchT>& p = patches[last_keypoint_id];
+      // TODO@mateosss: check p.valid here? otherwise it is checked elsewhere
+      Vector2 pos = corner.cast<Scalar>();
+      for (int l = 0; l <= config.optical_flow_levels; l++) {
+        Scalar scale = 1 << l;
+        Vector2 pos_scaled = pos / scale;
+        p.emplace_back(pyramid->at(0).lvl(l), pos_scaled);
+      }
+
       auto transform = Eigen::AffineCompact2f::Identity();
       transform.translation() = corner.cast<Scalar>();
 
@@ -538,6 +685,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
  private:
+  Eigen::aligned_unordered_map<KeypointId, Eigen::aligned_vector<PatchT>> patches;
   const Vector3d accel_cov;
   const Vector3d gyro_cov;
 };

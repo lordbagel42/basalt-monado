@@ -581,7 +581,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
       float default_depth = config.optical_flow_matching_default_depth;
       double avg_depth = valid ? num_features / avg_invdepth : default_depth;
 
-      opt_flow_depth_guess_queue->push(avg_depth);
+      if (opt_flow_depth_guess_queue) opt_flow_depth_guess_queue->push(avg_depth);
     }
 
     if (features_ext) {
@@ -597,8 +597,26 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
         }
       }
     }
-    out_state_queue->push(data);
-    opt_flow_state_queue->push(data);
+    if (out_state_queue) out_state_queue->push(data);
+    if (opt_flow_state_queue) opt_flow_state_queue->push(data);
+  }
+
+  if (opt_flow_lm_bundle_queue) {
+    LandmarkBundle::Ptr lmb = std::make_shared<LandmarkBundle>();
+    lmb->ts = last_state_t_ns;
+    for (const auto& [lmid, lm] : lmdb.getLandmarks()) {
+      Vec4 pt_c = StereographicParam<Scalar>::unproject(lm.direction);
+      pt_c[3] = lm.inv_dist;
+      pt_c /= pt_c[3];  // TODO@mateosss: the division can be done in the final step at pt_w
+
+      SE3 T_w_i = frame_poses.at(lm.host_kf_id.frame_id).getPose();
+      SE3 T_i_c = calib.T_i_c[lm.host_kf_id.cam_id];
+      SE3 T_w_c = T_w_i * T_i_c;
+      Vec4 pt_w = T_w_c * pt_c;
+
+      lmb->landmarks[lmid] = pt_w.template segment<3>(0);
+    }
+    opt_flow_lm_bundle_queue->push(lmb);
   }
 
   if (out_vis_queue) {

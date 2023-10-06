@@ -64,6 +64,13 @@ using KeypointId = size_t;
 using Keypoints = Eigen::aligned_map<KeypointId, Keypoint>;
 using KeypointLevels = std::map<KeypointId, size_t>;
 using xrt::auxiliary::tracking::slam::timestats;
+using LandmarkId = KeypointId;
+
+struct LandmarkBundle {
+  using Ptr = std::shared_ptr<LandmarkBundle>;
+  int64_t ts = -1;
+  std::map<LandmarkId, Eigen::Vector3f> landmarks = {};
+};
 
 struct OpticalFlowInput {
   using Ptr = std::shared_ptr<OpticalFlowInput>;
@@ -143,10 +150,12 @@ class OpticalFlowBase {
   tbb::concurrent_bounded_queue<ImuData<double>::Ptr> input_imu_queue;
   tbb::concurrent_queue<double> input_depth_queue;
   tbb::concurrent_queue<PoseVelBiasState<double>::Ptr> input_state_queue;
+  tbb::concurrent_queue<LandmarkBundle::Ptr> input_lm_bundle_queue;
   tbb::concurrent_bounded_queue<OpticalFlowResult::Ptr>* output_queue = nullptr;
 
   Eigen::MatrixXf patch_coord;
   double depth_guess = -1;
+  LandmarkBundle::Ptr latest_lm_bundle;
   PoseVelBiasState<double>::Ptr latest_state = nullptr;
   PoseVelBiasState<double>::Ptr predicted_state = nullptr;
 

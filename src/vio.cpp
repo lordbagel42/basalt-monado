@@ -323,6 +323,7 @@ int main(int argc, char** argv) {
     vio->out_state_queue = &out_state_queue;
     vio->opt_flow_depth_guess_queue = &opt_flow_ptr->input_depth_queue;
     vio->opt_flow_state_queue = &opt_flow_ptr->input_state_queue;
+    vio->opt_flow_lm_bundle_queue = &opt_flow_ptr->input_lm_bundle_queue;
   }
 
   basalt::MargDataSaver::Ptr marg_data_saver;
@@ -785,7 +786,7 @@ bool next_step() {
 }
 
 bool prev_step() {
-  if (show_frame > 1) {
+  if (show_frame >= 1) {
     show_frame = show_frame - 1;
     show_frame.Meta().gui_changed = true;
     return true;
