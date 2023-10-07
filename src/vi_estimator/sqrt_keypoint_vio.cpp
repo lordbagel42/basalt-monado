@@ -605,16 +605,21 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
     LandmarkBundle::Ptr lmb = std::make_shared<LandmarkBundle>();
     lmb->ts = last_state_t_ns;
     for (const auto& [lmid, lm] : lmdb.getLandmarks()) {
+      if (frame_poses.count(lm.host_kf_id.frame_id) == 0) {  // This landmark is hosted in a frame
+        BASALT_ASSERT(frame_states.count(lm.host_kf_id.frame_id) > 0);
+        continue;
+      }
+
       Vec4 pt_c = StereographicParam<Scalar>::unproject(lm.direction);
-      pt_c[3] = lm.inv_dist;
-      pt_c /= pt_c[3];  // TODO@mateosss: the division can be done in the final step at pt_w
+      pt_c *= 1 / lm.inv_dist; // scale by depth
+      pt_c[3] = 1;
 
       SE3 T_w_i = frame_poses.at(lm.host_kf_id.frame_id).getPose();
       SE3 T_i_c = calib.T_i_c[lm.host_kf_id.cam_id];
       SE3 T_w_c = T_w_i * T_i_c;
       Vec4 pt_w = T_w_c * pt_c;
 
-      lmb->landmarks[lmid] = pt_w.template segment<3>(0);
+      lmb->landmarks[lmid] = pt_w.template head<3>();
     }
     opt_flow_lm_bundle_queue->push(lmb);
   }

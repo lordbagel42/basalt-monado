@@ -449,14 +449,17 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
    * @param[out] landmarks: A reference where landmarks will be returned.
    * @param[out] projections: A reference where the landmark's projections will be returned.
    */
-  void getProjectedLandmarks(size_t cam_id, Eigen::aligned_unordered_map<LandmarkId, Vector2>& projections) {
+  Eigen::aligned_unordered_map<LandmarkId, Vector2> getProjectedLandmarks(size_t cam_id) {
+    Eigen::aligned_unordered_map<LandmarkId, Vector2> projections;
+
     for (const auto& [lm_id, lm_pos] : latest_lm_bundle->landmarks) {
       // Skip landmarks that are already tracked by the current frame
       bool already_tracked = transforms->keypoints.at(cam_id).count(lm_id) > 0;
       if (already_tracked) continue;
 
       // Skip points that are behind the camera
-      // TODO@mateosss: dot product between latest-predicted-state forward-vector and relative vector to landmark from latest-predicted-state
+      // TODO@mateosss: dot product between latest-predicted-state forward-vector and relative vector to landmark from
+      // latest-predicted-state
 
       // Project landmark to current frame
       SE3 T_i1 = predicted_state->T_w_i.template cast<Scalar>();
@@ -474,6 +477,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
       projections[lm_id] = cj_uv;
     }
+
+    return projections;
   }
 
   //! Number of points that are in the same grid cell as img_pos
@@ -507,16 +512,15 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
   //! Recover tracks from older landmarks into the current frame
   void recallPoints() {
+    if (latest_lm_bundle == nullptr) return;
+
     uint64_t cam_id = 0;  // TODO@mateosss: recall in all cameras
 
     // Project the landmarks from the map into the new frame to obtain their projections.
-    Eigen::aligned_unordered_map<LandmarkId, Vector2> projections;
-    getProjectedLandmarks(cam_id, projections);
+    Eigen::aligned_unordered_map<LandmarkId, Vector2> projections = getProjectedLandmarks(cam_id);
 
     // TODO@mateosss: Parallelize?
-    for (const auto& [lm_id, lm_pos] : latest_lm_bundle->landmarks) {
-      Vector2 proj_pos = projections.at(lm_id);
-
+    for (const auto& [lm_id, proj_pos] : projections) {
       if (getNeighborPointsInCell(proj_pos, cam_id) > config.optical_flow_detection_num_points_cell) continue;
 
       Eigen::aligned_vector<PatchT>& lm_patch = patches.at(lm_id);
@@ -539,7 +543,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       // TODO@mateosss: Maybe I should store all patches that see this landmark and look in all of them
 #endif
 
-      transforms->keypoints.at(cam_id).at(lm_id) = curr_pose;
+      transforms->keypoints.at(cam_id)[lm_id] = curr_pose;
     }
   }
 
