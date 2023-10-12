@@ -104,6 +104,7 @@ struct OpticalFlowResult {
   std::vector<Keypoints> keypoints;
   std::vector<Keypoints> tracking_guesses;
   std::vector<Keypoints> matching_guesses;
+  std::vector<Keypoints> recall_guesses;
 
   std::vector<KeypointLevels> pyramid_levels;
 

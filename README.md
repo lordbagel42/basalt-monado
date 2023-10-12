@@ -1,3 +1,5 @@
+basalt_vio --show-gui 1 --dataset-path $msdmi/MIO_others/MIO11_short_3_backandforth --dataset-type euroc --cam-calib $msdmi/extras/calibration.json --config-path $bsltdeps/basalt/data/euroc_config_RECALL.json --save-trajectory euroc
+
 # Basalt for Monado
 
 This is a fork of [Basalt](https://gitlab.com/VladyslavUsenko/basalt) tuned for

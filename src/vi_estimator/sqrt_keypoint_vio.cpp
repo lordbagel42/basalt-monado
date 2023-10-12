@@ -454,6 +454,10 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
     take_kf = false;
     frames_after_kf = 0;
     kf_ids.emplace(last_state_t_ns);
+    if (expecting_first_kf) {
+      // protected_kfs.emplace(last_state_t_ns);
+      expecting_first_kf = false;
+    }
 
     int num_points_added = 0;
     for (int i = 0; i < NUM_CAMS; i++) {
@@ -605,20 +609,16 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
     LandmarkBundle::Ptr lmb = std::make_shared<LandmarkBundle>();
     lmb->ts = last_state_t_ns;
     for (const auto& [lmid, lm] : lmdb.getLandmarks()) {
-      if (frame_poses.count(lm.host_kf_id.frame_id) == 0) {  // This landmark is hosted in a frame
-        BASALT_ASSERT(frame_states.count(lm.host_kf_id.frame_id) > 0);
-        continue;
-      }
-
-      Vec4 pt_c = StereographicParam<Scalar>::unproject(lm.direction);
-      pt_c *= 1 / lm.inv_dist; // scale by depth
-      pt_c[3] = 1;
-
+      if (frame_poses.count(lm.host_kf_id.frame_id) == 0) continue;
       SE3 T_w_i = frame_poses.at(lm.host_kf_id.frame_id).getPose();
       SE3 T_i_c = calib.T_i_c[lm.host_kf_id.cam_id];
       SE3 T_w_c = T_w_i * T_i_c;
-      Vec4 pt_w = T_w_c * pt_c;
 
+      Vec4 pt_c = StereographicParam<Scalar>::unproject(lm.direction);
+      pt_c *= 1 / lm.inv_dist;  // scale by depth
+      pt_c[3] = 1;
+
+      Vec4 pt_w = T_w_c * pt_c;
       lmb->landmarks[lmid] = pt_w.template head<3>();
     }
     opt_flow_lm_bundle_queue->push(lmb);
@@ -681,6 +681,8 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
                                                     const std::unordered_set<KeypointId>& lost_landmaks) {
   if (!opt_started) return;
 
+  auto protectedKf = [&](int64_t kf_id) -> bool { return protected_kfs.count((kf_id)) != 0; };
+
   Timer t_total;
 
   if (frame_poses.size() > max_kfs || frame_states.size() >= max_states) {
@@ -699,7 +701,7 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
     for (const auto& kv : frame_poses) {
       aom.abs_order_map[kv.first] = std::make_pair(aom.total_size, POSE_SIZE);
 
-      if (kf_ids.count(kv.first) == 0) poses_to_marg.emplace(kv.first);
+      if (kf_ids.count(kv.first) == 0 && !protectedKf(kv.first)) poses_to_marg.emplace(kv.first);
 
       // Check that we have the same order as marginalization
       BASALT_ASSERT(marg_data.order.abs_order_map.at(kv.first) == aom.abs_order_map.at(kv.first));
@@ -747,6 +749,7 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
           if (num_points_connected.count(*it) == 0 ||
               (num_points_connected.at(*it) / static_cast<float>(num_points_kf.at(*it)) <
                config.vio_kf_marg_feature_ratio)) {
+            if (protectedKf(*it)) continue;
             id_to_marg = *it;
             break;
           }
@@ -782,7 +785,7 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
                                        .norm()) *
                          denom;
 
-          if (score < min_score) {
+          if (score < min_score && !protectedKf(*it1)) {
             min_score_id = *it1;
             min_score = score;
           }
@@ -793,6 +796,7 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
 
       // if no frame was selected, the logic above is faulty
       BASALT_ASSERT(id_to_marg >= 0);
+      BASALT_ASSERT(!protectedKf(id_to_marg));
 
       kfs_to_marg.emplace(id_to_marg);
       poses_to_marg.emplace(id_to_marg);

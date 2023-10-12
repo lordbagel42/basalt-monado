@@ -110,6 +110,17 @@ std::vector<const Landmark<Scalar_> *> LandmarkDatabase<Scalar_>::getLandmarksFo
 }
 
 template <class Scalar_>
+std::vector<std::pair<LandmarkId, const Landmark<Scalar_> *>> LandmarkDatabase<Scalar_>::getLandmarksForHostWithIds(
+    const TimeCamId &tcid) const {
+  std::vector<std::pair<LandmarkId, const Landmark<Scalar_> *>> res;
+
+  for (const auto &[k, obs] : observations.at(tcid))
+    for (const auto &v : obs) res.emplace_back(v, &kpts.at(v));
+
+  return res;
+}
+
+template <class Scalar_>
 void LandmarkDatabase<Scalar_>::addObservation(const TimeCamId &tcid_target, const KeypointObservation<Scalar> &o) {
   auto it = kpts.find(o.kpt_id);
   BASALT_ASSERT(it != kpts.end());
@@ -130,8 +141,8 @@ const Landmark<Scalar_> &LandmarkDatabase<Scalar_>::getLandmark(LandmarkId lm_id
 }
 
 template <class Scalar_>
-const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<LandmarkId>>>
-    &LandmarkDatabase<Scalar_>::getObservations() const {
+const std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<LandmarkId>>> &
+LandmarkDatabase<Scalar_>::getObservations() const {
   return observations;
 }
 

@@ -35,6 +35,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #pragma once
 
+#include <cstdio>
 #include <memory>
 
 #include <sophus/se2.hpp>
@@ -53,6 +54,17 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <basalt/utils/keypoints.h>
 #include <basalt/vi_estimator/landmark_database.h>
+
+#define DUMP_SE3(p)        \
+  printf(">>> " #p "=\n"); \
+  std::cout << p.matrix() << "\n\n";
+#define DUMP_VEC3(p)       \
+  printf(">>> " #p "=\n"); \
+  std::cout << p.transpose() << "\n\n";
+#define DUMP_VEC2(p)       \
+  printf(">>> " #p "=\n"); \
+  std::cout << p.transpose() << "\n\n";
+#define DUMP_BOOL(p) printf(">>> " #p "=%s\n", p ? "true" : "false");
 
 namespace basalt {
 
@@ -203,6 +215,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       transforms->keypoints.resize(num_cams);
       transforms->tracking_guesses.resize(num_cams);
       transforms->matching_guesses.resize(num_cams);
+      transforms->recall_guesses.resize(num_cams);
       transforms->t_ns = t_ns;
 
       pyramid.reset(new std::vector<ManagedImagePyr<uint16_t>>);
@@ -236,6 +249,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       new_transforms->keypoints.resize(num_cams);
       new_transforms->tracking_guesses.resize(num_cams);
       new_transforms->matching_guesses.resize(num_cams);
+      new_transforms->recall_guesses.resize(num_cams);
       new_transforms->t_ns = t_ns;
 
       SE3 T_i1 = latest_state->T_w_i.template cast<Scalar>();
@@ -380,8 +394,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     return patch_valid;
   }
 
-  inline bool trackPointAtLevel(const Image<const uint16_t>& img_2, const PatchT& dp,
-                                Eigen::AffineCompact2f& transform) const {
+  inline bool trackPointAtLevel(const Image<const uint16_t>& img_2, const PatchT& dp, Eigen::AffineCompact2f& transform,
+                                Scalar* out_error = nullptr) const {
     bool patch_valid = true;
 
     for (int iteration = 0; patch_valid && iteration < config.optical_flow_max_iterations; iteration++) {
@@ -391,6 +405,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       transformed_pat.colwise() += transform.translation();
 
       patch_valid &= dp.residual(img_2, transformed_pat, res);
+
+      if (out_error) *out_error = res.norm();
 
       if (patch_valid) {
         const Vector3 inc = -dp.H_se2_inv_J_se2_T * res;
@@ -415,12 +431,15 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
   }
 
   inline bool trackPointFromPyrPatch(const ManagedImagePyr<uint16_t>& pyr,
-                                     const Eigen::aligned_vector<PatchT>& patch_vec,
-                                     Eigen::AffineCompact2f& transform) const {
+                                     const Eigen::aligned_vector<PatchT>& patch_vec, Eigen::AffineCompact2f& transform,
+                                     int64_t frame_if_lm3 = -1) const {
     bool patch_valid = true;
 
     //! @note For some reason resetting transform linear part would be wrong only in patch_optical_flow?
     // transform.linear().setIdentity();
+
+    // Scalar S = 0.85; // Scaling of error
+    std::vector<Scalar> max_error_at_level = {1.74, 0.96, 0.99, 0.44};  // l3, l2, l1, l0
 
     for (int level = config.optical_flow_levels; level >= 0 && patch_valid; level--) {
       const Scalar scale = 1 << level;
@@ -431,8 +450,12 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       const auto& p = patch_vec[level];
       patch_valid &= p.valid;
       if (patch_valid) {
+        Scalar error = -1;
         // Perform tracking on current level
-        patch_valid &= trackPointAtLevel(pyr.lvl(level), p, transform);
+        patch_valid &= trackPointAtLevel(pyr.lvl(level), p, transform, &error);
+        patch_valid &= error <= max_error_at_level.at(level);
+        // if (frame_if_lm3 != -1)
+        //   printf("Landmark 3, frame %ld, level %d, error=%f, valid=%d\n", frame_if_lm3, level, error, patch_valid);
       }
 
       transform.translation() *= scale;
@@ -453,8 +476,10 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     Eigen::aligned_unordered_map<LandmarkId, Vector2> projections;
 
     for (const auto& [lm_id, lm_pos] : latest_lm_bundle->landmarks) {
+      // if (lm_id != 3 || lm_id==3) continue;
+
       // Skip landmarks that are already tracked by the current frame
-      bool already_tracked = transforms->keypoints.at(cam_id).count(lm_id) > 0;
+      bool already_tracked = transforms->keypoints.at(cam_id).count(lm_id) > 0;// TODO@mateosss: not sure if this is a good idea?
       if (already_tracked) continue;
 
       // Skip points that are behind the camera
@@ -468,6 +493,9 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       Vector3 cj_xyz = T_cj.inverse() * lm_pos;
       Vector2 cj_uv;
       bool valid = calib.intrinsics[cam_id].project(cj_xyz, cj_uv);
+      if (!valid) continue;
+
+      valid &= (cj_uv - Vector2{480, 480}).norm() <= 0.95 * 480;
       if (!valid) continue;
 
       // Check if the point is in the bounds of the frame
@@ -521,14 +549,21 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
     // TODO@mateosss: Parallelize?
     for (const auto& [lm_id, proj_pos] : projections) {
-      if (getNeighborPointsInCell(proj_pos, cam_id) > config.optical_flow_detection_num_points_cell) continue;
+      // if (getNeighborPointsInCell(proj_pos, cam_id) > config.optical_flow_detection_num_points_cell) continue;
+      Eigen::AffineCompact2f proj_pose = Eigen::AffineCompact2f::Identity();
+      proj_pose.translation() = proj_pos;
 
       Eigen::aligned_vector<PatchT>& lm_patch = patches.at(lm_id);
-      Eigen::AffineCompact2f curr_pose = Eigen::AffineCompact2f::Identity();
-      curr_pose.translation() = proj_pos;
+      Eigen::AffineCompact2f curr_pose = proj_pose;
 
-      bool valid = trackPointFromPyrPatch(pyramid->at(cam_id), lm_patch, curr_pose);
+      if (show_gui) transforms->recall_guesses.at(cam_id)[lm_id] = proj_pose;
+
+      // bool valid = trackPointFromPyrPatch(pyramid->at(cam_id), lm_patch, curr_pose, lm_id == 3 ? frame_counter : -1);
+      bool valid = trackPointFromPyrPatch(pyramid->at(cam_id), lm_patch, curr_pose, frame_counter);
       if (!valid) continue;
+
+        // valid &= (curr_pose.translation() - proj_pos).norm() <= 1 * 8; // 1 * patch_radius;
+        // if (!valid) continue;
 
 #if 0
       // TODO@mateosss: check that this improves things

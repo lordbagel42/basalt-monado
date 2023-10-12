@@ -206,6 +206,8 @@ class SqrtKeypointVioEstimator : public VioEstimatorBase, public SqrtBundleAdjus
   bool take_kf;
   int frames_after_kf;
   std::set<int64_t> kf_ids;
+  std::set<int64_t> protected_kfs;
+  bool expecting_first_kf = true;
 
   int64_t last_state_t_ns;
   Eigen::aligned_map<int64_t, IntegratedImuMeasurement<Scalar>> imu_meas;

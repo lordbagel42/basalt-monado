@@ -97,11 +97,12 @@ pangolin::Plotter* plotter;
 
 pangolin::Var<int> show_frame("ui.show_frame", 0, 0, 1500);
 
-pangolin::Var<bool> show_flow("ui.show_flow", false, false, true);
+pangolin::Var<bool> show_flow("ui.show_flow", true, false, true);
 pangolin::Var<bool> show_tracking_guess("ui.show_tracking_guess", false, false, true);
 pangolin::Var<bool> show_matching_guess("ui.show_matching_guess", false, false, true);
+pangolin::Var<bool> show_recall_guess("ui.show_recall_guess", true, false, true);
 pangolin::Var<bool> show_obs("ui.show_obs", true, false, true);
-pangolin::Var<bool> show_ids("ui.show_ids", false, false, true);
+pangolin::Var<bool> show_ids("ui.show_ids", true, false, true);
 pangolin::Var<bool> show_depth{"ui.show_depth", false, false, true};
 
 pangolin::Var<bool> show_grid{"ui.show_grid", false, false, true};
@@ -138,7 +139,7 @@ pangolin::Var<bool> kitti_fmt("ui.kitti_fmt", false, false, true);
 pangolin::Var<bool> save_groundtruth("ui.save_groundtruth", false, false, true);
 Button save_traj_btn("ui.save_traj", &saveTrajectoryButton);
 
-pangolin::Var<bool> follow("ui.follow", true, false, true);
+pangolin::Var<bool> follow("ui.follow", false, false, true);
 
 // pangolin::Var<bool> record("ui.record", false, false, true);
 
@@ -706,6 +707,8 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
 
   if (show_matching_guess) vis::show_matching_guesses(cam_id, curr_vis_data);
 
+  if (show_recall_guess) vis::show_recall_guesses(cam_id, curr_vis_data);
+
   if (show_masks) vis::show_masks(cam_id, curr_vis_data);
 
   if (show_cam0_proj) vis::show_cam0_proj(cam_id, depth_guess, vio_config, calib);
@@ -755,6 +758,20 @@ void draw_scene(pangolin::View& view) {
 
     glColor3ubv(pose_color);
     pangolin::glDrawPoints(it->second->points);
+
+    static Eigen::Vector3d lm3 = {0.1, 0.1, 0.1};
+    for (size_t i = 0; i < it->second->point_ids.size(); i++) {
+      if (it->second->point_ids.at(i) == 3) {
+        lm3 = it->second->points.at(i);
+        break;
+      }
+    }
+
+    glColor3ubv(gt_color);
+    glPointSize(10);
+    Eigen::aligned_vector<Eigen::Vector3d> fake_points;
+    fake_points.push_back(lm3);
+    pangolin::glDrawPoints(fake_points);
   }
 
   pangolin::glDrawAxis(Sophus::SE3d().matrix(), 1.0);
