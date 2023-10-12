@@ -97,11 +97,12 @@ pangolin::Plotter* plotter;
 
 pangolin::Var<int> show_frame("ui.show_frame", 0, 0, 1500);
 
-pangolin::Var<bool> show_flow("ui.show_flow", false, false, true);
+pangolin::Var<bool> show_flow("ui.show_flow", true, false, true);
 pangolin::Var<bool> show_tracking_guess("ui.show_tracking_guess", false, false, true);
 pangolin::Var<bool> show_matching_guess("ui.show_matching_guess", false, false, true);
+pangolin::Var<bool> show_recall_guess("ui.show_recall_guess", true, false, true);
 pangolin::Var<bool> show_obs("ui.show_obs", true, false, true);
-pangolin::Var<bool> show_ids("ui.show_ids", false, false, true);
+pangolin::Var<bool> show_ids("ui.show_ids", true, false, true);
 pangolin::Var<bool> show_depth{"ui.show_depth", false, false, true};
 
 pangolin::Var<bool> show_grid{"ui.show_grid", false, false, true};
@@ -138,7 +139,7 @@ pangolin::Var<bool> kitti_fmt("ui.kitti_fmt", false, false, true);
 pangolin::Var<bool> save_groundtruth("ui.save_groundtruth", false, false, true);
 Button save_traj_btn("ui.save_traj", &saveTrajectoryButton);
 
-pangolin::Var<bool> follow("ui.follow", true, false, true);
+pangolin::Var<bool> follow("ui.follow", false, false, true);
 
 // pangolin::Var<bool> record("ui.record", false, false, true);
 
@@ -705,6 +706,8 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
   if (show_tracking_guess) vis::show_tracking_guess_vio(cam_id, show_frame, vio_dataset, vis_map);
 
   if (show_matching_guess) vis::show_matching_guesses(cam_id, curr_vis_data);
+
+  if (show_recall_guess) vis::show_recall_guesses(cam_id, curr_vis_data);
 
   if (show_masks) vis::show_masks(cam_id, curr_vis_data);
 

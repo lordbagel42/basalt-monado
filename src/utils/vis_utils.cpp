@@ -127,6 +127,36 @@ void show_tracking_guess(size_t cam_id, size_t frame_id, const VioVisualizationD
   glDrawCirclePerimeters(guess_points, radius);
 }
 
+void show_recall_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data) {
+  auto new_kpts = curr_vis_data->opt_flow_res->keypoints.at(cam_id);
+  auto guess_obs = curr_vis_data->opt_flow_res->recall_guesses.at(cam_id);
+
+  std::vector<Vector2f> guess_lines;
+  std::vector<Vector2f> guess_points;
+
+  guess_lines.reserve(new_kpts.size());
+  guess_points.reserve(new_kpts.size());
+
+  float radius = 1.0F;
+  glColor4f(255 / 255.0F, 13 / 255.0F, 134 / 255.0F, 0.9);
+
+  // Draw tracked features in previous frame
+  for (auto& [kpid, kpt] : guess_obs) {
+    auto g = kpt.translation();
+    guess_points.emplace_back(g);
+    pangolin::GlFont::I().Text("%zu", kpid).Draw(5 + g.x(), 5 + g.y());
+
+    if (new_kpts.count(kpid) > 0) {
+      auto n = new_kpts.at(kpid).translation();
+      guess_lines.emplace_back(g);
+      guess_lines.emplace_back(n);
+    }
+  }
+
+  pangolin::glDrawLines(guess_lines);
+  glDrawCirclePerimeters(guess_points, radius);
+}
+
 void show_tracking_guess_vio(size_t cam_id, size_t frame_id, const VioDatasetPtr& vio_dataset,
                              const std::unordered_map<int64_t, VioVisualizationData::Ptr>& vis_map) {
   if (frame_id < 1) return;

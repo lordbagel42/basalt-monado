@@ -134,6 +134,8 @@ void show_tracking_guess(size_t cam_id, size_t frame_id, const VioVisualizationD
 void show_tracking_guess_vio(size_t cam_id, size_t frame_id, const VioDatasetPtr& vio_dataset,
                              const std::unordered_map<int64_t, VioVisualizationData::Ptr>& vis_map);
 
+void show_recall_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data);
+
 void show_matching_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data);
 
 void show_masks(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data);

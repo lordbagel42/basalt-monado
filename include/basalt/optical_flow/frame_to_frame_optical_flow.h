@@ -203,6 +203,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       transforms->keypoints.resize(num_cams);
       transforms->tracking_guesses.resize(num_cams);
       transforms->matching_guesses.resize(num_cams);
+      transforms->recall_guesses.resize(num_cams);
       transforms->t_ns = t_ns;
 
       pyramid.reset(new std::vector<ManagedImagePyr<uint16_t>>);
@@ -236,6 +237,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       new_transforms->keypoints.resize(num_cams);
       new_transforms->tracking_guesses.resize(num_cams);
       new_transforms->matching_guesses.resize(num_cams);
+      new_transforms->recall_guesses.resize(num_cams);
       new_transforms->t_ns = t_ns;
 
       SE3 T_i1 = latest_state->T_w_i.template cast<Scalar>();

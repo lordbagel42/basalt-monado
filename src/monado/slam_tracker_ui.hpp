@@ -253,6 +253,7 @@ class slam_tracker_ui {
   pangolin::Var<bool> show_flow{"ui.show_flow", false, false, true};
   pangolin::Var<bool> show_tracking_guess{"ui.show_tracking_guess", false, false, true};
   pangolin::Var<bool> show_matching_guess{"ui.show_matching_guess", false, false, true};
+  pangolin::Var<bool> show_recall_guess{"ui.show_recall_guess", true, false, true};
   pangolin::Var<bool> show_obs{"ui.show_obs", true, false, true};
   pangolin::Var<bool> show_ids{"ui.show_ids", false, false, true};
   pangolin::Var<bool> show_depth{"ui.show_depth", false, false, true};
@@ -291,6 +292,8 @@ class slam_tracker_ui {
     if (show_tracking_guess) vis::show_tracking_guess(cam_id, show_frame, curr_vis_data, prev_vis_data);
 
     if (show_matching_guess) vis::show_matching_guesses(cam_id, curr_vis_data);
+
+    if (show_recall_guess) vis::show_recall_guesses(cam_id, curr_vis_data);
 
     if (show_masks) vis::show_masks(cam_id, curr_vis_data);
 
