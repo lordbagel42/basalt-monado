@@ -468,7 +468,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     Eigen::aligned_unordered_map<LandmarkId, Vector2> projections;
 
     for (const auto& [lm_id, lm_pos] : latest_lm_bundle->landmarks) {
-      if (!is_debug_point(lm_id)) continue;
+      // if (!is_debug_point(lm_id)) continue;
 
       // Skip landmarks that are already tracked by the current frame
       // TODO@mateosss: removing already_tracked check improves tracks stability

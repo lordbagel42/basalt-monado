@@ -763,18 +763,18 @@ void draw_scene(pangolin::View& view) {
     glColor3ubv(pose_color);
     pangolin::glDrawPoints(it->second->points);
 
-    glColor3ubv(gt_color);
-    Eigen::aligned_vector<Eigen::Vector3d> debug_points;
-    for (size_t i = 0; i < it->second->point_ids.size(); i++) {
-      Vector3d pos = it->second->points.at(i);
-      int id = it->second->point_ids.at(i);
-      if (is_debug_point(id)) {
-        debug_points.push_back(pos);
-        pangolin::GlFont::I().Text("%d", id).Draw(pos.x(), pos.y(), pos.z());
-      }
-    }
-    glPointSize(10);
-    pangolin::glDrawPoints(debug_points);
+    // glColor3ubv(gt_color);
+    // Eigen::aligned_vector<Eigen::Vector3d> debug_points;
+    // for (size_t i = 0; i < it->second->point_ids.size(); i++) {
+    //   Vector3d pos = it->second->points.at(i);
+    //   int id = it->second->point_ids.at(i);
+    //   if (is_debug_point(id)) {
+    //     debug_points.push_back(pos);
+    //     pangolin::GlFont::I().Text("%d", id).Draw(pos.x(), pos.y(), pos.z());
+    //   }
+    // }
+    // glPointSize(10);
+    // pangolin::glDrawPoints(debug_points);
   }
 
   pangolin::glDrawAxis(Sophus::SE3d().matrix(), 1.0);

@@ -455,7 +455,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
     frames_after_kf = 0;
     kf_ids.emplace(last_state_t_ns);
     if (expecting_first_kf) {
-      protected_kfs.emplace(last_state_t_ns);
+      // protected_kfs.emplace(last_state_t_ns);
       expecting_first_kf = false;
     }
 
