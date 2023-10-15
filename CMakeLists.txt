@@ -344,6 +344,7 @@ target_sources(basalt_internal
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/utils/ba_utils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/utils/cast_utils.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/utils/common_types.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/utils/debug_points.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/utils/filesystem.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/utils/format.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/basalt/utils/imu_types.h

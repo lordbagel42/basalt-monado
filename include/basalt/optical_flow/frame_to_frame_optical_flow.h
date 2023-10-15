@@ -41,6 +41,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "basalt/imu/imu_types.h"
 #include "basalt/imu/preintegration.h"
 #include "basalt/utils/common_types.h"
+#include "basalt/utils/debug_points.h"
 #include "basalt/utils/imu_types.h"
 #include "sophus/se3.hpp"
 
@@ -443,6 +444,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
         patch_valid &= trackPointAtLevel(pyr.lvl(level), p, transform, &error);
         patch_valid &= error <= max_error_at_level.at(level);
         // TODO@mateosss: remove print
+        UNUSED(ts_lm);
         // if (ts_lm[0] != SIZE_MAX)
         //   printf("frame:%ld,landmark:%ld,level:%d,error:%f,valid:%d\n", ts_lm[0], ts_lm[1], level, error,
         //   patch_valid);
@@ -466,6 +468,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     Eigen::aligned_unordered_map<LandmarkId, Vector2> projections;
 
     for (const auto& [lm_id, lm_pos] : latest_lm_bundle->landmarks) {
+      if (!is_debug_point(lm_id)) continue;
+
       // Skip landmarks that are already tracked by the current frame
       // TODO@mateosss: removing already_tracked check improves tracks stability
       // with the check: we get avgdepth-reprojection+f2f OF always but when lost, it uses patch for track recovery as

@@ -67,7 +67,7 @@ VioConfig::VioConfig() {
   vio_sqrt_marg = true;
 
   vio_max_states = 3;
-  vio_max_kfs = 7;
+  vio_max_kfs = 15;
   vio_min_frames_after_kf = 5;
   vio_new_kf_keypoints_thresh = 0.7;
 
@@ -95,7 +95,7 @@ VioConfig::VioConfig() {
   vio_init_ba_weight = 1e1;
   vio_init_bg_weight = 1e2;
 
-  vio_marg_lost_landmarks = true;
+  vio_marg_lost_landmarks = false;
 
   vio_kf_marg_feature_ratio = 0.1;
 

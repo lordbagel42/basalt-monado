@@ -454,6 +454,10 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
     take_kf = false;
     frames_after_kf = 0;
     kf_ids.emplace(last_state_t_ns);
+    if (expecting_first_kf) {
+      protected_kfs.emplace(last_state_t_ns);
+      expecting_first_kf = false;
+    }
 
     int num_points_added = 0;
     for (int i = 0; i < NUM_CAMS; i++) {
@@ -677,6 +681,8 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
                                                     const std::unordered_set<KeypointId>& lost_landmaks) {
   if (!opt_started) return;
 
+  auto protectedKf = [&](int64_t kf_id) -> bool { return protected_kfs.count((kf_id)) != 0; };
+
   Timer t_total;
 
   if (frame_poses.size() > max_kfs || frame_states.size() >= max_states) {
@@ -695,7 +701,7 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
     for (const auto& kv : frame_poses) {
       aom.abs_order_map[kv.first] = std::make_pair(aom.total_size, POSE_SIZE);
 
-      if (kf_ids.count(kv.first) == 0) poses_to_marg.emplace(kv.first);
+      if (kf_ids.count(kv.first) == 0 && !protectedKf(kv.first)) poses_to_marg.emplace(kv.first);
 
       // Check that we have the same order as marginalization
       BASALT_ASSERT(marg_data.order.abs_order_map.at(kv.first) == aom.abs_order_map.at(kv.first));
@@ -732,6 +738,7 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
     while (kf_ids.size() > max_kfs && !states_to_marg_vel_bias.empty()) {
       int64_t id_to_marg = -1;
 
+#if 1
       // starting from the oldest kf (and skipping the newest 2 kfs), try to
       // find a kf that has less than a small percentage of it's landmarks
       // tracked by the current frame
@@ -743,11 +750,13 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
           if (num_points_connected.count(*it) == 0 ||
               (num_points_connected.at(*it) / static_cast<float>(num_points_kf.at(*it)) <
                config.vio_kf_marg_feature_ratio)) {
+            if (protectedKf(*it)) continue;
             id_to_marg = *it;
             break;
           }
         }
       }
+#endif
 
       // Note: This score function is taken from DSO, but it seems to mostly
       // marginalize the oldest keyframe. This may be due to the fact that
@@ -778,7 +787,7 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
                                        .norm()) *
                          denom;
 
-          if (score < min_score) {
+          if (score < min_score && !protectedKf(*it1)) {
             min_score_id = *it1;
             min_score = score;
           }
@@ -789,6 +798,7 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
 
       // if no frame was selected, the logic above is faulty
       BASALT_ASSERT(id_to_marg >= 0);
+      BASALT_ASSERT(!protectedKf(id_to_marg));
 
       kfs_to_marg.emplace(id_to_marg);
       poses_to_marg.emplace(id_to_marg);
