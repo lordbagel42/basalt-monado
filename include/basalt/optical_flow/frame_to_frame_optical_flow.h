@@ -382,8 +382,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     return patch_valid;
   }
 
-  inline bool trackPointAtLevel(const Image<const uint16_t>& img_2, const PatchT& dp,
-                                Eigen::AffineCompact2f& transform) const {
+  inline bool trackPointAtLevel(const Image<const uint16_t>& img_2, const PatchT& dp, Eigen::AffineCompact2f& transform,
+                                Scalar* out_error = nullptr) const {
     bool patch_valid = true;
 
     for (int iteration = 0; patch_valid && iteration < config.optical_flow_max_iterations; iteration++) {
@@ -393,6 +393,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       transformed_pat.colwise() += transform.translation();
 
       patch_valid &= dp.residual(img_2, transformed_pat, res);
+
+      if (out_error) *out_error = res.norm();
 
       if (patch_valid) {
         const Vector3 inc = -dp.H_se2_inv_J_se2_T * res;
@@ -417,12 +419,15 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
   }
 
   inline bool trackPointFromPyrPatch(const ManagedImagePyr<uint16_t>& pyr,
-                                     const Eigen::aligned_vector<PatchT>& patch_vec,
-                                     Eigen::AffineCompact2f& transform) const {
+                                     const Eigen::aligned_vector<PatchT>& patch_vec, Eigen::AffineCompact2f& transform,
+                                     std::array<size_t, 2> ts_lm = {SIZE_MAX, SIZE_MAX}) const {
     bool patch_valid = true;
 
     //! @note For some reason resetting transform linear part would be wrong only in patch_optical_flow?
     // transform.linear().setIdentity();
+
+    // TODO@mateosss: values are very arbitrary from tracking lm 3 of MIO11 dataset
+    std::vector<Scalar> max_error_at_level = {1.74, 0.96, 0.99, 0.44};
 
     for (int level = config.optical_flow_levels; level >= 0 && patch_valid; level--) {
       const Scalar scale = 1 << level;
@@ -434,7 +439,13 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       patch_valid &= p.valid;
       if (patch_valid) {
         // Perform tracking on current level
-        patch_valid &= trackPointAtLevel(pyr.lvl(level), p, transform);
+        Scalar error = -1;
+        patch_valid &= trackPointAtLevel(pyr.lvl(level), p, transform, &error);
+        patch_valid &= error <= max_error_at_level.at(level);
+        // TODO@mateosss: remove print
+        // if (ts_lm[0] != SIZE_MAX)
+        //   printf("frame:%ld,landmark:%ld,level:%d,error:%f,valid:%d\n", ts_lm[0], ts_lm[1], level, error,
+        //   patch_valid);
       }
 
       transform.translation() *= scale;
@@ -456,8 +467,11 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
     for (const auto& [lm_id, lm_pos] : latest_lm_bundle->landmarks) {
       // Skip landmarks that are already tracked by the current frame
-      bool already_tracked = transforms->keypoints.at(cam_id).count(lm_id) > 0;
-      if (already_tracked) continue;
+      // TODO@mateosss: removing already_tracked check improves tracks stability
+      // with the check: we get avgdepth-reprojection+f2f OF always but when lost, it uses patch for track recovery as
+      // fallback without the check: we get good-reprojection+patch OF always that overrides f2f, but when lost, it uses
+      // f2f for track recovery as fallback bool already_tracked = transforms->keypoints.at(cam_id).count(lm_id) > 0; if
+      // (already_tracked) continue;
 
       // Skip points that are behind the camera
       // TODO@mateosss: dot product between latest-predicted-state forward-vector and relative vector to landmark from
@@ -470,6 +484,11 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       Vector3 cj_xyz = T_cj.inverse() * lm_pos;
       Vector2 cj_uv;
       bool valid = calib.intrinsics[cam_id].project(cj_xyz, cj_uv);
+      if (!valid) continue;
+
+      // TODO@mateosss: this info should probably come from calibration
+      Scalar sr = 480;
+      valid &= sr == 0 || (cj_uv - Vector2{sr, sr}).norm() <= 0.95 * sr;
       if (!valid) continue;
 
       // Check if the point is in the bounds of the frame
@@ -523,13 +542,32 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
     // TODO@mateosss: Parallelize?
     for (const auto& [lm_id, proj_pos] : projections) {
-      if (getNeighborPointsInCell(proj_pos, cam_id) > config.optical_flow_detection_num_points_cell) continue;
+      // TODO@mateosss:
+      // Decide whether to filter recalled points based on gridcell ocupancy. I think it makes sense for recalled points
+      // are too important to ignore. If we want to keep the front end bounded we might remove other neighbors in that
+      // cell? or just recall a limited number of points?
+      //
+      // This if:
+      // if (getNeighborPointsInCell(old_transforms, proj_pos, cam_id) > config.optical_flow_detection_num_points_cell
+      //  && getNeighborPointsInCell(new_transforms, proj_pos, cam_id) > config.optical_flow_detection_num_points_cell)
+      //  continue;
+      //
+      // Or this if (only checks new_transforms):
+      // if (getNeighborPointsInCell(proj_pos, cam_id) > config.optical_flow_detection_num_points_cell) continue;
+
+      Eigen::AffineCompact2f proj_pose = Eigen::AffineCompact2f::Identity();
+      proj_pose.translation() = proj_pos;
 
       Eigen::aligned_vector<PatchT>& lm_patch = patches.at(lm_id);
-      Eigen::AffineCompact2f curr_pose = Eigen::AffineCompact2f::Identity();
-      curr_pose.translation() = proj_pos;
+      Eigen::AffineCompact2f curr_pose = proj_pose;
 
-      bool valid = trackPointFromPyrPatch(pyramid->at(cam_id), lm_patch, curr_pose);
+      if (show_gui) transforms->recall_guesses.at(cam_id)[lm_id] = proj_pose;
+
+      bool valid = trackPointFromPyrPatch(pyramid->at(cam_id), lm_patch, curr_pose, {frame_counter, lm_id});
+      if (!valid) continue;
+
+      Scalar pattern_width = 8;  // TODO@mateosss: hardcoded
+      valid &= (curr_pose.translation() - proj_pos).norm() <= pattern_width * 1;
       if (!valid) continue;
 
 #if 0
