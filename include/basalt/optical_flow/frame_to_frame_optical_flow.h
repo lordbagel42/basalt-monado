@@ -486,8 +486,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       bool valid = calib.intrinsics[cam_id].project(cj_xyz, cj_uv);
       if (!valid) continue;
 
-      // TODO@mateosss: this info should probably come from calibration
-      Scalar sr = 480;
+      // TODO@mateosss: this info should probably come from calibration, not from config, and it should use cx and cy
+      Scalar sr = config.optical_flow_image_safe_radius;
       valid &= sr == 0 || (cj_uv - Vector2{sr, sr}).norm() <= 0.95 * sr;
       if (!valid) continue;
 

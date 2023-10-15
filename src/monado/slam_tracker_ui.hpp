@@ -259,6 +259,7 @@ class slam_tracker_ui {
   pangolin::Var<bool> show_depth{"ui.show_depth", false, false, true};
 
   pangolin::Var<bool> show_grid{"ui.show_grid", false, false, true};
+  pangolin::Var<bool> show_safe_radius{"ui.show_safe_radius", false, false, true};
   pangolin::Var<bool> show_cam0_proj{"ui.show_cam0_proj", false, false, true};
   pangolin::Var<bool> show_masks{"ui.show_masks", false, false, true};
 
@@ -300,6 +301,8 @@ class slam_tracker_ui {
     if (show_cam0_proj) vis::show_cam0_proj(cam_id, depth_guess, config, calib);
 
     if (show_grid) vis::show_grid(config, calib);
+
+    if (show_safe_radius) vis::show_safe_radius(config, calib);
   }
 
   void draw_scene() {

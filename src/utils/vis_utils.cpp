@@ -343,6 +343,13 @@ void show_grid(const VioConfig& config, const Calibration<double>& calib) {
   pangolin::glDrawLines(grid_lines);
 }
 
+void show_safe_radius(const VioConfig& config, const Calibration<double>& calib) {
+  glColor4f(1.0, 0.0, 1.0, 0.25);
+  int w = calib.resolution.at(0).x();
+  int h = calib.resolution.at(0).y();
+  pangolin::glDrawCirclePerimeter(w / 2, h / 2, config.optical_flow_image_safe_radius);
+}
+
 void show_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const VioConfig& config,
                   const Calibration<double>& calib, bool show_same_pixel_guess, bool show_reproj_fix_depth_guess,
                   bool show_reproj_avg_depth_guess, bool show_active_guess, double fixed_depth) {

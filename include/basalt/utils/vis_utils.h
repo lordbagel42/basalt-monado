@@ -144,6 +144,8 @@ void show_cam0_proj(size_t cam_id, double depth_guess, const VioConfig& config, 
 
 void show_grid(const VioConfig& config, const Calibration<double>& calib);
 
+void show_safe_radius(const VioConfig& config, const Calibration<double>& calib);
+
 void show_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const VioConfig& config,
                   const Calibration<double>& calib, bool show_same_pixel_guess, bool show_reproj_fix_depth_guess,
                   bool show_reproj_avg_depth_guess, bool show_active_guess, double fixed_depth);

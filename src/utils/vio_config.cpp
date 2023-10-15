@@ -60,6 +60,7 @@ VioConfig::VioConfig() {
   optical_flow_skip_frames = 1;
   optical_flow_matching_guess_type = MatchingGuessType::REPROJ_AVG_DEPTH;
   optical_flow_matching_default_depth = 2.0;
+  optical_flow_image_safe_radius = 480.0; // TODO@mateosss: this should be 0.0 by default
   optical_flow_enable_recall = true;
 
   vio_linearization_type = LinearizationType::ABS_QR;
@@ -199,6 +200,7 @@ void serialize(Archive& ar, basalt::VioConfig& config) {
   ar(CEREAL_NVP(config.optical_flow_skip_frames));
   ar(CEREAL_NVP(config.optical_flow_matching_guess_type));
   ar(CEREAL_NVP(config.optical_flow_matching_default_depth));
+  ar(CEREAL_NVP(config.optical_flow_image_safe_radius));
   ar(CEREAL_NVP(config.optical_flow_enable_recall));
 
   ar(CEREAL_NVP(config.vio_linearization_type));

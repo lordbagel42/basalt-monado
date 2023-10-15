@@ -60,6 +60,7 @@ struct VioConfig {
   int optical_flow_skip_frames;
   MatchingGuessType optical_flow_matching_guess_type;
   float optical_flow_matching_default_depth;
+  float optical_flow_image_safe_radius; // TODO@mateosss: add to all config files
   bool optical_flow_enable_recall;
 
   LinearizationType vio_linearization_type;

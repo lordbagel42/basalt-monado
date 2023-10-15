@@ -106,6 +106,7 @@ pangolin::Var<bool> show_ids("ui.show_ids", true, false, true);
 pangolin::Var<bool> show_depth{"ui.show_depth", false, false, true};
 
 pangolin::Var<bool> show_grid{"ui.show_grid", false, false, true};
+pangolin::Var<bool> show_safe_radius{"ui.show_safe_radius", false, false, true};
 pangolin::Var<bool> show_cam0_proj{"ui.show_cam0_proj", false, false, true};
 pangolin::Var<bool> show_masks{"ui.show_masks", false, false, true};
 
@@ -714,6 +715,8 @@ void draw_image_overlay(pangolin::View& v, size_t cam_id) {
   if (show_cam0_proj) vis::show_cam0_proj(cam_id, depth_guess, vio_config, calib);
 
   if (show_grid) vis::show_grid(vio_config, calib);
+
+  if (show_safe_radius) vis::show_safe_radius(vio_config, calib);
 }
 
 void draw_scene(pangolin::View& view) {
