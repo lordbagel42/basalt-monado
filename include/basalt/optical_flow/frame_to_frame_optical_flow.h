@@ -570,9 +570,11 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       bool valid = trackPointFromPyrPatch(pyramid->at(cam_id), lm_patch, curr_pose, {frame_counter, lm_id});
       if (!valid) continue;
 
-      Scalar pattern_width = 8;  // TODO@mateosss: hardcoded
-      valid &= (curr_pose.translation() - proj_pos).norm() <= pattern_width * 1;
-      if (!valid) continue;
+      // TODO@mateosss: how to avoid very long jumps to wrong features with
+      // similar patch? This was happening in other datasets
+      // Scalar pattern_width = 8;  // TODO@mateosss: hardcoded
+      // valid &= (curr_pose.translation() - proj_pos).norm() <= pattern_width * 1;
+      // if (!valid) continue;
 
 #if 0
       // TODO@mateosss: check that this improves things
