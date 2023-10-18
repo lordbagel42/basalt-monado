@@ -40,6 +40,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <cereal/archives/json.hpp>
 #include <cereal/cereal.hpp>
+#include <cereal/types/vector.hpp>
 #include <magic_enum.hpp>
 
 namespace basalt {
@@ -60,8 +61,13 @@ VioConfig::VioConfig() {
   optical_flow_skip_frames = 1;
   optical_flow_matching_guess_type = MatchingGuessType::REPROJ_AVG_DEPTH;
   optical_flow_matching_default_depth = 2.0;
-  optical_flow_image_safe_radius = 480.0; // TODO@mateosss: this should be 0.0 by default
-  optical_flow_enable_recall = true;
+  optical_flow_image_safe_radius = 0.0;
+  optical_flow_recall_enable = true;
+  optical_flow_recall_num_points_cell = false;
+  optical_flow_recall_over_tracking = false;
+  optical_flow_recall_update_patch_viewpoint = false;
+  optical_flow_recall_max_patch_dist = 5;
+  optical_flow_recall_max_patch_norms = {1.74, 0.96, 0.99, 0.44};
 
   vio_linearization_type = LinearizationType::ABS_QR;
   vio_sqrt_marg = true;
@@ -201,7 +207,12 @@ void serialize(Archive& ar, basalt::VioConfig& config) {
   ar(CEREAL_NVP(config.optical_flow_matching_guess_type));
   ar(CEREAL_NVP(config.optical_flow_matching_default_depth));
   ar(CEREAL_NVP(config.optical_flow_image_safe_radius));
-  ar(CEREAL_NVP(config.optical_flow_enable_recall));
+  ar(CEREAL_NVP(config.optical_flow_recall_enable));
+  ar(CEREAL_NVP(config.optical_flow_recall_num_points_cell));
+  ar(CEREAL_NVP(config.optical_flow_recall_over_tracking));
+  ar(CEREAL_NVP(config.optical_flow_recall_update_patch_viewpoint));
+  ar(CEREAL_NVP(config.optical_flow_recall_max_patch_dist));
+  ar(CEREAL_NVP(config.optical_flow_recall_max_patch_norms));
 
   ar(CEREAL_NVP(config.vio_linearization_type));
   ar(CEREAL_NVP(config.vio_sqrt_marg));

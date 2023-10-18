@@ -15,7 +15,17 @@
         "config.optical_flow_matching_guess_type": "REPROJ_AVG_DEPTH",
         "config.optical_flow_matching_default_depth": 2.0,
         "config.optical_flow_image_safe_radius": 480.0,
-        "config.optical_flow_enable_recall": true,
+        "config.optical_flow_recall_enable": true,
+        "config.optical_flow_recall_num_points_cell": false,
+        "config.optical_flow_recall_over_tracking": false,
+        "config.optical_flow_recall_update_patch_viewpoint": false,
+        "config.optical_flow_recall_max_patch_dist": 5,
+        "config.optical_flow_recall_max_patch_norms": [
+            1.74,
+            0.96,
+            0.99,
+            0.44
+        ],
         "config.vio_linearization_type": "ABS_QR",
         "config.vio_sqrt_marg": true,
         "config.vio_max_states": 3,

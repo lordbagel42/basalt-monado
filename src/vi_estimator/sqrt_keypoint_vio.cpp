@@ -605,7 +605,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
     if (opt_flow_state_queue) opt_flow_state_queue->push(data);
   }
 
-  bool lm_bundle_needed = opt_flow_lm_bundle_queue && config.optical_flow_enable_recall;
+  bool lm_bundle_needed = opt_flow_lm_bundle_queue && config.optical_flow_recall_enable;
   if (lm_bundle_needed) {
     LandmarkBundle::Ptr lmb = std::make_shared<LandmarkBundle>();
     lmb->ts = last_state_t_ns;
