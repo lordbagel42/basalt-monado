@@ -326,7 +326,6 @@ int main(int argc, char** argv) {
     vio->out_state_queue = &out_state_queue;
     vio->opt_flow_depth_guess_queue = &opt_flow_ptr->input_depth_queue;
     vio->opt_flow_state_queue = &opt_flow_ptr->input_state_queue;
-    // TODO@mateosss: set and push to this queue only if we want recall
     vio->opt_flow_lm_bundle_queue = &opt_flow_ptr->input_lm_bundle_queue;
   }
 
