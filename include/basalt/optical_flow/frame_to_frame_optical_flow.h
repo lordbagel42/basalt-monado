@@ -427,9 +427,6 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     //! @note For some reason resetting transform linear part would be wrong only in patch_optical_flow?
     // transform.linear().setIdentity();
 
-    // TODO@mateosss: values are very arbitrary from tracking lm 3 of MIO11 dataset
-    std::vector<Scalar> max_error_at_level = {1.74, 0.96, 0.99, 0.44};
-
     for (int level = config.optical_flow_levels; level >= 0 && patch_valid; level--) {
       const Scalar scale = 1 << level;
 
@@ -442,7 +439,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
         // Perform tracking on current level
         Scalar error = -1;
         patch_valid &= trackPointAtLevel(pyr.lvl(level), p, transform, &error);
-        patch_valid &= error <= max_error_at_level.at(level);
+        patch_valid &= error <= config.optical_flow_recall_max_patch_norms.at(level);
         // TODO@mateosss: remove print
         UNUSED(ts_lm);
         // if (ts_lm[0] != SIZE_MAX)
@@ -470,12 +467,12 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     for (const auto& [lm_id, lm_pos] : latest_lm_bundle->landmarks) {
       // if (!is_debug_point(lm_id)) continue;
 
-      // Skip landmarks that are already tracked by the current frame
-      // TODO@mateosss: removing already_tracked check improves tracks stability
-      // with the check: we get avgdepth-reprojection+f2f OF always but when lost, it uses patch for track recovery as
-      // fallback without the check: we get good-reprojection+patch OF always that overrides f2f, but when lost, it uses
-      // f2f for track recovery as fallback bool already_tracked = transforms->keypoints.at(cam_id).count(lm_id) > 0; if
-      // (already_tracked) continue;
+      if (!config.optical_flow_recall_over_tracking) {  // Optionally skip recall for already tracked lms
+        // NOTE: With the already_tracked check, this works like patch-OF with fallback
+        // to f2f-OF without the check it works as f2f-OF with fallback to patch-OF.
+        bool already_tracked = transforms->keypoints.at(cam_id).count(lm_id) > 0;
+        if (already_tracked) continue;
+      }
 
       // Skip points that are behind the camera
       // TODO@mateosss: dot product between latest-predicted-state forward-vector and relative vector to landmark from
@@ -490,7 +487,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       bool valid = calib.intrinsics[cam_id].project(cj_xyz, cj_uv);
       if (!valid) continue;
 
-      // TODO@mateosss: this info should probably come from calibration, not from config, and it should use cx and cy
+      // TODO: This should probably come from calibration not from config
       Scalar sr = config.optical_flow_image_safe_radius;
       valid &= sr == 0 || (cj_uv - Vector2{sr, sr}).norm() <= 0.95 * sr;
       if (!valid) continue;
@@ -526,6 +523,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     int bottom = top + C;
 
     int neighbors = 0;
+    // TODO@mateosss: this is very inefficient, create a buffer with this count,
+    // maybe reuse it in detectKeypoints?
     for (const auto& [kpid, affine] : transforms->keypoints.at(cam_id)) {
       float x = affine.translation().x();
       float y = affine.translation().y();
@@ -546,18 +545,9 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
     // TODO@mateosss: Parallelize?
     for (const auto& [lm_id, proj_pos] : projections) {
-      // TODO@mateosss:
-      // Decide whether to filter recalled points based on gridcell ocupancy. I think it makes sense for recalled points
-      // are too important to ignore. If we want to keep the front end bounded we might remove other neighbors in that
-      // cell? or just recall a limited number of points?
-      //
-      // This if:
-      // if (getNeighborPointsInCell(old_transforms, proj_pos, cam_id) > config.optical_flow_detection_num_points_cell
-      //  && getNeighborPointsInCell(new_transforms, proj_pos, cam_id) > config.optical_flow_detection_num_points_cell)
-      //  continue;
-      //
-      // Or this if (only checks new_transforms):
-      // if (getNeighborPointsInCell(proj_pos, cam_id) > config.optical_flow_detection_num_points_cell) continue;
+      // Optionally cap recalls to max number of points in gridcell
+      if (config.optical_flow_recall_num_points_cell)
+        if (getNeighborPointsInCell(proj_pos, cam_id) >= config.optical_flow_detection_num_points_cell) continue;
 
       Eigen::AffineCompact2f proj_pose = Eigen::AffineCompact2f::Identity();
       proj_pose.translation() = proj_pos;
@@ -570,24 +560,25 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       bool valid = trackPointFromPyrPatch(pyramid->at(cam_id), lm_patch, curr_pose, {frame_counter, lm_id});
       if (!valid) continue;
 
-      // TODO@mateosss: how to avoid very long jumps to wrong features with
-      // similar patch? This was happening in other datasets
-      // Scalar pattern_width = 8;  // TODO@mateosss: hardcoded
-      // valid &= (curr_pose.translation() - proj_pos).norm() <= pattern_width * 1;
-      // if (!valid) continue;
-
-#if 0
-      // TODO@mateosss: check that this improves things
-      // Update patch viewpoint, see point 2 of the following discussion
-      // https://gitlab.com/VladyslavUsenko/basalt/-/issues/69#note_906947578
-      for (int l = 0; l <= config.optical_flow_levels; l++) {
-        Scalar scale = 1 << l;
-        Vector2 pos_scaled = curr_pose.translation() / scale;
-        lm_patch[l] = PatchT(pyramid->at(0).lvl(l), pos_scaled);
+      // Optionally limit recalled patch reprojected distance
+      if (config.optical_flow_recall_max_patch_dist > 0) {
+        float w = transforms->input_images->img_data.at(cam_id).img->w;
+        float max_patch_dist = config.optical_flow_recall_max_patch_dist * w;
+        valid &= (curr_pose.translation() - proj_pos).norm() <= max_patch_dist;
+        if (!valid) continue;
       }
 
-      // TODO@mateosss: Maybe I should store all patches that see this landmark and look in all of them
-#endif
+      if (config.optical_flow_recall_update_patch_viewpoint) {
+        // Update patch viewpoint, see point 2 of the following discussion
+        // https://gitlab.com/VladyslavUsenko/basalt/-/issues/69#note_906947578
+        for (int l = 0; l <= config.optical_flow_levels; l++) {
+          Scalar scale = 1 << l;
+          Vector2 pos_scaled = curr_pose.translation() / scale;
+          lm_patch[l] = PatchT(pyramid->at(0).lvl(l), pos_scaled);
+        }
+
+        // TODO@mateosss: Maybe I should store all patches that see this landmark and look in all of them
+      }
 
       transforms->keypoints.at(cam_id)[lm_id] = curr_pose;
     }

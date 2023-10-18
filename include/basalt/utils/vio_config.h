@@ -63,11 +63,11 @@ struct VioConfig {
   float optical_flow_matching_default_depth;
   float optical_flow_image_safe_radius;                    // Use to mask black corners in cameras
   bool optical_flow_recall_enable;                         // Enable feature/landmark recall
-  std::vector<float> optical_flow_recall_max_patch_norms;  // Maximum patch residual norm to accept a recall
-  float optical_flow_recall_max_patch_dist;                // Maximum distance in % of width to accept a recall
-  bool optical_flow_recall_over_tracking;                  // Always perform recall, even on already tracked features
   bool optical_flow_recall_num_points_cell;                // Respect gridcell feature limit
+  bool optical_flow_recall_over_tracking;                  // Always perform recall, even on already tracked features
   bool optical_flow_recall_update_patch_viewpoint;         // Update feature patch when succesfully recalled
+  float optical_flow_recall_max_patch_dist;                // Maximum distance in % of width to accept a recall, or 0
+  std::vector<float> optical_flow_recall_max_patch_norms;  // Maximum patch residual norm to accept a recall
 
   LinearizationType vio_linearization_type;
   bool vio_sqrt_marg;

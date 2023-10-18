@@ -17,9 +17,9 @@
         "config.optical_flow_image_safe_radius": 480.0,
         "config.optical_flow_recall_enable": true,
         "config.optical_flow_recall_num_points_cell": false,
-        "config.optical_flow_recall_over_tracking": false,
+        "config.optical_flow_recall_over_tracking": true,
         "config.optical_flow_recall_update_patch_viewpoint": false,
-        "config.optical_flow_recall_max_patch_dist": 5,
+        "config.optical_flow_recall_max_patch_dist": 0,
         "config.optical_flow_recall_max_patch_norms": [
             1.74,
             0.96,
