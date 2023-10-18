@@ -432,7 +432,6 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
       transform.translation() /= scale;
 
-      // TODO: maybe we should better check patch validity when creating points
       const auto& p = patch_vec[level];
       patch_valid &= p.valid;
       if (patch_valid) {
@@ -503,34 +502,35 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     return projections;
   }
 
-  //! Number of points that are in the same grid cell as img_pos
-  int getNeighborPointsInCell(const Vector2& img_pos, size_t cam_id) {
-    const int C = config.optical_flow_detection_grid_size;
-    int w = transforms->input_images->img_data.at(cam_id).img->w;
-    int h = transforms->input_images->img_data.at(cam_id).img->h;
-    int x_pad = (w % C) / 2;
-    int y_pad = (h % C) / 2;
+  void updateCellCounts(size_t cam_id) {
+    const size_t C = config.optical_flow_detection_grid_size;  // Gridcell size
+    const size_t W = transforms->input_images->img_data.at(cam_id).img->w;
+    const size_t H = transforms->input_images->img_data.at(cam_id).img->h;
+    const size_t x_start = (W % C) / 2;
+    const size_t x_stop = x_start + C * (W / C - 1);
+    const size_t y_start = (H % C) / 2;
+    const size_t y_stop = y_start + C * (H / C - 1);
 
-    const int u = img_pos.x();
-    const int v = img_pos.y();
-    const int cell_x = (u - x_pad) / C;
-    const int cell_y = (v - y_pad) / C;
-
-    int left = x_pad + C * cell_x;
-    int top = y_pad + C * cell_y;
-
-    int right = left + C;
-    int bottom = top + C;
-
-    int neighbors = 0;
-    // TODO@mateosss: this is very inefficient, create a buffer with this count,
-    // maybe reuse it in detectKeypoints?
-    for (const auto& [kpid, affine] : transforms->keypoints.at(cam_id)) {
-      float x = affine.translation().x();
-      float y = affine.translation().y();
-      if (x >= left && x < right && y >= top && y < bottom) neighbors++;
+    cells.setZero(H / C + 1, W / C + 1);
+    for (const auto& [lmid, lm] : transforms->keypoints.at(cam_id)) {
+      Vector2 p = lm.translation();
+      if (p[0] < x_start || p[1] < y_start || p[0] >= x_stop + C || p[1] >= y_stop + C) continue;
+      int x = (p[0] - x_start) / C;
+      int y = (p[1] - y_start) / C;
+      cells(y, x) += 1;
     }
+  }
 
+  //! Number of points that are in the same grid cell as img_pos
+  int getNeighborPointsInCell(const Vector2& xy, size_t cam_id) {
+    const size_t C = config.optical_flow_detection_grid_size;
+    const size_t W = transforms->input_images->img_data.at(cam_id).img->w;
+    const size_t H = transforms->input_images->img_data.at(cam_id).img->h;
+    const size_t x_start = (W % C) / 2;
+    const size_t y_start = (H % C) / 2;
+    int x = (xy[0] - x_start) / C;
+    int y = (xy[1] - y_start) / C;
+    int neighbors = cells(y, x);
     return neighbors;
   }
 
@@ -539,6 +539,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     if (latest_lm_bundle == nullptr) return;
 
     uint64_t cam_id = 0;  // TODO@mateosss: recall in all cameras
+    if (config.optical_flow_recall_num_points_cell) updateCellCounts(cam_id);
 
     // Project the landmarks from the map into the new frame to obtain their projections.
     Eigen::aligned_unordered_map<LandmarkId, Vector2> projections = getProjectedLandmarks(cam_id);
@@ -576,7 +577,6 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
           Vector2 pos_scaled = curr_pose.translation() / scale;
           lm_patch[l] = PatchT(pyramid->at(0).lvl(l), pos_scaled);
         }
-
         // TODO@mateosss: Maybe I should store all patches that see this landmark and look in all of them
       }
 
@@ -600,7 +600,6 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
       // Save patch
       Eigen::aligned_vector<PatchT>& p = patches[last_keypoint_id];
-      // TODO@mateosss: check p.valid here? otherwise it is checked elsewhere
       Vector2 pos = corner.cast<Scalar>();
       for (int l = 0; l <= config.optical_flow_levels; l++) {
         Scalar scale = 1 << l;
@@ -727,6 +726,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
  private:
   Eigen::aligned_unordered_map<KeypointId, Eigen::aligned_vector<PatchT>> patches;
+  Eigen::MatrixXi cells;
   const Vector3d accel_cov;
   const Vector3d gyro_cov;
 };
