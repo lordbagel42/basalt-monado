@@ -108,6 +108,15 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     latest_state = std::make_shared<PoseVelBiasState<double>>();
     predicted_state = std::make_shared<PoseVelBiasState<double>>();
     patches.reserve(3000);
+    C = config.optical_flow_detection_grid_size;  // Gridcell size
+    W = cal.resolution.at(0).x();
+    H = cal.resolution.at(0).y();
+    x_start = (W % C) / 2;
+    x_stop = x_start + C * (W / C - 1);
+    y_start = (H % C) / 2;
+    y_stop = y_start + C * (H / C - 1);
+    cells.resize(getNumCams());
+    for (size_t i = 0; i < getNumCams(); i++) cells.at(i).setZero(H / C + 1, W / C + 1);
   }
 
   void processingLoop() override {
@@ -255,6 +264,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
       transforms = new_transforms;
       transforms->input_images = new_img_vec;
+
+      for (size_t i = 0; i < num_cams; i++) updateCellCounts(i);
 
       if (config.optical_flow_recall_enable) recallPoints();
       addPoints();
@@ -483,6 +494,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       SE3 T_cj = T_i1 * T_i_cj;
       Vector3 cj_xyz = T_cj.inverse() * lm_pos;
       Vector2 cj_uv;
+      // TODO@mateosss: use batch project(vector<point>) instead of project(point)
       bool valid = calib.intrinsics[cam_id].project(cj_xyz, cj_uv);
       if (!valid) continue;
 
@@ -502,62 +514,27 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     return projections;
   }
 
-  void updateCellCounts(size_t cam_id) {
-    const size_t C = config.optical_flow_detection_grid_size;  // Gridcell size
-    const size_t W = transforms->input_images->img_data.at(cam_id).img->w;
-    const size_t H = transforms->input_images->img_data.at(cam_id).img->h;
-    const size_t x_start = (W % C) / 2;
-    const size_t x_stop = x_start + C * (W / C - 1);
-    const size_t y_start = (H % C) / 2;
-    const size_t y_stop = y_start + C * (H / C - 1);
-
-    cells.setZero(H / C + 1, W / C + 1);
-    for (const auto& [lmid, lm] : transforms->keypoints.at(cam_id)) {
-      Vector2 p = lm.translation();
-      if (p[0] < x_start || p[1] < y_start || p[0] >= x_stop + C || p[1] >= y_stop + C) continue;
-      int x = (p[0] - x_start) / C;
-      int y = (p[1] - y_start) / C;
-      cells(y, x) += 1;
-    }
-  }
-
-  //! Number of points that are in the same grid cell as img_pos
-  int getNeighborPointsInCell(const Vector2& xy, size_t cam_id) {
-    const size_t C = config.optical_flow_detection_grid_size;
-    const size_t W = transforms->input_images->img_data.at(cam_id).img->w;
-    const size_t H = transforms->input_images->img_data.at(cam_id).img->h;
-    const size_t x_start = (W % C) / 2;
-    const size_t y_start = (H % C) / 2;
-    int x = (xy[0] - x_start) / C;
-    int y = (xy[1] - y_start) / C;
-    int neighbors = cells(y, x);
-    return neighbors;
-  }
-
   //! Recover tracks from older landmarks into the current frame
   void recallPoints() {
     if (latest_lm_bundle == nullptr) return;
 
     uint64_t cam_id = 0;  // TODO@mateosss: recall in all cameras
-    if (config.optical_flow_recall_num_points_cell) updateCellCounts(cam_id);
 
     // Project the landmarks from the map into the new frame to obtain their projections.
     Eigen::aligned_unordered_map<LandmarkId, Vector2> projections = getProjectedLandmarks(cam_id);
 
     // TODO@mateosss: Parallelize?
     for (const auto& [lm_id, proj_pos] : projections) {
-      // Optionally cap recalls to max number of points in gridcell
-      if (config.optical_flow_recall_num_points_cell)
-        if (getNeighborPointsInCell(proj_pos, cam_id) >= config.optical_flow_detection_num_points_cell) continue;
-
       Eigen::AffineCompact2f proj_pose = Eigen::AffineCompact2f::Identity();
       proj_pose.translation() = proj_pos;
+      if (show_gui) transforms->recall_guesses.at(cam_id)[lm_id] = proj_pose;
+
+      // Optionally cap recalls to max number of points in gridcell
+      if (config.optical_flow_recall_num_points_cell)
+        if (getCellCount(proj_pos, cam_id) >= config.optical_flow_detection_num_points_cell) continue;
 
       Eigen::aligned_vector<PatchT>& lm_patch = patches.at(lm_id);
       Eigen::AffineCompact2f curr_pose = proj_pose;
-
-      if (show_gui) transforms->recall_guesses.at(cam_id)[lm_id] = proj_pose;
-
       bool valid = trackPointFromPyrPatch(pyramid->at(cam_id), lm_patch, curr_pose, {frame_counter, lm_id});
       if (!valid) continue;
 
@@ -580,7 +557,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
         // TODO@mateosss: Maybe I should store all patches that see this landmark and look in all of them
       }
 
-      transforms->keypoints.at(cam_id)[lm_id] = curr_pose;
+      addKeypoint(cam_id, lm_id, curr_pose);
     }
   }
 
@@ -591,9 +568,9 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     }
 
     KeypointsData kd;  // Detected new points
-    detectKeypoints(pyramid->at(cam_id).lvl(0), kd, config.optical_flow_detection_grid_size,
-                    config.optical_flow_detection_num_points_cell, config.optical_flow_detection_min_threshold,
-                    config.optical_flow_detection_max_threshold, transforms->input_images->masks.at(cam_id), pts);
+    detectKeypointsWithCells(pyramid->at(cam_id).lvl(0), kd, cells.at(cam_id), config.optical_flow_detection_grid_size,
+                             config.optical_flow_detection_num_points_cell, config.optical_flow_detection_min_threshold,
+                             config.optical_flow_detection_max_threshold, transforms->input_images->masks.at(cam_id));
 
     Keypoints new_kpts;
     for (auto& corner : kd.corners) {  // Set new points as keypoints
@@ -610,7 +587,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       auto transform = Eigen::AffineCompact2f::Identity();
       transform.translation() = corner.cast<Scalar>();
 
-      transforms->keypoints.at(cam_id)[last_keypoint_id] = transform;
+      addKeypoint(cam_id, last_keypoint_id, transform);
       new_kpts[last_keypoint_id] = transform;
 
       last_keypoint_id++;
@@ -669,7 +646,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       Keypoints kpts;
       SE3 T_c0_ci = calib.T_i_c[0].inverse() * calib.T_i_c[i];
       trackPoints(pyr0, pyri, kpts0, kpts, mgs, ms0, ms, T_c0_ci, 0, i);
-      transforms->keypoints.at(i).insert(kpts.begin(), kpts.end());
+      addKeypoints(i, kpts);
 
       // Update masks and detect features on area not overlapping with cam0
       if (!config.optical_flow_detection_nonoverlap) continue;
@@ -712,23 +689,79 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       }
     }
 
-    for (int id : kp_to_remove) {
-      transforms->keypoints.at(cam_id).erase(id);
-    }
+    for (int id : kp_to_remove) removeKeypoint(cam_id, id);
   }
 
   void filterPoints() {
+    // TODO@mateosss: filter points outside of safe radius
     for (size_t i = 1; i < getNumCams(); i++) {
       filterPointsForCam(i);
     }
   }
 
+  void updateCellCounts(size_t cam_id) {
+    cells.at(cam_id).setZero(H / C + 1, W / C + 1);
+    for (const auto& [lmid, lm] : transforms->keypoints.at(cam_id)) {
+      Vector2 p = lm.translation();
+      if (p[0] < x_start || p[1] < y_start || p[0] >= x_stop + C || p[1] >= y_stop + C) continue;
+      int x = (p[0] - x_start) / C;
+      int y = (p[1] - y_start) / C;
+      cells.at(cam_id)(y, x)++;
+    }
+  }
+
+  //! Number of points that are in the grid cell of point xy
+  int getCellCount(const Vector2& xy, size_t cam_id) {
+    int x = (xy[0] - x_start) / C;
+    int y = (xy[1] - y_start) / C;
+    int neighbors = cells.at(cam_id)(y, x);
+    return neighbors;
+  }
+
+  // TODO@mateosss: delete print function
+  void printCells(int64_t frame_id, size_t cam_id) {
+    printf("(%ld) cells=[\n", frame_id);
+    for (int i = 0; i < cells.at(cam_id).rows(); i++) {
+      printf("  ");
+      for (int j = 0; j < cells.at(cam_id).cols(); j++) {
+        printf("%d%s", cells.at(cam_id)(i, j), j == cells.at(cam_id).cols() - 1 ? "," : "");
+      }
+      printf("\n");
+    }
+    printf("]\n");
+  }
+
+  void addKeypoint(size_t cam_id, KeypointId kpid, Eigen::Affine2f kp) {
+    int x = (kp.translation().x() - x_start) / C;
+    int y = (kp.translation().y() - y_start) / C;
+    cells.at(cam_id)(y, x)++;
+    transforms->keypoints.at(cam_id)[kpid] = kp;
+  }
+
+  void addKeypoints(size_t cam_id, Keypoints kpts) {
+    for (const auto& [kpid, kp] : kpts) {
+      int x = (kp.translation().x() - x_start) / C;
+      int y = (kp.translation().y() - y_start) / C;
+      cells.at(cam_id)(y, x)++;
+    }
+    transforms->keypoints.at(cam_id).insert(kpts.begin(), kpts.end());
+  }
+
+  void removeKeypoint(size_t cam_id, KeypointId kpid) {
+    Vector2 pos = transforms->keypoints.at(cam_id).at(kpid).translation();
+    int x = (pos.x() - x_start) / C;
+    int y = (pos.y() - y_start) / C;
+    cells.at(cam_id)(y, x)--;
+    transforms->keypoints.at(cam_id).erase(kpid);
+  }
+
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
  private:
   Eigen::aligned_unordered_map<KeypointId, Eigen::aligned_vector<PatchT>> patches;
-  Eigen::MatrixXi cells;
+  Eigen::aligned_vector<Eigen::MatrixXi> cells;  // Number of features in each gridcell
   const Vector3d accel_cov;
   const Vector3d gyro_cov;
+  size_t C, W, H, x_start, x_stop, y_start, y_stop;  // Grid properties
 };
 
 }  // namespace basalt

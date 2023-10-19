@@ -135,9 +135,9 @@ void detectKeypointsMapping(const basalt::Image<const uint16_t>& img_raw, Keypoi
   }
 }
 
-void detectKeypoints(const basalt::Image<const uint16_t>& img_raw, KeypointsData& kd, int PATCH_SIZE,
-                     int num_points_cell, int min_threshold, int max_threshold, const Masks& masks,
-                     const Eigen::aligned_vector<Eigen::Vector2d>& current_points) {
+void detectKeypointsWithCells(const basalt::Image<const uint16_t>& img_raw, KeypointsData& kd,
+                              const Eigen::MatrixXi& cells, int PATCH_SIZE, int num_points_cell, int min_threshold,
+                              int max_threshold, const Masks& masks) {
   kd.corners.clear();
   kd.corner_angles.clear();
   kd.corner_descriptors.clear();
@@ -147,21 +147,6 @@ void detectKeypoints(const basalt::Image<const uint16_t>& img_raw, KeypointsData
 
   const size_t y_start = (img_raw.h % PATCH_SIZE) / 2;
   const size_t y_stop = y_start + PATCH_SIZE * (img_raw.h / PATCH_SIZE - 1);
-
-  //  std::cerr << "x_start " << x_start << " x_stop " << x_stop << std::endl;
-  //  std::cerr << "y_start " << y_start << " y_stop " << y_stop << std::endl;
-
-  Eigen::MatrixXi cells;
-  cells.setZero(img_raw.h / PATCH_SIZE + 1, img_raw.w / PATCH_SIZE + 1);
-
-  for (const Eigen::Vector2d& p : current_points) {
-    if (p[0] >= x_start && p[1] >= y_start && p[0] < x_stop + PATCH_SIZE && p[1] < y_stop + PATCH_SIZE) {
-      int x = (p[0] - x_start) / PATCH_SIZE;
-      int y = (p[1] - y_start) / PATCH_SIZE;
-
-      cells(y, x) += 1;
-    }
-  }
 
   for (size_t x = x_start; x <= x_stop; x += PATCH_SIZE) {
     for (size_t y = y_start; y <= y_stop; y += PATCH_SIZE) {
@@ -221,6 +206,34 @@ void detectKeypoints(const basalt::Image<const uint16_t>& img_raw, KeypointsData
   //      kd.corners.emplace_back(points[i].pt.x, points[i].pt.y);
   //    }
   //  }
+}
+
+void detectKeypoints(const basalt::Image<const uint16_t>& img_raw, KeypointsData& kd, int PATCH_SIZE,
+                     int num_points_cell, int min_threshold, int max_threshold, const Masks& masks,
+                     const Eigen::aligned_vector<Eigen::Vector2d>& current_points) {
+  kd.corners.clear();
+  kd.corner_angles.clear();
+  kd.corner_descriptors.clear();
+
+  const size_t x_start = (img_raw.w % PATCH_SIZE) / 2;
+  const size_t x_stop = x_start + PATCH_SIZE * (img_raw.w / PATCH_SIZE - 1);
+
+  const size_t y_start = (img_raw.h % PATCH_SIZE) / 2;
+  const size_t y_stop = y_start + PATCH_SIZE * (img_raw.h / PATCH_SIZE - 1);
+
+  Eigen::MatrixXi cells;
+  cells.setZero(img_raw.h / PATCH_SIZE + 1, img_raw.w / PATCH_SIZE + 1);
+
+  for (const Eigen::Vector2d& p : current_points) {
+    if (p[0] >= x_start && p[1] >= y_start && p[0] < x_stop + PATCH_SIZE && p[1] < y_stop + PATCH_SIZE) {
+      int x = (p[0] - x_start) / PATCH_SIZE;
+      int y = (p[1] - y_start) / PATCH_SIZE;
+
+      cells(y, x)++;
+    }
+  }
+
+  detectKeypointsWithCells(img_raw, kd, cells, PATCH_SIZE, num_points_cell, min_threshold, max_threshold, masks);
 }
 
 void computeAngles(const basalt::Image<const uint16_t>& img_raw, KeypointsData& kd, bool rotate_features) {

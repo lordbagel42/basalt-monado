@@ -85,6 +85,10 @@ void detectKeypoints(
     int min_threshold = 5, int max_threshold = 40, const Masks& masks = {},
     const Eigen::aligned_vector<Eigen::Vector2d>& current_points = Eigen::aligned_vector<Eigen::Vector2d>());
 
+void detectKeypointsWithCells(const basalt::Image<const uint16_t>& img_raw, KeypointsData& kd,
+                              const Eigen::MatrixXi& cells, int PATCH_SIZE = 32, int num_points_cell = 1,
+                              int min_threshold = 5, int max_threshold = 40, const Masks& masks = {});
+
 void computeAngles(const basalt::Image<const uint16_t>& img_raw, KeypointsData& kd, bool rotate_features);
 
 void computeDescriptors(const basalt::Image<const uint16_t>& img_raw, KeypointsData& kd);
