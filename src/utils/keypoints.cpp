@@ -137,7 +137,7 @@ void detectKeypointsMapping(const basalt::Image<const uint16_t>& img_raw, Keypoi
 
 void detectKeypointsWithCells(const basalt::Image<const uint16_t>& img_raw, KeypointsData& kd,
                               const Eigen::MatrixXi& cells, int PATCH_SIZE, int num_points_cell, int min_threshold,
-                              int max_threshold, const Masks& masks) {
+                              int max_threshold, float safe_radius, const Masks& masks) {
   kd.corners.clear();
   kd.corner_angles.clear();
   kd.corner_descriptors.clear();
@@ -180,7 +180,10 @@ void detectKeypointsWithCells(const basalt::Image<const uint16_t>& img_raw, Keyp
         for (size_t i = 0; i < points.size() && points_added < num_points_cell; i++) {
           float full_x = x + points[i].pt.x;
           float full_y = y + points[i].pt.y;
+          // float dist_to_center = Eigen::Vector2f{full_x - img_raw.w / 2, full_y - img_raw.h / 2}.norm();
 
+          // TODO@mateosss: uncomment to improve things, commented to keep previous scores reproducible
+          // if (safe_radius != 0.0 && dist_to_center >= safe_radius) continue;
           if (masks.inBounds(full_x, full_y)) continue;
           if (!img_raw.InBounds(full_x, full_y, EDGE_THRESHOLD)) continue;
 
@@ -209,7 +212,7 @@ void detectKeypointsWithCells(const basalt::Image<const uint16_t>& img_raw, Keyp
 }
 
 void detectKeypoints(const basalt::Image<const uint16_t>& img_raw, KeypointsData& kd, int PATCH_SIZE,
-                     int num_points_cell, int min_threshold, int max_threshold, const Masks& masks,
+                     int num_points_cell, int min_threshold, int max_threshold, float safe_radius, const Masks& masks,
                      const Eigen::aligned_vector<Eigen::Vector2d>& current_points) {
   kd.corners.clear();
   kd.corner_angles.clear();
@@ -233,7 +236,8 @@ void detectKeypoints(const basalt::Image<const uint16_t>& img_raw, KeypointsData
     }
   }
 
-  detectKeypointsWithCells(img_raw, kd, cells, PATCH_SIZE, num_points_cell, min_threshold, max_threshold, masks);
+  detectKeypointsWithCells(img_raw, kd, cells, PATCH_SIZE, num_points_cell, min_threshold, max_threshold, safe_radius,
+                           masks);
 }
 
 void computeAngles(const basalt::Image<const uint16_t>& img_raw, KeypointsData& kd, bool rotate_features) {

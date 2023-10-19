@@ -500,7 +500,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
       // TODO: This should probably come from calibration not from config
       Scalar sr = config.optical_flow_image_safe_radius;
-      valid &= sr == 0 || (cj_uv - Vector2{sr, sr}).norm() <= 0.95 * sr;
+      valid &= sr == 0 || (cj_uv - Vector2{W / 2, H / 2}).norm() <= sr;
       if (!valid) continue;
 
       // Check if the point is in the bounds of the frame
@@ -541,7 +541,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       // Optionally limit recalled patch reprojected distance
       if (config.optical_flow_recall_max_patch_dist > 0) {
         float w = transforms->input_images->img_data.at(cam_id).img->w;
-        float max_patch_dist = config.optical_flow_recall_max_patch_dist * w;
+        float max_patch_dist = config.optical_flow_recall_max_patch_dist / 100 * w;
         valid &= (curr_pose.translation() - proj_pos).norm() <= max_patch_dist;
         if (!valid) continue;
       }
@@ -570,7 +570,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     KeypointsData kd;  // Detected new points
     detectKeypointsWithCells(pyramid->at(cam_id).lvl(0), kd, cells.at(cam_id), config.optical_flow_detection_grid_size,
                              config.optical_flow_detection_num_points_cell, config.optical_flow_detection_min_threshold,
-                             config.optical_flow_detection_max_threshold, transforms->input_images->masks.at(cam_id));
+                             config.optical_flow_detection_max_threshold, config.optical_flow_image_safe_radius,
+                             transforms->input_images->masks.at(cam_id));
 
     Keypoints new_kpts;
     for (auto& corner : kd.corners) {  // Set new points as keypoints
