@@ -472,9 +472,80 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
    * @param[out] projections: A reference where the landmark's projections will be returned.
    */
   Eigen::aligned_unordered_map<LandmarkId, Vector2> getProjectedLandmarks(size_t cam_id) {
+    using Eigen::Matrix4Xf, Eigen::Map, Eigen::aligned_vector, Eigen::Vector4f, Eigen::Aligned;
+
+    SE3 T_i1 = predicted_state->T_w_i.template cast<Scalar>();
+    SE3 T_i_cj = calib.T_i_c[cam_id];
+    SE3 T_w_cj = T_i1 * T_i_cj;
+    SE3 T_cj_w = T_w_cj.inverse();
+
+    const aligned_vector<LandmarkId>& lmids = latest_lm_bundle->lmids;
+    const aligned_vector<Vector4f>& lms = latest_lm_bundle->lms;
+    const aligned_vector<Vector4f> cj_xyz_vec(lms.size());
+
+    Map<Matrix4Xf, Aligned> w_xyz((float*)lms.data(), 4, lms.size());
+    Map<Matrix4Xf, Aligned> cj_xyz((float*)cj_xyz_vec.data(), 4, cj_xyz_vec.size());
+    printPoints("cj_xyz before mul", lmids, cj_xyz_vec);
+    printf("&cj_xyz_vec=%p &cj_xyz=%p\n", (void*)cj_xyz_vec.data(), (void*)cj_xyz.data());
+    cj_xyz.noalias() = T_cj_w.matrix() * w_xyz;
+    printf("&cj_xyz_vec=%p &cj_xyz=%p\n", (void*)cj_xyz_vec.data(), (void*)cj_xyz.data());
+    printPoints("cj_xyz after mul", lmids, cj_xyz_vec);
+
+    aligned_vector<Vector2> cj_uvs;
+    std::vector<bool> valid_uvs;
+    calib.intrinsics[cam_id].project(cj_xyz_vec, cj_uvs, valid_uvs);
+
+    Eigen::aligned_unordered_map<LandmarkId, Vector2> p;
+    for (size_t i = 0; i < lms.size(); i++) p[lmids[i]] = cj_uvs[i];
+    printProjections("new projections initially", p);
+    printBoolVec("after project", lmids, valid_uvs);
+
+    // The following are the loops I want to optimize with eigen batch operations
+
+    // TODO@mateosss: optionally make project() use prefilled valid_uvs and prefill with already tracked
+    if (!config.optical_flow_recall_over_tracking) {  // Optionally skip recall for already tracked lms
+      // NOTE: With the already_tracked check, this works like patch-OF with fallback
+      // to f2f-OF without the check it works as f2f-OF with fallback to patch-OF.
+      for (size_t i = 0; i < lms.size(); i++)
+        valid_uvs[i] = valid_uvs[i] && transforms->keypoints.at(cam_id).count(lmids[i]) == 0;
+    }
+
+    printBoolVec("after recall-over-tracking", lmids, valid_uvs);
+
+    // for (size_t i = 0; i < lms.size(); i++) valid_uvs[i] = valid_uvs[i] && is_debug_point(lmids[i]);
+    // printBoolVec("after debug point", lmids, valid_uvs);
+
+    // Safe radius check
+    Scalar sr = config.optical_flow_image_safe_radius;  // TODO: This should come from calib not config
+    if (sr != 0)
+      for (size_t i = 0; i < lms.size(); i++)
+        valid_uvs[i] = valid_uvs[i] && ((cj_uvs[i] - Vector2{W / 2, H / 2}).norm() <= sr);
+    printBoolVec("after safe radius", lmids, valid_uvs);
+
+    // In-bounds check
+    for (size_t i = 0; i < lms.size(); i++)
+      valid_uvs[i] = valid_uvs[i] && cj_uvs[i].x() >= 0 && cj_uvs[i].x() < W && cj_uvs[i].y() >= 0 && cj_uvs[i].y() < H;
+    printBoolVec("after inbounds", lmids, valid_uvs);
+
+    Eigen::aligned_unordered_map<LandmarkId, Vector2> projections;
+    for (size_t i = 0; i < lms.size(); i++)
+      if (valid_uvs[i]) projections[lmids[i]] = cj_uvs[i];
+
+    return projections;
+  }
+
+  // TODO@mateosss: delete old version
+  Eigen::aligned_unordered_map<LandmarkId, Vector2> getProjectedLandmarksOld(size_t cam_id) {
+    using Eigen::Matrix4Xf, Eigen::Map, Eigen::aligned_vector, Eigen::Vector4f;
+
     Eigen::aligned_unordered_map<LandmarkId, Vector2> projections;
 
-    for (const auto& [lm_id, lm_pos] : latest_lm_bundle->landmarks) {
+    const aligned_vector<LandmarkId>& lmids = latest_lm_bundle->lmids;
+    const aligned_vector<Vector4f>& lms = latest_lm_bundle->lms;
+
+    for (size_t i = 0; i < lms.size(); i++) {
+      LandmarkId lm_id = lmids[i];
+      Eigen::Vector3f lm_pos = lms[i].head<3>();
       // if (!is_debug_point(lm_id)) continue;
 
       if (!config.optical_flow_recall_over_tracking) {  // Optionally skip recall for already tracked lms
@@ -514,6 +585,30 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     return projections;
   }
 
+  // TODO@mateosss: delete function
+  void printPoints(const char* title, const Eigen::aligned_vector<LandmarkId>& lmids,
+                   const Eigen::aligned_vector<Eigen::Vector4f>& vec) {
+    printf(">>> [%lu] [%s] projections:\n", frame_counter, title);
+    for (size_t i = 0; i < lmids.size(); i++) {
+      printf("\t[%lu]=[%f %f %f %f]\n", lmids[i], vec[i].x(), vec[i].y(), vec[i].z(), vec[i].w());
+    }
+  }
+  // TODO@mateosss: delete function
+  void printProjections(const char* title, Eigen::aligned_unordered_map<LandmarkId, Vector2> projections) {
+    printf(">>> [%lu] [%s] projections:\n", frame_counter, title);
+    for (const auto& [lmid, uv] : projections) {
+      printf("\t[%lu]=[%f %f]\n", lmid, uv.x(), uv.y());
+    }
+  }
+
+  // TODO@mateosss: delete function
+  void printBoolVec(const char* title, const Eigen::aligned_vector<LandmarkId>& lmids, const std::vector<bool>& vec) {
+    printf("[%lu] [%s] vector<bool>:\n", frame_counter, title);
+    for (size_t i = 0; i < lmids.size(); i++) {
+      printf("\t[%lu]=%s\n", lmids[i], vec[i] ? "true" : "false");
+    }
+  }
+
   //! Recover tracks from older landmarks into the current frame
   void recallPoints() {
     if (latest_lm_bundle == nullptr) return;
@@ -521,7 +616,12 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     uint64_t cam_id = 0;  // TODO@mateosss: recall in all cameras
 
     // Project the landmarks from the map into the new frame to obtain their projections.
+    // TODO@mateosss: remove projections_old
+    Eigen::aligned_unordered_map<LandmarkId, Vector2> projections_old = getProjectedLandmarksOld(cam_id);
     Eigen::aligned_unordered_map<LandmarkId, Vector2> projections = getProjectedLandmarks(cam_id);
+
+    printProjections("old", projections_old);
+    printProjections("new", projections);
 
     // TODO@mateosss: Parallelize?
     for (const auto& [lm_id, proj_pos] : projections) {

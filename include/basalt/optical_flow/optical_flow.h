@@ -69,7 +69,8 @@ using LandmarkId = KeypointId;
 struct LandmarkBundle {
   using Ptr = std::shared_ptr<LandmarkBundle>;
   int64_t ts = -1;
-  std::map<LandmarkId, Eigen::Vector3f> landmarks = {};
+  Eigen::aligned_vector<LandmarkId> lmids = {};
+  Eigen::aligned_vector<Eigen::Vector4f> lms = {};
 };
 
 struct OpticalFlowInput {

@@ -620,7 +620,8 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
       pt_c[3] = 1;
 
       Vec4 pt_w = T_w_c * pt_c;
-      lmb->landmarks[lmid] = pt_w.template head<3>();
+      lmb->lmids.emplace_back(lmid);
+      lmb->lms.emplace_back(pt_w.template cast<float>());
     }
     opt_flow_lm_bundle_queue->push(lmb);
   }
