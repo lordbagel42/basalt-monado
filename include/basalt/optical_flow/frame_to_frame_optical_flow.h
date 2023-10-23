@@ -41,7 +41,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "basalt/imu/imu_types.h"
 #include "basalt/imu/preintegration.h"
 #include "basalt/utils/common_types.h"
-#include "basalt/utils/debug_points.h"
 #include "basalt/utils/imu_types.h"
 #include "sophus/se3.hpp"
 
@@ -465,7 +464,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
    * @param[out] landmarks: A reference where landmarks will be returned.
    * @param[out] projections: A reference where the landmark's projections will be returned.
    */
-  Eigen::aligned_unordered_map<LandmarkId, Vector2> getProjectedLandmarks(size_t cam_id) {
+  Eigen::aligned_unordered_map<LandmarkId, Vector2> getProjectedLandmarks(size_t cam_id) const {
     using Eigen::Matrix4Xf, Eigen::Map, Eigen::aligned_vector, Eigen::Vector4f, Eigen::Aligned;
 
     SE3 T_i1 = predicted_state->T_w_i.template cast<Scalar>();
@@ -493,11 +492,6 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
         valid_uvs[i] = valid_uvs[i] && transforms->keypoints.at(cam_id).count(lmids[i]) == 0;
     }
 
-    // for (size_t i = 0; i < lms.size(); i++) valid_uvs[i] = valid_uvs[i] && is_debug_point(lmids[i]);
-
-    // TODO@mateosss: consider doing just one for loop for vaid_uvs, would it be
-    // faster? what if I parallelize recall, would it make sense?
-    // Camera masks check
     const Masks& masks = transforms->input_images->masks.at(cam_id);
     for (size_t i = 0; i < lms.size(); i++)
       valid_uvs[i] = valid_uvs[i] && !masks.inBounds(cj_uvs[i].x(), cj_uvs[i].y());
@@ -520,13 +514,13 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
   }
 
   //! Recover tracks from older landmarks into the current frame
+  //! TODO: Parallelize recall
   void recallPointsForCamera(size_t cam_id) {
     if (latest_lm_bundle == nullptr) return;
 
     // Project the landmarks from the map into the new frame to obtain their projections.
     Eigen::aligned_unordered_map<LandmarkId, Vector2> projections = getProjectedLandmarks(cam_id);
 
-    // TODO@mateosss: Parallelize?
     for (const auto& [lm_id, proj_pos] : projections) {
       Eigen::AffineCompact2f proj_pose = Eigen::AffineCompact2f::Identity();
       proj_pose.translation() = proj_pos;
@@ -605,7 +599,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     return new_kpts;
   }
 
-  Masks cam0OverlapCellsMasksForCam(size_t cam_id) {
+  Masks cam0OverlapCellsMasksForCam(size_t cam_id) const {
     int x_first = x_start + c / 2;
     int y_first = y_start + c / 2;
 
@@ -708,7 +702,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
   }
 
   //! Number of points that are in the grid cell of point xy
-  int getCellCount(const Vector2& xy, size_t cam_id) {
+  int getCellCount(const Vector2& xy, size_t cam_id) const {
     int x = (xy[0] - x_start) / c;
     int y = (xy[1] - y_start) / c;
     int neighbors = cells.at(cam_id)(y, x);

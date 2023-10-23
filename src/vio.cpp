@@ -64,7 +64,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <basalt/serialization/headers_serialization.h>
 
-#include <basalt/utils/debug_points.h>
 #include <basalt/utils/keypoints.h>
 #include <basalt/utils/system_utils.h>
 #include <basalt/utils/vio_config.h>
@@ -98,12 +97,12 @@ pangolin::Plotter* plotter;
 
 pangolin::Var<int> show_frame("ui.show_frame", 0, 0, 1500);
 
-pangolin::Var<bool> show_flow("ui.show_flow", true, false, true);
+pangolin::Var<bool> show_flow("ui.show_flow", false, false, true);
 pangolin::Var<bool> show_tracking_guess("ui.show_tracking_guess", false, false, true);
 pangolin::Var<bool> show_matching_guess("ui.show_matching_guess", false, false, true);
 pangolin::Var<bool> show_recall_guess("ui.show_recall_guess", true, false, true);
 pangolin::Var<bool> show_obs("ui.show_obs", true, false, true);
-pangolin::Var<bool> show_ids("ui.show_ids", true, false, true);
+pangolin::Var<bool> show_ids("ui.show_ids", false, false, true);
 pangolin::Var<bool> show_depth{"ui.show_depth", false, false, true};
 
 pangolin::Var<bool> show_grid{"ui.show_grid", false, false, true};
@@ -762,19 +761,6 @@ void draw_scene(pangolin::View& view) {
 
     glColor3ubv(pose_color);
     pangolin::glDrawPoints(it->second->points);
-
-    // glColor3ubv(gt_color);
-    // Eigen::aligned_vector<Eigen::Vector3d> debug_points;
-    // for (size_t i = 0; i < it->second->point_ids.size(); i++) {
-    //   Vector3d pos = it->second->points.at(i);
-    //   int id = it->second->point_ids.at(i);
-    //   if (is_debug_point(id)) {
-    //     debug_points.push_back(pos);
-    //     pangolin::GlFont::I().Text("%d", id).Draw(pos.x(), pos.y(), pos.z());
-    //   }
-    // }
-    // glPointSize(10);
-    // pangolin::glDrawPoints(debug_points);
   }
 
   pangolin::glDrawAxis(Sophus::SE3d().matrix(), 1.0);

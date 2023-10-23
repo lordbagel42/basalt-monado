@@ -74,7 +74,7 @@ VioConfig::VioConfig() {
   vio_sqrt_marg = true;
 
   vio_max_states = 3;
-  vio_max_kfs = 15;
+  vio_max_kfs = 7;
   vio_min_frames_after_kf = 5;
   vio_new_kf_keypoints_thresh = 0.7;
 
