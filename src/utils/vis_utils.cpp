@@ -45,7 +45,7 @@ using Eigen::Vector2f;
 using Eigen::Vector4d;
 
 void show_flow(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const OpticalFlowBase::Ptr& opt_flow,
-               bool show_ids) {
+               bool show_ids, bool show_responses) {
   glLineWidth(1.0);
   glColor3f(1.0, 0.0, 0.0);
   glEnable(GL_BLEND);
@@ -55,19 +55,22 @@ void show_flow(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, co
   if (cam_id >= keypoints.size()) return;
 
   const Keypoints& kp_map = keypoints[cam_id];
+  const KeypointResponses& responses = curr_vis_data->opt_flow_res->keypoint_responses[cam_id];
 
-  for (const auto& kv : kp_map) {
-    MatrixXf transformed_patch = kv.second.linear() * opt_flow->patch_coord;
-    transformed_patch.colwise() += kv.second.translation();
+  for (const auto& [lmid, pose] : kp_map) {
+    MatrixXf transformed_patch = pose.linear() * opt_flow->patch_coord;
+    transformed_patch.colwise() += pose.translation();
 
     for (int i = 0; i < transformed_patch.cols(); i++) {
       const Vector2f c = transformed_patch.col(i);
       pangolin::glDrawCirclePerimeter(c[0], c[1], 0.5F);
     }
 
-    const Vector2f c = kv.second.translation();
+    const Vector2f c = pose.translation();
 
-    if (show_ids) pangolin::GlFont::I().Text("%d", kv.first).Draw(5 + c[0], 5 + c[1]);
+    if (show_ids) pangolin::GlFont::I().Text("%d", lmid).Draw(5 + c[0], 5 + c[1]);
+    if (show_responses && responses.count(lmid) > 0)
+      pangolin::GlFont::I().Text("%.1f", responses.at(lmid)).Draw(5 + c[0], c[1]);
   }
 
   pangolin::GlFont::I().Text("Detected %d keypoints", kp_map.size()).Draw(5, 40);

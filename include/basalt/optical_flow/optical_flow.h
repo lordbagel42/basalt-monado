@@ -63,6 +63,7 @@ using Keypoint = Eigen::AffineCompact2f;
 using KeypointId = size_t;
 using Keypoints = Eigen::aligned_map<KeypointId, Keypoint>;
 using KeypointLevels = std::map<KeypointId, size_t>;
+using KeypointResponses = std::map<KeypointId, float>;
 using xrt::auxiliary::tracking::slam::timestats;
 using LandmarkId = KeypointId;
 
@@ -108,6 +109,7 @@ struct OpticalFlowResult {
   std::vector<Keypoints> recall_guesses;
 
   std::vector<KeypointLevels> pyramid_levels;
+  std::vector<KeypointResponses> keypoint_responses;
 
   OpticalFlowInput::Ptr input_images;
 };

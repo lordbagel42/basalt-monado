@@ -153,7 +153,7 @@ pangolin::Var<bool> continue_btn("ui.continue", true, false, true);
 Button align_step_btn("ui.align_se3", &alignButton);
 
 bool use_imu = true;
-bool use_double = true;
+bool use_double = false;
 
 int main(int argc, char** argv) {
   srand(1);

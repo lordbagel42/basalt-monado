@@ -251,9 +251,10 @@ class slam_tracker_ui {
 
   pangolin::Var<int> show_frame{"ui.show_frame", 0, pangolin::META_FLAG_READONLY};
   pangolin::Var<bool> show_flow{"ui.show_flow", false, false, true};
+  pangolin::Var<bool> show_responses{"ui.show_responses", false, false, true};
   pangolin::Var<bool> show_tracking_guess{"ui.show_tracking_guess", false, false, true};
   pangolin::Var<bool> show_matching_guess{"ui.show_matching_guess", false, false, true};
-  pangolin::Var<bool> show_recall_guess{"ui.show_recall_guess", true, false, true};
+  pangolin::Var<bool> show_recall_guess{"ui.show_recall_guess", false, false, true};
   pangolin::Var<bool> show_obs{"ui.show_obs", true, false, true};
   pangolin::Var<bool> show_ids{"ui.show_ids", false, false, true};
   pangolin::Var<bool> show_depth{"ui.show_depth", false, false, true};
@@ -288,7 +289,7 @@ class slam_tracker_ui {
                     show_reproj_avg_depth_guess, show_active_guess, fixed_depth, show_ids, show_depth, show_guesses);
     }
 
-    if (show_flow) vis::show_flow(cam_id, curr_vis_data, opt_flow, show_ids);
+    if (show_flow) vis::show_flow(cam_id, curr_vis_data, opt_flow, show_ids, show_responses);
 
     if (show_tracking_guess) vis::show_tracking_guess(cam_id, show_frame, curr_vis_data, prev_vis_data);
 

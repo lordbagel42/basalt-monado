@@ -126,7 +126,7 @@ void glDrawCirclePerimeters(const std::vector<Eigen::Matrix<P, N, 1>, Allocator>
 namespace basalt::vis {
 
 void show_flow(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const OpticalFlowBase::Ptr& opt_flow,
-               bool show_ids);
+               bool show_ids, bool show_responses);
 
 void show_tracking_guess(size_t cam_id, size_t frame_id, const VioVisualizationData::Ptr& curr_vis_data,
                          const VioVisualizationData::Ptr& prev_vis_data);

@@ -210,6 +210,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
       transforms.reset(new OpticalFlowResult);
       transforms->keypoints.resize(num_cams);
+      transforms->keypoint_responses.resize(num_cams);
       transforms->tracking_guesses.resize(num_cams);
       transforms->matching_guesses.resize(num_cams);
       transforms->recall_guesses.resize(num_cams);
@@ -244,6 +245,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       OpticalFlowResult::Ptr new_transforms;
       new_transforms.reset(new OpticalFlowResult);
       new_transforms->keypoints.resize(num_cams);
+      new_transforms->keypoint_responses.resize(num_cams);
       new_transforms->tracking_guesses.resize(num_cams);
       new_transforms->matching_guesses.resize(num_cams);
       new_transforms->recall_guesses.resize(num_cams);
@@ -576,7 +578,9 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
                              transforms->input_images->masks.at(cam_id));
 
     Keypoints new_kpts;
-    for (auto& corner : kd.corners) {  // Set new points as keypoints
+    for (size_t i = 0; i < kd.corners.size(); i++) {  // Set new points as keypoints
+      const Eigen::Vector2d& corner = kd.corners[i];
+      const float response = kd.corner_responses[i];
 
       // Save patch
       Eigen::aligned_vector<PatchT>& p = patches[last_keypoint_id];
@@ -590,7 +594,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       auto transform = Eigen::AffineCompact2f::Identity();
       transform.translation() = corner.cast<Scalar>();
 
-      addKeypoint(cam_id, last_keypoint_id, transform);
+      addKeypoint(cam_id, last_keypoint_id, transform, response);
       new_kpts[last_keypoint_id] = transform;
 
       last_keypoint_id++;
@@ -709,10 +713,11 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     return neighbors;
   }
 
-  void addKeypoint(size_t cam_id, KeypointId kpid, Eigen::Affine2f kp) {
+  void addKeypoint(size_t cam_id, KeypointId kpid, Eigen::Affine2f kp, float response = -1.0) {
     int x = (kp.translation().x() - x_start) / c;
     int y = (kp.translation().y() - y_start) / c;
     cells.at(cam_id)(y, x)++;
+    transforms->keypoint_responses.at(cam_id)[kpid] = response;
     transforms->keypoints.at(cam_id)[kpid] = kp;
   }
 

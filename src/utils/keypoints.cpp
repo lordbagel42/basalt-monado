@@ -139,7 +139,7 @@ void detectKeypointsWithCells(const basalt::Image<const uint16_t>& img_raw, Keyp
                               const Eigen::MatrixXi& cells, int PATCH_SIZE, int num_points_cell, int min_threshold,
                               int max_threshold, float safe_radius, const Masks& masks) {
   kd.corners.clear();
-  kd.responses.clear();
+  kd.corner_responses.clear();
   kd.corner_angles.clear();
   kd.corner_descriptors.clear();
 
@@ -188,7 +188,7 @@ void detectKeypointsWithCells(const basalt::Image<const uint16_t>& img_raw, Keyp
           if (!img_raw.InBounds(full_x, full_y, EDGE_THRESHOLD)) continue;
 
           kd.corners.emplace_back(x + points[i].pt.x, y + points[i].pt.y);
-          kd.responses.emplace_back(points[i].response);
+          kd.corner_responses.emplace_back(points[i].response);
           points_added++;
         }
 
