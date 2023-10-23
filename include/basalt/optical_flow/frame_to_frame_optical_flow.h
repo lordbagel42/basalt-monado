@@ -104,19 +104,19 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
   FrameToFrameOpticalFlow(const VioConfig& conf, const Calibration<double>& cal)
       : OpticalFlowTyped<Scalar, Pattern>(conf, cal),
         accel_cov(cal.dicrete_time_accel_noise_std().array().square()),
-        gyro_cov(cal.dicrete_time_gyro_noise_std().array().square()) {
+        gyro_cov(cal.dicrete_time_gyro_noise_std().array().square()),
+        c(config.optical_flow_detection_grid_size),
+        w(cal.resolution.at(0).x()),
+        h(cal.resolution.at(0).y()),
+        x_start((w % c) / 2),
+        x_stop(x_start + c * (w / c - 1)),
+        y_start((h % c) / 2),
+        y_stop(y_start + c * (h / c - 1)) {
     latest_state = std::make_shared<PoseVelBiasState<double>>();
     predicted_state = std::make_shared<PoseVelBiasState<double>>();
     patches.reserve(3000);
-    C = config.optical_flow_detection_grid_size;  // Gridcell size
-    W = cal.resolution.at(0).x();
-    H = cal.resolution.at(0).y();
-    x_start = (W % C) / 2;
-    x_stop = x_start + C * (W / C - 1);
-    y_start = (H % C) / 2;
-    y_stop = y_start + C * (H / C - 1);
     cells.resize(getNumCams());
-    for (size_t i = 0; i < getNumCams(); i++) cells.at(i).setZero(H / C + 1, W / C + 1);
+    for (size_t i = 0; i < getNumCams(); i++) cells.at(i).setZero(h / c + 1, w / c + 1);
   }
 
   void processingLoop() override {
@@ -334,7 +334,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
           guesses_tbb[id] = transform_2;
         }
 
-        valid = t2(0) >= 0 && t2(1) >= 0 && t2(0) < pyr_2.lvl(0).w && t2(1) < pyr_2.lvl(0).h;
+        valid = t2(0) >= 0 && t2(1) >= 0 && t2(0) < w && t2(1) < h;
         if (!valid) continue;
 
         valid = trackPoint(pyr_1, pyr_2, transform_1, transform_2);
@@ -504,13 +504,13 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
     // Safe radius check
     Scalar sr = config.optical_flow_image_safe_radius;  // TODO: This should come from calib not config
-    Vector2 center{W / 2, H / 2};
+    Vector2 center{w / 2, h / 2};
     if (sr != 0)
       for (size_t i = 0; i < lms.size(); i++) valid_uvs[i] = valid_uvs[i] && (cj_uvs[i] - center).norm() <= sr;
 
     // In-bounds check
     for (size_t i = 0; i < lms.size(); i++)
-      valid_uvs[i] = valid_uvs[i] && cj_uvs[i].x() >= 0 && cj_uvs[i].x() < W && cj_uvs[i].y() >= 0 && cj_uvs[i].y() < H;
+      valid_uvs[i] = valid_uvs[i] && cj_uvs[i].x() >= 0 && cj_uvs[i].x() < w && cj_uvs[i].y() >= 0 && cj_uvs[i].y() < h;
 
     Eigen::aligned_unordered_map<LandmarkId, Vector2> projections;
     for (size_t i = 0; i < lms.size(); i++)
@@ -543,7 +543,6 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
       // Optionally limit recalled patch reprojected distance
       if (config.optical_flow_recall_max_patch_dist > 0) {
-        float w = transforms->input_images->img_data.at(cam_id).img->w;
         float max_patch_dist = config.optical_flow_recall_max_patch_dist / 100 * w;
         valid &= (curr_pose.translation() - proj_pos).norm() <= max_patch_dist;
         if (!valid) continue;
@@ -607,26 +606,15 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
   }
 
   Masks cam0OverlapCellsMasksForCam(size_t cam_id) {
-    int C = config.optical_flow_detection_grid_size;  // cell size
+    int x_first = x_start + c / 2;
+    int y_first = y_start + c / 2;
 
-    int w = transforms->input_images->img_data.at(cam_id).img->w;
-    int h = transforms->input_images->img_data.at(cam_id).img->h;
-
-    int x_start = (w % C) / 2;
-    int y_start = (h % C) / 2;
-
-    int x_stop = x_start + C * (w / C - 1);
-    int y_stop = y_start + C * (h / C - 1);
-
-    int x_first = x_start + C / 2;
-    int y_first = y_start + C / 2;
-
-    int x_last = x_stop + C / 2;
-    int y_last = y_stop + C / 2;
+    int x_last = x_stop + c / 2;
+    int y_last = y_stop + c / 2;
 
     Masks masks;
-    for (int y = y_first; y <= y_last; y += C) {
-      for (int x = x_first; x <= x_last; x += C) {
+    for (int y = y_first; y <= y_last; y += c) {
+      for (int x = x_first; x <= x_last; x += c) {
         Vector2 ci_uv{x, y};
         Vector2 c0_uv;
         Scalar _;
@@ -634,7 +622,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
         bool in_bounds = c0_uv.x() >= 0 && c0_uv.x() < w && c0_uv.y() >= 0 && c0_uv.y() < h;
         bool valid = projected && in_bounds;
         if (valid) {
-          Rect cell_mask(x - C / 2, y - C / 2, C, C);
+          Rect cell_mask(x - c / 2, y - c / 2, c, c);
           masks.masks.push_back(cell_mask);
         }
       }
@@ -710,20 +698,20 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
   }
 
   void updateCellCounts(size_t cam_id) {
-    cells.at(cam_id).setZero(H / C + 1, W / C + 1);
+    cells.at(cam_id).setZero(h / c + 1, w / c + 1);
     for (const auto& [lmid, lm] : transforms->keypoints.at(cam_id)) {
       Vector2 p = lm.translation();
-      if (p[0] < x_start || p[1] < y_start || p[0] >= x_stop + C || p[1] >= y_stop + C) continue;
-      int x = (p[0] - x_start) / C;
-      int y = (p[1] - y_start) / C;
+      if (p[0] < x_start || p[1] < y_start || p[0] >= x_stop + c || p[1] >= y_stop + c) continue;
+      int x = (p[0] - x_start) / c;
+      int y = (p[1] - y_start) / c;
       cells.at(cam_id)(y, x)++;
     }
   }
 
   //! Number of points that are in the grid cell of point xy
   int getCellCount(const Vector2& xy, size_t cam_id) {
-    int x = (xy[0] - x_start) / C;
-    int y = (xy[1] - y_start) / C;
+    int x = (xy[0] - x_start) / c;
+    int y = (xy[1] - y_start) / c;
     int neighbors = cells.at(cam_id)(y, x);
     return neighbors;
   }
@@ -742,16 +730,16 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
   }
 
   void addKeypoint(size_t cam_id, KeypointId kpid, Eigen::Affine2f kp) {
-    int x = (kp.translation().x() - x_start) / C;
-    int y = (kp.translation().y() - y_start) / C;
+    int x = (kp.translation().x() - x_start) / c;
+    int y = (kp.translation().y() - y_start) / c;
     cells.at(cam_id)(y, x)++;
     transforms->keypoints.at(cam_id)[kpid] = kp;
   }
 
   void addKeypoints(size_t cam_id, Keypoints kpts) {
     for (const auto& [kpid, kp] : kpts) {
-      int x = (kp.translation().x() - x_start) / C;
-      int y = (kp.translation().y() - y_start) / C;
+      int x = (kp.translation().x() - x_start) / c;
+      int y = (kp.translation().y() - y_start) / c;
       cells.at(cam_id)(y, x)++;
     }
     transforms->keypoints.at(cam_id).insert(kpts.begin(), kpts.end());
@@ -759,8 +747,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
   void removeKeypoint(size_t cam_id, KeypointId kpid) {
     Vector2 pos = transforms->keypoints.at(cam_id).at(kpid).translation();
-    int x = (pos.x() - x_start) / C;
-    int y = (pos.y() - y_start) / C;
+    int x = (pos.x() - x_start) / c;
+    int y = (pos.y() - y_start) / c;
     cells.at(cam_id)(y, x)--;
     transforms->keypoints.at(cam_id).erase(kpid);
   }
@@ -771,7 +759,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
   Eigen::aligned_vector<Eigen::MatrixXi> cells;  // Number of features in each gridcell
   const Vector3d accel_cov;
   const Vector3d gyro_cov;
-  size_t C, W, H, x_start, x_stop, y_start, y_stop;  // Grid properties
+  const size_t c, w, h, x_start, x_stop, y_start, y_stop;  // Grid properties
 };
 
 }  // namespace basalt
