@@ -63,6 +63,7 @@ struct VioConfig {
   float optical_flow_matching_default_depth;
   float optical_flow_image_safe_radius;                    // Use to mask black corners in cameras
   bool optical_flow_recall_enable;                         // Enable feature/landmark recall
+  bool optical_flow_recall_all_cams;                       // Recall in all cameras, not just cam0
   bool optical_flow_recall_num_points_cell;                // Respect gridcell feature limit
   bool optical_flow_recall_over_tracking;                  // Always perform recall, even on already tracked features
   bool optical_flow_recall_update_patch_viewpoint;         // Update feature patch when succesfully recalled

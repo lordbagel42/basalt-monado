@@ -491,9 +491,6 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     std::vector<bool> valid_uvs;
     calib.intrinsics[cam_id].project(cj_xyz_vec, cj_uvs, valid_uvs);
 
-    Eigen::aligned_unordered_map<LandmarkId, Vector2> p;
-    for (size_t i = 0; i < lms.size(); i++) p[lmids[i]] = cj_uvs[i];
-
     // TODO: optionally make project() use prefilled valid_uvs and prefill with already tracked
     if (!config.optical_flow_recall_over_tracking) {  // Optionally skip recall for already tracked lms
       // NOTE: With the already_tracked check, this works like patch-OF with fallback
@@ -503,6 +500,13 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     }
 
     // for (size_t i = 0; i < lms.size(); i++) valid_uvs[i] = valid_uvs[i] && is_debug_point(lmids[i]);
+
+    // TODO@mateosss: consider doing just one for loop for vaid_uvs, would it be
+    // faster? what if I parallelize recall, would it make sense?
+    // Camera masks check
+    const Masks& masks = transforms->input_images->masks.at(cam_id);
+    for (size_t i = 0; i < lms.size(); i++)
+      valid_uvs[i] = valid_uvs[i] && !masks.inBounds(cj_uvs[i].x(), cj_uvs[i].y());
 
     // Safe radius check
     Scalar sr = config.optical_flow_image_safe_radius;  // TODO: This should come from calib not config
@@ -522,10 +526,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
   }
 
   //! Recover tracks from older landmarks into the current frame
-  void recallPoints() {
+  void recallPointsForCamera(size_t cam_id) {
     if (latest_lm_bundle == nullptr) return;
-
-    uint64_t cam_id = 0;  // TODO@mateosss: recall in all cameras
 
     // Project the landmarks from the map into the new frame to obtain their projections.
     Eigen::aligned_unordered_map<LandmarkId, Vector2> projections = getProjectedLandmarks(cam_id);
@@ -566,6 +568,11 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
       addKeypoint(cam_id, lm_id, curr_pose);
     }
+  }
+
+  void recallPoints() {
+    size_t max_cams = config.optical_flow_recall_all_cams ? getNumCams() : 1;
+    for (size_t i = 0; i < max_cams; i++) recallPointsForCamera(i);
   }
 
   Keypoints addPointsForCamera(size_t cam_id) {

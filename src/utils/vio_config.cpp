@@ -63,10 +63,11 @@ VioConfig::VioConfig() {
   optical_flow_matching_default_depth = 2.0;
   optical_flow_image_safe_radius = 0.0;
   optical_flow_recall_enable = true;
-  optical_flow_recall_num_points_cell = false;
+  optical_flow_recall_all_cams = true;
+  optical_flow_recall_num_points_cell = true;
   optical_flow_recall_over_tracking = false;
   optical_flow_recall_update_patch_viewpoint = false;
-  optical_flow_recall_max_patch_dist = 5;
+  optical_flow_recall_max_patch_dist = 3;
   optical_flow_recall_max_patch_norms = {1.74, 0.96, 0.99, 0.44};
 
   vio_linearization_type = LinearizationType::ABS_QR;
@@ -208,6 +209,7 @@ void serialize(Archive& ar, basalt::VioConfig& config) {
   ar(CEREAL_NVP(config.optical_flow_matching_default_depth));
   ar(CEREAL_NVP(config.optical_flow_image_safe_radius));
   ar(CEREAL_NVP(config.optical_flow_recall_enable));
+  ar(CEREAL_NVP(config.optical_flow_recall_all_cams));
   ar(CEREAL_NVP(config.optical_flow_recall_num_points_cell));
   ar(CEREAL_NVP(config.optical_flow_recall_over_tracking));
   ar(CEREAL_NVP(config.optical_flow_recall_update_patch_viewpoint));
