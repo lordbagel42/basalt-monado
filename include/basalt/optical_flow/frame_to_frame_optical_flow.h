@@ -431,8 +431,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
   }
 
   inline bool trackPointFromPyrPatch(const ManagedImagePyr<uint16_t>& pyr,
-                                     const Eigen::aligned_vector<PatchT>& patch_vec, Eigen::AffineCompact2f& transform,
-                                     std::array<size_t, 2> ts_lm = {SIZE_MAX, SIZE_MAX}) const {
+                                     const Eigen::aligned_vector<PatchT>& patch_vec,
+                                     Eigen::AffineCompact2f& transform) const {
     bool patch_valid = true;
 
     //! @note For some reason resetting transform linear part would be wrong only in patch_optical_flow?
@@ -445,16 +445,10 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
       const auto& p = patch_vec[level];
       patch_valid &= p.valid;
-      if (patch_valid) {
-        // Perform tracking on current level
+      if (patch_valid) {  // Perform tracking on current level
         Scalar error = -1;
         patch_valid &= trackPointAtLevel(pyr.lvl(level), p, transform, &error);
         patch_valid &= error <= config.optical_flow_recall_max_patch_norms.at(level);
-        // TODO@mateosss: remove print
-        UNUSED(ts_lm);
-        // if (ts_lm[0] != SIZE_MAX)
-        //   printf("frame:%ld,landmark:%ld,level:%d,error:%f,valid:%d\n", ts_lm[0], ts_lm[1], level, error,
-        //   patch_valid);
       }
 
       transform.translation() *= scale;
@@ -544,7 +538,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
       Eigen::aligned_vector<PatchT>& lm_patch = patches.at(lm_id);
       Eigen::AffineCompact2f curr_pose = proj_pose;
-      bool valid = trackPointFromPyrPatch(pyramid->at(cam_id), lm_patch, curr_pose, {frame_counter, lm_id});
+      bool valid = trackPointFromPyrPatch(pyramid->at(cam_id), lm_patch, curr_pose);
       if (!valid) continue;
 
       // Optionally limit recalled patch reprojected distance
@@ -558,12 +552,13 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       if (config.optical_flow_recall_update_patch_viewpoint) {
         // Update patch viewpoint, see point 2 of the following discussion
         // https://gitlab.com/VladyslavUsenko/basalt/-/issues/69#note_906947578
+        // TODO: Efficiently storing more than one patch for the same feature from
+        // multiple viewpoints could yield even more accurate feature detection.
         for (int l = 0; l <= config.optical_flow_levels; l++) {
           Scalar scale = 1 << l;
           Vector2 pos_scaled = curr_pose.translation() / scale;
           lm_patch[l] = PatchT(pyramid->at(0).lvl(l), pos_scaled);
         }
-        // TODO@mateosss: Maybe I should store all patches that see this landmark and look in all of them
       }
 
       addKeypoint(cam_id, lm_id, curr_pose);
