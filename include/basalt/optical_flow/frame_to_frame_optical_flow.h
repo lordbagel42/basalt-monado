@@ -691,7 +691,6 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
   }
 
   void filterPoints() {
-    // TODO@mateosss: filter points outside of safe radius
     for (size_t i = 1; i < getNumCams(); i++) {
       filterPointsForCam(i);
     }
@@ -714,19 +713,6 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     int y = (xy[1] - y_start) / c;
     int neighbors = cells.at(cam_id)(y, x);
     return neighbors;
-  }
-
-  // TODO@mateosss: delete print function
-  void printCells(int64_t frame_id, size_t cam_id) {
-    printf("(%ld) cells=[\n", frame_id);
-    for (int i = 0; i < cells.at(cam_id).rows(); i++) {
-      printf("  ");
-      for (int j = 0; j < cells.at(cam_id).cols(); j++) {
-        printf("%d%s", cells.at(cam_id)(i, j), j == cells.at(cam_id).cols() - 1 ? "," : "");
-      }
-      printf("\n");
-    }
-    printf("]\n");
   }
 
   void addKeypoint(size_t cam_id, KeypointId kpid, Eigen::Affine2f kp) {
