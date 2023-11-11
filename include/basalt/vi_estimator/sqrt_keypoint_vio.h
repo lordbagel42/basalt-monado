@@ -38,6 +38,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <basalt/imu/preintegration.h>
 #include <basalt/utils/time_utils.hpp>
+#include <unordered_set>
 
 #include <basalt/vi_estimator/sqrt_ba_base.h>
 #include <basalt/vi_estimator/vio_estimator.h>
@@ -115,6 +116,8 @@ class SqrtKeypointVioEstimator : public VioEstimatorBase, public SqrtBundleAdjus
   typename ImuData<Scalar>::Ptr popFromImuDataQueue();
 
   bool measure(const OpticalFlowResult::Ptr& opt_flow_meas, const typename IntegratedImuMeasurement<Scalar>::Ptr& meas);
+
+  void deleteOpticalFlowResult(int64_t rmts);
 
   // int64_t propagate();
   // void addNewState(int64_t data_t_ns);
@@ -209,6 +212,7 @@ class SqrtKeypointVioEstimator : public VioEstimatorBase, public SqrtBundleAdjus
   std::set<int64_t> kf_ids;
   std::set<int64_t> ltkfs;  // Long term keyframes
   bool take_ltkf;           // Whether the next keyframe should be made into ltkfs
+  std::unordered_set<size_t> removed_lmids;
 
   int64_t last_state_t_ns;
   Eigen::aligned_map<int64_t, IntegratedImuMeasurement<Scalar>> imu_meas;

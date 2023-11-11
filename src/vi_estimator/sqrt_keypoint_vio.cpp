@@ -639,6 +639,21 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
       lmb->lmids.emplace_back(lmid);
       lmb->lms.emplace_back(pt_w.template cast<float>());
     }
+
+    if (!lmb->lmids.empty()) {
+      printf("SQRT will use lmids: ");
+      for (const auto& lmid : lmb->lmids) printf("%lu,", lmid);
+      printf("\n");
+    }
+
+    lmb->removed_lmids = removed_lmids;
+    if (!removed_lmids.empty()) {
+      printf("SQRT will remove lmids: ");
+      for (const auto& lmid : removed_lmids) printf("%lu,", lmid);
+      printf("\n");
+    }
+
+    removed_lmids.clear();
     opt_flow_lm_bundle_queue->push(lmb);
   }
 
@@ -689,6 +704,28 @@ Eigen::VectorXd SqrtKeypointVioEstimator<Scalar_>::checkMargNullspace() const {
 template <class Scalar_>
 Eigen::VectorXd SqrtKeypointVioEstimator<Scalar_>::checkMargEigenvalues() const {
   return checkEigenvalues(nullspace_marg_data, false);
+}
+
+template <class Scalar_>
+void SqrtKeypointVioEstimator<Scalar_>::deleteOpticalFlowResult(int64_t rmts) {
+  for (const Keypoints& rmkps : prev_opt_flow_res.at(rmts)->keypoints) {
+    for (const auto& [rmkpid, rmkp] : rmkps) {
+      bool remove = true;
+      for (const auto& [ts, res] : prev_opt_flow_res) {
+        if (ts == rmts) continue;
+        for (const Keypoints& kps : res->keypoints) {
+          bool present_elsewhere = kps.count(rmkpid) != 0;
+          remove &= !present_elsewhere;
+          if (!remove) break;
+        }
+        if (!remove) break;
+      }
+
+      if (remove) removed_lmids.insert(rmkpid);
+    }
+  }
+
+  prev_opt_flow_res.erase(rmts);
 }
 
 template <class Scalar_>
@@ -1069,7 +1106,7 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
     for (const int64_t id : states_to_marg_all) {
       frame_states.erase(id);
       imu_meas.erase(id);
-      prev_opt_flow_res.erase(id);
+      deleteOpticalFlowResult(id);
     }
 
     for (const int64_t id : states_to_marg_vel_bias) {
@@ -1083,13 +1120,15 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
 
     for (const int64_t id : poses_to_marg) {
       frame_poses.erase(id);
-      prev_opt_flow_res.erase(id);
+      deleteOpticalFlowResult(id);
     }
 
-    lmdb.removeKeyframes(kfs_to_marg, poses_to_marg, states_to_marg_all);
+    std::vector<LandmarkId> rmids = lmdb.removeKeyframes(kfs_to_marg, poses_to_marg, states_to_marg_all);
+    removed_lmids.insert(rmids.begin(), rmids.end());
 
     if (config.vio_marg_lost_landmarks) {
       for (const auto& lm_id : lost_landmaks) lmdb.removeLandmark(lm_id);
+      removed_lmids.insert(lost_landmaks.begin(), lost_landmaks.end());
     }
 
     AbsOrderMap marg_order_new;

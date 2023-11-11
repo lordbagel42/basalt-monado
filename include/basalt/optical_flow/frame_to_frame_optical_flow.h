@@ -272,6 +272,8 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       if (config.optical_flow_recall_enable) recallPoints();
       addPoints();
       filterPoints();
+      if (config.optical_flow_recall_enable) deleteStalePatches();
+      printf("patches.size()=%lu\n", patches.size());  // TODO@mateosss: delete prints
     }
 
     if (output_queue && frame_counter % config.optical_flow_skip_frames == 0) {
@@ -569,6 +571,24 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
     for (size_t i = 0; i < max_cams; i++) recallPointsForCamera(i);
   }
 
+  void deleteStalePatches() {
+    if (latest_lm_bundle == nullptr) return;
+
+    std::unordered_set<LandmarkId>& to_remove = latest_lm_bundle->removed_lmids;
+    auto is_tracked = [this](LandmarkId lmid) {
+      for (const Keypoints& kpts : transforms->keypoints)
+        if (kpts.count(lmid) != 0) return true;
+      return false;
+    };
+
+    for (auto it = patches.begin(); it != patches.end();) {
+      LandmarkId lmid = it->first;
+      bool remove = to_remove.find(lmid) != to_remove.end() && !is_tracked(lmid);
+      if (remove) printf(">>> removed=%lu\n", lmid);  // TODO@mateosss: delete print
+      it = remove ? patches.erase(it) : std::next(it);
+    }
+  }
+
   Keypoints addPointsForCamera(size_t cam_id) {
     KeypointsData kd;  // Detected new points
     detectKeypointsWithCells(pyramid->at(cam_id).lvl(0), kd, cells.at(cam_id), config.optical_flow_detection_grid_size,
@@ -582,6 +602,7 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
       const float response = kd.corner_responses[i];
 
       if (config.optical_flow_recall_enable) {  // Save patch
+        printf(">>> added=%lu\n", last_keypoint_id);  // TODO@mateosss: delete print
         // TODO: Patches are never getting deleted
         Eigen::aligned_vector<PatchT>& p = patches[last_keypoint_id];
         Vector2 pos = corner.cast<Scalar>();

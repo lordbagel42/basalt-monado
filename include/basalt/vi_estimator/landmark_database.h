@@ -101,8 +101,8 @@ class LandmarkDatabase {
     observations.clear();
   }
 
-  void removeKeyframes(const std::set<FrameId>& kfs_to_marg, const std::set<FrameId>& poses_to_marg,
-                       const std::set<FrameId>& states_to_marg_all);
+  std::vector<LandmarkId> removeKeyframes(const std::set<FrameId>& kfs_to_marg, const std::set<FrameId>& poses_to_marg,
+                                          const std::set<FrameId>& states_to_marg_all);
 
   void addObservation(const TimeCamId& tcid_target, const KeypointObservation<Scalar>& o);
 

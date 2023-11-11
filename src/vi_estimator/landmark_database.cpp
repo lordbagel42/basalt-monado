@@ -67,11 +67,14 @@ void LandmarkDatabase<Scalar_>::removeFrame(const FrameId &frame) {
 }
 
 template <class Scalar_>
-void LandmarkDatabase<Scalar_>::removeKeyframes(const std::set<FrameId> &kfs_to_marg,
-                                                const std::set<FrameId> &poses_to_marg,
-                                                const std::set<FrameId> &states_to_marg_all) {
+std::vector<LandmarkId> LandmarkDatabase<Scalar_>::removeKeyframes(const std::set<FrameId> &kfs_to_marg,
+                                                                   const std::set<FrameId> &poses_to_marg,
+                                                                   const std::set<FrameId> &states_to_marg_all) {
+  std::vector<LandmarkId> removed_lmids{};
   for (auto it = kpts.begin(); it != kpts.end();) {
     if (kfs_to_marg.count(it->second.host_kf_id.frame_id) > 0) {
+      removed_lmids.push_back(it->first);
+      printf(">>> A removeLandmarkHelper(%lu)\n", it->first);
       it = removeLandmarkHelper(it);
     } else {
       for (auto it2 = it->second.obs.begin(); it2 != it->second.obs.end();) {
@@ -83,12 +86,15 @@ void LandmarkDatabase<Scalar_>::removeKeyframes(const std::set<FrameId> &kfs_to_
       }
 
       if (it->second.obs.size() < min_num_obs) {
+        removed_lmids.push_back(it->first);
+        printf(">>> B removeLandmarkHelper(%lu)\n", it->first);
         it = removeLandmarkHelper(it);
       } else {
         ++it;
       }
     }
   }
+  return removed_lmids;
 }
 
 template <class Scalar_>

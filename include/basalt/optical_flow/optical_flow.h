@@ -72,6 +72,7 @@ struct LandmarkBundle {
   int64_t ts = -1;
   Eigen::aligned_vector<LandmarkId> lmids = {};
   Eigen::aligned_vector<Eigen::Vector4f> lms = {};
+  std::unordered_set<LandmarkId> removed_lmids = {};
 };
 
 struct OpticalFlowInput {
