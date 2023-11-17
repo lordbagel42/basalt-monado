@@ -708,20 +708,22 @@ Eigen::VectorXd SqrtKeypointVioEstimator<Scalar_>::checkMargEigenvalues() const 
 
 template <class Scalar_>
 void SqrtKeypointVioEstimator<Scalar_>::deleteOpticalFlowResult(int64_t rmts) {
-  for (const Keypoints& rmkps : prev_opt_flow_res.at(rmts)->keypoints) {
-    for (const auto& [rmkpid, rmkp] : rmkps) {
-      bool remove = true;
-      for (const auto& [ts, res] : prev_opt_flow_res) {
-        if (ts == rmts) continue;
-        for (const Keypoints& kps : res->keypoints) {
-          bool present_elsewhere = kps.count(rmkpid) != 0;
-          remove &= !present_elsewhere;
+  if (config.optical_flow_recall_enable) {
+    for (const Keypoints& rmkps : prev_opt_flow_res.at(rmts)->keypoints) {
+      for (const auto& [rmkpid, rmkp] : rmkps) {
+        bool remove = true;
+        for (const auto& [ts, res] : prev_opt_flow_res) {
+          if (ts == rmts) continue;
+          for (const Keypoints& kps : res->keypoints) {
+            bool present_elsewhere = kps.count(rmkpid) != 0;
+            remove &= !present_elsewhere;
+            if (!remove) break;
+          }
           if (!remove) break;
         }
-        if (!remove) break;
-      }
 
-      if (remove) removed_lmids.insert(rmkpid);
+        if (remove) removed_lmids.insert(rmkpid);
+      }
     }
   }
 
@@ -1124,11 +1126,11 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
     }
 
     std::vector<LandmarkId> rmids = lmdb.removeKeyframes(kfs_to_marg, poses_to_marg, states_to_marg_all);
-    removed_lmids.insert(rmids.begin(), rmids.end());
+    if (config.optical_flow_recall_enable) removed_lmids.insert(rmids.begin(), rmids.end());
 
     if (config.vio_marg_lost_landmarks) {
       for (const auto& lm_id : lost_landmaks) lmdb.removeLandmark(lm_id);
-      removed_lmids.insert(lost_landmaks.begin(), lost_landmaks.end());
+      if (config.optical_flow_recall_enable) removed_lmids.insert(lost_landmaks.begin(), lost_landmaks.end());
     }
 
     AbsOrderMap marg_order_new;
