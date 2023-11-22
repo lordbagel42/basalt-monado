@@ -146,6 +146,7 @@ class BundleAdjustmentBase {
 
   // Point management
   LandmarkDatabase<Scalar> lmdb;
+  LandmarkDatabase<Scalar> persistent_lmdb;
 
   Scalar obs_std_dev;
   Scalar huber_thresh;

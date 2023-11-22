@@ -49,6 +49,15 @@ void LandmarkDatabase<Scalar_>::addLandmark(LandmarkId lm_id, const Landmark<Sca
 }
 
 template <class Scalar_>
+void LandmarkDatabase<Scalar_>::addLandmarkWithPose(LandmarkId lm_id, const Landmark<Scalar> &pos, int64_t frame_id, const SE3& frame_pose) {
+  auto &kpt = kpts[lm_id];
+  kpt.direction = pos.direction;
+  kpt.inv_dist = pos.inv_dist;
+  kpt.host_kf_id = pos.host_kf_id;
+  frame_poses[frame_id] = frame_pose;
+}
+
+template <class Scalar_>
 void LandmarkDatabase<Scalar_>::removeFrame(const FrameId &frame) {
   for (auto it = kpts.begin(); it != kpts.end();) {
     for (auto it2 = it->second.obs.begin(); it2 != it->second.obs.end();) {
@@ -129,6 +138,16 @@ void LandmarkDatabase<Scalar_>::addObservation(const TimeCamId &tcid_target, con
   it->second.obs[tcid_target] = o.pos;
 
   observations[it->second.host_kf_id][tcid_target].insert(it->first);
+}
+
+template <class Scalar_>
+void LandmarkDatabase<Scalar_>::addFramePose(int64_t frame_id, const SE3& frame_pose) {
+  frame_poses[frame_id] = frame_pose;
+}
+
+template <class Scalar_>
+Sophus::SE3<Scalar_> &LandmarkDatabase<Scalar_>::getFramePose(int64_t frame_id) {
+  return frame_poses.at(frame_id);
 }
 
 template <class Scalar_>

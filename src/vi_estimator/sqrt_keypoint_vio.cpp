@@ -448,6 +448,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
 
         connected[i]++;
       } else {
+        /// TODO:@brunozanotti what happend if the kpt_id is in the persistent database? (recall)
         unconnected_obs[i].emplace(kpt_id);
       }
     }
@@ -486,6 +487,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
       TimeCamId tcidl(opt_flow_meas->t_ns, i);
 
       for (int lm_id : unconnected_obs[i]) {
+        /// TODO:@brunozanotti what happend if the kpt_id is in the persistent database? (recall)
         if (lmdb.landmarkExists(lm_id)) continue;
         // Find all observations
         std::map<TimeCamId, KeypointObservation<Scalar>> kp_obs;
@@ -539,7 +541,10 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
             lm_pos.host_kf_id = tcidl;
             lm_pos.direction = StereographicParam<Scalar>::project(p0_triangulated);
             lm_pos.inv_dist = p0_triangulated[3];
-            lmdb.addLandmark(lm_id, lm_pos);
+            /// TODO:@brunozanotti getPoseStateWithLin of getPoseState??
+            const SE3 pos = getPoseStateWithLin(tcidl.frame_id).getPose();
+            lmdb.addLandmarkWithPose(lm_id, lm_pos, tcidl.frame_id, pos);
+            persistent_lmdb.addLandmarkWithPose(lm_id, lm_pos, tcidl.frame_id, pos);
 
             num_points_added++;
             valid_kp = true;
@@ -549,6 +554,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
         if (valid_kp) {
           for (const auto& kv_obs : kp_obs) {
             lmdb.addObservation(kv_obs.first, kv_obs.second);
+            persistent_lmdb.addObservation(kv_obs.first, kv_obs.second);
           }
         }
       }

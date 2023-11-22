@@ -90,9 +90,12 @@ template <class Scalar_>
 class LandmarkDatabase {
  public:
   using Scalar = Scalar_;
+  using SE3 = Sophus::SE3<Scalar>;
 
   // Non-const
   void addLandmark(LandmarkId lm_id, const Landmark<Scalar>& pos);
+
+  void addLandmarkWithPose(LandmarkId lm_id, const Landmark<Scalar>& lm_pos, int64_t frame_id, const SE3& pos);
 
   void removeFrame(const FrameId& frame);
 
@@ -106,7 +109,11 @@ class LandmarkDatabase {
 
   void addObservation(const TimeCamId& tcid_target, const KeypointObservation<Scalar>& o);
 
+  void addFramePose(FrameId frame_id, const SE3& pos);
+
   Landmark<Scalar>& getLandmark(LandmarkId lm_id);
+
+  SE3 &getFramePose(FrameId frame_id);
 
   // Const
   const Landmark<Scalar>& getLandmark(LandmarkId lm_id) const;
@@ -150,6 +157,8 @@ class LandmarkDatabase {
   Eigen::aligned_unordered_map<LandmarkId, Landmark<Scalar>> kpts;
 
   std::unordered_map<TimeCamId, std::map<TimeCamId, std::set<LandmarkId>>> observations;
+
+  Eigen::aligned_map<FrameId, SE3> frame_poses;
 
   static constexpr int min_num_obs = 2;
 };
