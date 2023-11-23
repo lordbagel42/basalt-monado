@@ -18,20 +18,20 @@
 
 #include <opencv2/core/mat.hpp>
 
+#include <chrono>
 #include <cstdint>
 #include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
-#include <chrono>
 
 namespace xrt::auxiliary::tracking::slam {
 
 // For implementation: same as IMPLEMENTATION_VERSION_*
 // For user: expected IMPLEMENTATION_VERSION_*. Should be checked in runtime.
-constexpr int HEADER_VERSION_MAJOR = 8; //!< API Breakages
-constexpr int HEADER_VERSION_MINOR = 0; //!< Backwards compatible API changes
-constexpr int HEADER_VERSION_PATCH = 0; //!< Backw. comp. .h-implemented changes
+constexpr int HEADER_VERSION_MAJOR = 8;  //!< API Breakages
+constexpr int HEADER_VERSION_MINOR = 0;  //!< Backwards compatible API changes
+constexpr int HEADER_VERSION_PATCH = 0;  //!< Backw. comp. .h-implemented changes
 
 // Which header version the external system is implementing.
 extern const int IMPLEMENTATION_VERSION_MAJOR;
@@ -44,22 +44,26 @@ enum class pose_ext_type : int;
  * @brief Standard pose type to communicate Monado with the external SLAM system
  */
 struct pose {
-  std::int64_t timestamp;   //!< In same clock as input samples
-  float px, py, pz;         //!< Position vector
-  float rx, ry, rz, rw = 1; //!< Orientation quaternion
-  float vx, vy, vz; //!< Linear velocity
+  std::int64_t timestamp;    //!< In same clock as input samples
+  float px, py, pz;          //!< Position vector
+  float rx, ry, rz, rw = 1;  //!< Orientation quaternion
+  float vx, vy, vz;          //!< Linear velocity
   std::shared_ptr<struct pose_extension> next = nullptr;
 
   pose() = default;
-  pose(std::int64_t timestamp,       //
-       float px, float py, float pz, //
+  pose(std::int64_t timestamp,        //
+       float px, float py, float pz,  //
        float rx, float ry, float rz, float rw)
-      : timestamp(timestamp),   //
-        px(px), py(py), pz(pz), //
-        rx(rx), ry(ry), rz(rz), rw(rw) {}
+      : timestamp(timestamp),  //
+        px(px),
+        py(py),
+        pz(pz),  //
+        rx(rx),
+        ry(ry),
+        rz(rz),
+        rw(rw) {}
 
-  std::shared_ptr<pose_extension>
-  find_pose_extension(pose_ext_type required_type) const;
+  std::shared_ptr<pose_extension> find_pose_extension(pose_ext_type required_type) const;
 };
 
 struct rect {
@@ -70,12 +74,11 @@ struct rect {
  * @brief IMU Sample type to pass around between programs
  */
 struct imu_sample {
-  std::int64_t timestamp; //!< In nanoseconds
-  double ax, ay, az;      //!< Accel in meters per second squared (m / s^2)
-  double wx, wy, wz;      //!< Gyro in radians per second (rad / s)
+  std::int64_t timestamp;  //!< In nanoseconds
+  double ax, ay, az;       //!< Accel in meters per second squared (m / s^2)
+  double wx, wy, wz;       //!< Gyro in radians per second (rad / s)
   imu_sample() = default;
-  imu_sample(std::int64_t timestamp, double ax, double ay, double az, double wx,
-             double wy, double wz)
+  imu_sample(std::int64_t timestamp, double ax, double ay, double az, double wx, double wy, double wz)
       : timestamp(timestamp), ax(ax), ay(ay), az(az), wx(wx), wy(wy), wz(wz) {}
 };
 
@@ -87,7 +90,7 @@ struct img_sample {
   std::int64_t timestamp;
   cv::Mat img;
   int cam_index;
-  std::vector<rect> masks{}; //!< Masks to ignore
+  std::vector<rect> masks{};  //!< Masks to ignore
   img_sample() = default;
   img_sample(std::int64_t timestamp, const cv::Mat &img, int cam_index)
       : timestamp(timestamp), img(img), cam_index(cam_index) {}
@@ -127,7 +130,7 @@ struct slam_tracker {
   void stop();
   void finalize();
 
-  bool get_latest_imu_pose(pose &out_pose);
+  bool get_pose_at(int64_t ts, pose &out_pose);
 
   /*!
    * @brief Push an IMU sample into the tracker.
@@ -174,10 +177,9 @@ struct slam_tracker {
    * @param result Pointer to the result produced by the feature call.
    * @return false if the feature was not supported, true otherwise.
    */
-  bool use_feature(int feature_id, const std::shared_ptr<void> &params,
-                   std::shared_ptr<void> &result);
+  bool use_feature(int feature_id, const std::shared_ptr<void> &params, std::shared_ptr<void> &result);
 
-private:
+ private:
   struct implementation;
   std::unique_ptr<implementation> impl;
 };
@@ -195,10 +197,10 @@ private:
  *
  */
 
-#define DEFINE_FEATURE(NAME, SHORT_NAME, ID, PARAMS_TYPE, RESULT_TYPE)         \
-  using FPARAMS_##SHORT_NAME = PARAMS_TYPE;                                    \
-  using FRESULT_##SHORT_NAME = RESULT_TYPE;                                    \
-  constexpr int FID_##SHORT_NAME = ID;                                         \
+#define DEFINE_FEATURE(NAME, SHORT_NAME, ID, PARAMS_TYPE, RESULT_TYPE) \
+  using FPARAMS_##SHORT_NAME = PARAMS_TYPE;                            \
+  using FRESULT_##SHORT_NAME = RESULT_TYPE;                            \
+  constexpr int FID_##SHORT_NAME = ID;                                 \
   constexpr int F_##NAME = ID;
 
 /*!
@@ -209,14 +211,14 @@ private:
  * standardized in this struct to facilitate implementation prototyping.
  */
 struct cam_calibration {
-  int cam_index; //!< For multi-camera setups. For stereo 0 ~ left, 1 ~ right.
-  int width, height;                //<! Resolution
-  double frequency;                 //<! Frames per second
-  double fx, fy;                    //<! Focal point
-  double cx, cy;                    //<! Principal point
-  std::string distortion_model;     //!< Models like: none, rt4, rt5, rt8, kb4
-  std::vector<double> distortion{}; //!< Parameters for the distortion_model
-  cv::Matx<double, 4, 4> t_imu_cam; //!< Transformation from IMU to camera
+  int cam_index;                     //!< For multi-camera setups. For stereo 0 ~ left, 1 ~ right.
+  int width, height;                 //<! Resolution
+  double frequency;                  //<! Frames per second
+  double fx, fy;                     //<! Focal point
+  double cx, cy;                     //<! Principal point
+  std::string distortion_model;      //!< Models like: none, rt4, rt5, rt8, kb4
+  std::vector<double> distortion{};  //!< Parameters for the distortion_model
+  cv::Matx<double, 4, 4> t_imu_cam;  //!< Transformation from IMU to camera
 };
 
 struct inertial_calibration {
@@ -245,8 +247,8 @@ struct inertial_calibration {
 };
 
 struct imu_calibration {
-  int imu_index;    //!< For multi-imu setups. Usually just 0.
-  double frequency; //!< Samples per second
+  int imu_index;     //!< For multi-imu setups. Usually just 0.
+  double frequency;  //!< Samples per second
   inertial_calibration accel;
   inertial_calibration gyro;
 };
@@ -312,8 +314,7 @@ struct pose_extension {
   pose_extension(pose_ext_type type) : type(type) {}
 };
 
-inline std::shared_ptr<pose_extension>
-pose::find_pose_extension(pose_ext_type required_type) const {
+inline std::shared_ptr<pose_extension> pose::find_pose_extension(pose_ext_type required_type) const {
   std::shared_ptr<pose_extension> pe = next;
   while (pe != nullptr && pe->type != required_type) {
     pe = pe->next;
@@ -396,4 +397,4 @@ struct timestats : pose_ext_timing_data, pose_ext_features_data {
   }
 };
 
-} // namespace xrt::auxiliary::tracking::slam
+}  // namespace xrt::auxiliary::tracking::slam

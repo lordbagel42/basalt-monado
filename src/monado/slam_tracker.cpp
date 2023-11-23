@@ -1,6 +1,7 @@
 // Copyright 2022, Collabora, Ltd.
 
 #include "slam_tracker.hpp"
+#include "basalt/imu/imu_types.h"
 #include "basalt/imu/preintegration.h"
 #include "slam_tracker_ui.hpp"
 
@@ -514,7 +515,7 @@ struct slam_tracker::implementation {
     }
   }
 
-  bool get_latest_imu_pose(pose &p) {
+  bool get_pose_at(int64_t ts, pose &p) {
     if (pim_ == nullptr) return false;
 
     PoseVelBiasState<double> latest_state{};
@@ -524,17 +525,16 @@ struct slam_tracker::implementation {
     latest_state = *latest_state_;
     latest_state_lock.unlock();
 
-    pim_lock.lock();
-    pim = *pim_;
-    pim_lock.unlock();
-
     PoseVelBiasState<double> predicted_state{};
     int64_t prev_ts = latest_state.t_ns;
     if (ts <= prev_ts) {
       printf(">>> ts=%ld is not newer than prev_ts=%ld\n", ts, prev_ts);
     }
 
-    pim.predictState(latest_state, constants::g, predicted_state);
+    pim_lock.lock();
+    pim.predictStateAt(latest_state, ts, constants::g, accel_cov, gyro_cov, predicted_state);
+    ImuData<double> latest_imu = pim.getLastImu();
+    pim_lock.unlock();
 
     p.timestamp = pim.get_start_t_ns() + pim.get_dt_ns();
     p.px = predicted_state.T_w_i.translation().x();
@@ -547,6 +547,9 @@ struct slam_tracker::implementation {
     p.vx = predicted_state.vel_w_i.x();
     p.vy = predicted_state.vel_w_i.y();
     p.vz = predicted_state.vel_w_i.z();
+    p.wx = predicted_state.T_w_i.so3 * latest_imu;  // ???
+    p.wy = predicted_state.T_w_i.so3 * latest_imu;  // ???
+    p.wz = predicted_state.T_w_i.so3 * latest_imu;  // ???
     return true;
   }
 
@@ -703,7 +706,7 @@ EXPORT void slam_tracker::stop() { impl->stop(); }
 
 EXPORT void slam_tracker::finalize() { impl->finalize(); }
 
-EXPORT bool slam_tracker::get_latest_imu_pose(pose &p) { return impl->get_latest_imu_pose(p); }
+EXPORT bool slam_tracker::get_pose_at(int64_t ts, pose &p) { return impl->get_pose_at(ts, p); }
 
 EXPORT bool slam_tracker::is_running() { return impl->is_running(); }
 
