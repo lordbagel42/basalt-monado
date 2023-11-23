@@ -29,7 +29,7 @@ namespace xrt::auxiliary::tracking::slam {
 
 // For implementation: same as IMPLEMENTATION_VERSION_*
 // For user: expected IMPLEMENTATION_VERSION_*. Should be checked in runtime.
-constexpr int HEADER_VERSION_MAJOR = 7; //!< API Breakages
+constexpr int HEADER_VERSION_MAJOR = 8; //!< API Breakages
 constexpr int HEADER_VERSION_MINOR = 0; //!< Backwards compatible API changes
 constexpr int HEADER_VERSION_PATCH = 0; //!< Backw. comp. .h-implemented changes
 
@@ -47,6 +47,7 @@ struct pose {
   std::int64_t timestamp;   //!< In same clock as input samples
   float px, py, pz;         //!< Position vector
   float rx, ry, rz, rw = 1; //!< Orientation quaternion
+  float vx, vy, vz; //!< Linear velocity
   std::shared_ptr<struct pose_extension> next = nullptr;
 
   pose() = default;
@@ -125,6 +126,8 @@ struct slam_tracker {
   bool is_running();
   void stop();
   void finalize();
+
+  bool get_latest_imu_pose(pose &out_pose);
 
   /*!
    * @brief Push an IMU sample into the tracker.

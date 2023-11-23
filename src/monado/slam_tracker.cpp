@@ -1,6 +1,7 @@
 // Copyright 2022, Collabora, Ltd.
 
 #include "slam_tracker.hpp"
+#include "basalt/imu/preintegration.h"
 #include "slam_tracker_ui.hpp"
 
 #include <pangolin/display/image_view.h>
@@ -12,6 +13,7 @@
 #include <cstdio>
 #include <memory>
 #include <mutex>
+#include <queue>
 #include <string>
 #include <thread>
 #include <unordered_set>
@@ -220,12 +222,33 @@ struct slam_tracker::implementation {
     return p;
   }
 
+  IntegratedImuMeasurement<double>::Ptr pim_ = nullptr;
+  std::mutex pim_lock;
+  PoseVelBiasState<double>::Ptr latest_state_ = nullptr;
+  std::mutex latest_state_lock;
   void state_consumer() {
     PoseVelBiasState<double>::Ptr data;
     PoseVelBiasState<double>::Ptr _;
 
     while (true) {
       out_state_queue.pop(data);
+      if (latest_state_ != nullptr) {
+        Vector3d bg = data->bias_gyro;
+        Vector3d ba = data->bias_accel;
+        int64_t ts = data->t_ns;
+        // printf("new frame state ts=%ld, imu_queue_size=%lu, creating pim\n", ts, input_imu_queue.unsafe_size());
+        IntegratedImuMeasurement<double>::Ptr pim = make_shared<IntegratedImuMeasurement<double>>(ts, bg, ba);
+        integrateIMUs(pim, ts);
+
+        pim_lock.lock();
+        pim_ = pim;
+        pim_lock.unlock();
+      }
+
+      latest_state_lock.lock();
+      latest_state_ = data;
+      latest_state_lock.unlock();
+
       if (data.get() == nullptr) {
         while (!monado_out_state_queue.try_push(nullptr)) monado_out_state_queue.pop(_);
         break;
@@ -266,6 +289,10 @@ struct slam_tracker::implementation {
 
  public:
   void initialize() {
+    accel_cov = calib.dicrete_time_accel_noise_std().array().square();
+    gyro_cov = calib.dicrete_time_gyro_noise_std().array().square();
+    // input_imu_queue.set_capacity(300);
+
     // Overwrite camera calibration data
     for (const auto &c : added_cam_calibs) {
       apply_cam_calibration(c);
@@ -321,6 +348,7 @@ struct slam_tracker::implementation {
   void stop() {
     running = false;
     image_data_queue->push(nullptr);
+    input_imu_queue.push(nullptr);
     imu_data_queue->push(nullptr);
     opt_flow_ptr->input_imu_queue.push(nullptr);
 
@@ -348,6 +376,19 @@ struct slam_tracker::implementation {
     data->t_ns = s.timestamp;
     data->accel = {s.ax, s.ay, s.az};
     data->gyro = {s.wx, s.wy, s.wz};
+
+    if (pim_ != nullptr) {
+      pim_lock.lock();
+      if (data->t_ns > pim_->get_start_t_ns()) {
+        // printf(">>> new imu sample (%ld) integrating to pim (%ld)\n", data->t_ns, pim_->get_start_t_ns());
+        pim_->integrate(*data, accel_cov, gyro_cov);
+      } else {
+        // printf(">>> new imu sample (%ld) discarded( pim ts = %ld)\n", data->t_ns, pim_->get_start_t_ns());
+      }
+      pim_lock.unlock();
+    }
+
+    input_imu_queue.push(data);
     imu_data_queue->push(data);
     opt_flow_ptr->input_imu_queue.push(data);
   }
@@ -419,6 +460,94 @@ struct slam_tracker::implementation {
       p = get_pose_from_state(state);
     }
     return dequeued;
+  }
+
+  Vector3d accel_cov;
+  Vector3d gyro_cov;
+  tbb::concurrent_queue<ImuData<double>::Ptr> input_imu_queue;
+  std::vector<ImuData<double>::Ptr> imu_reminders;
+  void integrateIMUs(IntegratedImuMeasurement<double>::Ptr pim, int64_t ts) {
+    // printf(">>> integrateIMUs ts=%ld\n", ts);
+    if (input_imu_queue.empty()) return;
+
+    auto pop_imu = [&](ImuData<double>::Ptr &data) -> bool {
+      ImuData<double>::Ptr sample;
+      bool got = input_imu_queue.try_pop(sample);  // Blocking pop
+      if (!got || sample == nullptr) return false;
+
+      // Calibrate sample
+      int64_t t = sample->t_ns;
+      Vector3d a = calib.calib_accel_bias.getCalibrated(sample->accel);
+      Vector3d g = calib.calib_gyro_bias.getCalibrated(sample->gyro);
+
+      data = std::make_shared<ImuData<double>>();
+      data->t_ns = t;
+      data->accel = a.template cast<double>();
+      data->gyro = g.template cast<double>();
+      return true;
+    };
+
+    typename ImuData<double>::Ptr data = nullptr;
+
+    if (!imu_reminders.empty()) {
+      for (auto it = imu_reminders.begin(); it != imu_reminders.end();) {
+        data = *it;
+        if (data->t_ns <= ts) {
+          // printf(">>> [A] discarding %ld\n", data->t_ns);
+          it = imu_reminders.erase(it);
+        } else {
+          // printf(">>> [A] integrating %ld\n", data->t_ns);
+          pim->integrate(*data, accel_cov, gyro_cov);
+          it++;
+        }
+      }
+    }
+
+    while (pop_imu(data)) {
+      if (data->t_ns <= ts) {
+        // printf(">>> [B] discarding %ld\n", data->t_ns);
+      } else {
+        // printf(">>> [B] integrating %ld\n", data->t_ns);
+        pim->integrate(*data, accel_cov, gyro_cov);
+        imu_reminders.push_back(data);
+      }
+    }
+  }
+
+  bool get_latest_imu_pose(pose &p) {
+    if (pim_ == nullptr) return false;
+
+    PoseVelBiasState<double> latest_state{};
+    IntegratedImuMeasurement<double> pim{};
+
+    latest_state_lock.lock();
+    latest_state = *latest_state_;
+    latest_state_lock.unlock();
+
+    pim_lock.lock();
+    pim = *pim_;
+    pim_lock.unlock();
+
+    PoseVelBiasState<double> predicted_state{};
+    int64_t prev_ts = latest_state.t_ns;
+    if (ts <= prev_ts) {
+      printf(">>> ts=%ld is not newer than prev_ts=%ld\n", ts, prev_ts);
+    }
+
+    pim.predictState(latest_state, constants::g, predicted_state);
+
+    p.timestamp = pim.get_start_t_ns() + pim.get_dt_ns();
+    p.px = predicted_state.T_w_i.translation().x();
+    p.py = predicted_state.T_w_i.translation().y();
+    p.pz = predicted_state.T_w_i.translation().z();
+    p.rx = predicted_state.T_w_i.unit_quaternion().x();
+    p.ry = predicted_state.T_w_i.unit_quaternion().y();
+    p.rz = predicted_state.T_w_i.unit_quaternion().z();
+    p.rw = predicted_state.T_w_i.unit_quaternion().w();
+    p.vx = predicted_state.vel_w_i.x();
+    p.vy = predicted_state.vel_w_i.y();
+    p.vz = predicted_state.vel_w_i.z();
+    return true;
   }
 
   bool supports_feature(int feature_id) { return supported_features.count(feature_id) == 1; }
@@ -573,6 +702,8 @@ EXPORT void slam_tracker::start() { impl->start(); }
 EXPORT void slam_tracker::stop() { impl->stop(); }
 
 EXPORT void slam_tracker::finalize() { impl->finalize(); }
+
+EXPORT bool slam_tracker::get_latest_imu_pose(pose &p) { return impl->get_latest_imu_pose(p); }
 
 EXPORT bool slam_tracker::is_running() { return impl->is_running(); }
 

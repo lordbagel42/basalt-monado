@@ -9,6 +9,7 @@ BASALT_6.0.0 {
       xrt::auxiliary::tracking::slam::slam_tracker::is_running*;
       xrt::auxiliary::tracking::slam::slam_tracker::stop*;
       xrt::auxiliary::tracking::slam::slam_tracker::finalize*;
+      xrt::auxiliary::tracking::slam::slam_tracker::get_latest_imu_pose*;
 
       xrt::auxiliary::tracking::slam::slam_tracker::push_imu_sample*;
       xrt::auxiliary::tracking::slam::slam_tracker::push_frame*;
