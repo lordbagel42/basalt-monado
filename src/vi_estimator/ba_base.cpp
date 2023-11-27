@@ -389,7 +389,8 @@ void BundleAdjustmentBase<Scalar_>::linearizeMargPrior(const MargLinData<Scalar>
   for (const auto& kv : mld.order.abs_order_map) {
     UNUSED(aom);
     UNUSED(kv);
-    BASALT_ASSERT(aom.abs_order_map.at(kv.first) == kv.second);
+    /// TODO:@brunozanotti ASSERT commented to add prior keyframes
+    // BASALT_ASSERT(aom.abs_order_map.at(kv.first) == kv.second);
     BASALT_ASSERT(kv.second.first < int(mld.order.total_size));
   }
 

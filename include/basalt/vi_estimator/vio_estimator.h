@@ -133,6 +133,9 @@ class VioEstimatorBase {
 
   virtual void scheduleResetState(){};
   virtual void takeLongTermKeyframe(){};
+  virtual void takePriorKeyframe(){};
+  virtual void addPriorKeyframe(){};
+  virtual void removePriorKeyframe(){};
 
   virtual inline void debug_finalize() {}
 

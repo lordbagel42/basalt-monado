@@ -131,6 +131,49 @@ void SqrtKeypointVioEstimator<Scalar>::takeLongTermKeyframe() {
 }
 
 template <class Scalar>
+void SqrtKeypointVioEstimator<Scalar>::takePriorKeyframe() {
+  take_priorkf = true;
+}
+
+template <class Scalar>
+void SqrtKeypointVioEstimator<Scalar>::addPriorKeyframe() {
+  for (auto kf : priorkfs) {
+    if (kf_ids.find(kf) == kf_ids.end() && ltkfs.find(kf) == ltkfs.end()) {
+      // Add Prior Keyframe as long term keyframe
+      ltkfs.emplace(kf);
+
+      // Add pose to poses state window
+      auto pose = persistent_lmdb.getFramePose(kf);
+      frame_poses[kf] = PoseStateWithLin<Scalar>(kf, pose);
+      frame_poses[kf].setLinTrue();
+
+      // Add Prior Keyframe to visual data
+      visual_data->ltframes.emplace_back(pose.template cast<double>());
+      std::cout << "Add Keyframe " << kf << " to ltkfs.. now the size is: " << ltkfs.size() << std::endl;
+    }
+  }
+}
+
+template <class Scalar>
+void SqrtKeypointVioEstimator<Scalar>::removePriorKeyframe() {
+  for (auto kf : priorkfs) {
+    if (ltkfs.find(kf) != ltkfs.end()) {
+      ltkfs.erase(kf);
+      frame_poses.erase(kf);
+      std::cout << "Remove Keyframe " << kf << " from ltkfs.. now the size is: " << ltkfs.size() << std::endl;
+    }
+  }
+  priorkfs.clear();
+  for (auto lm_id : prior_landmarks) {
+    if (lmdb.landmarkExists(lm_id)) {
+      lmdb.removeLandmark(lm_id);
+      std::cout << "Remove landmark " << lm_id << " from lmdb." << std::endl;
+    }
+  }
+  prior_landmarks.clear();
+}
+
+template <class Scalar>
 bool SqrtKeypointVioEstimator<Scalar>::resetState(typename IntegratedImuMeasurement<Scalar>::Ptr& meas,
                                                   OpticalFlowResult::Ptr& curr_frame,
                                                   OpticalFlowResult::Ptr& prev_frame) {
@@ -147,6 +190,7 @@ bool SqrtKeypointVioEstimator<Scalar>::resetState(typename IntegratedImuMeasurem
   last_processed_t_ns = 0;
   // drain_input_queues();
   frame_states.clear();
+  frame_states_ids.clear();
   frame_poses.clear();
   frame_idx.clear();
   lmdb.clear();
@@ -156,6 +200,9 @@ bool SqrtKeypointVioEstimator<Scalar>::resetState(typename IntegratedImuMeasurem
   frame_count = 0;
   kf_ids.clear();
   ltkfs.clear();
+  ltkfs_ids.clear();
+  priorkfs.clear();
+  prior_landmarks.clear();
   imu_meas.clear();
   prev_opt_flow_res.clear();
   num_points_kf.clear();
@@ -350,6 +397,7 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_, c
       }
       curr_frame->input_images->addTime("imu_preintegrated");
 
+
       measure(curr_frame, meas);
       prev_frame = curr_frame;
     }
@@ -428,10 +476,18 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
   for (int i = 0; i < NUM_CAMS; i++) {
     TimeCamId tcid_target(opt_flow_meas->t_ns, i);
 
+    if (take_priorkf) {
+      auto kfs = persistent_lmdb.getCovisibleKeyframes(last_state_t_ns, opt_flow_meas->keypoints[i]);
+      priorkfs.insert(kfs.begin(), kfs.end());
+      addPriorKeyframe();
+    }
+
     for (const auto& kv_obs : opt_flow_meas->keypoints[i]) {
       int kpt_id = kv_obs.first;
 
       if (lmdb.landmarkExists(kpt_id)) {
+        if (kpt_id == 966)
+            std::cout << "[" << opt_flow_meas->frame_id << "_" << i << "] Landmark " << kpt_id << " found in window" << std::endl;
         const TimeCamId& tcid_host = lmdb.getLandmark(kpt_id).host_kf_id;
 
         KeypointObservation<Scalar> kobs;
@@ -439,6 +495,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
         kobs.pos = kv_obs.second.translation().cast<Scalar>();
 
         lmdb.addObservation(tcid_target, kobs);
+        persistent_lmdb.addObservation(tcid_target, kobs);
         // obs[tcid_host][tcid_target].push_back(kobs);
 
         if (num_points_connected.count(tcid_host.frame_id) == 0) {
@@ -448,10 +505,33 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
 
         connected[i]++;
       } else {
-        /// TODO:@brunozanotti what happend if the kpt_id is in the persistent database? (recall)
-        unconnected_obs[i].emplace(kpt_id);
+        // If the landmark is not in the window.. I added again only for this run.
+        if (persistent_lmdb.landmarkExists(kpt_id)) {
+          auto lm = persistent_lmdb.getLandmark(kpt_id);
+          if (kpt_id == 966)
+            std::cout << "[" << opt_flow_meas->frame_id << "_" << i << "] Landmark " << kpt_id << " found in map" << std::endl;
+          if (priorkfs.find(lm.host_kf_id.frame_id) != priorkfs.end()) {
+            std::cout << "[" << opt_flow_meas->frame_id << "_" << i << "] Landmark " << kpt_id << " en mapa asociado al prior kf " << lm.host_kf_id.frame_id << std::endl;
+            lmdb.addLandmark(kpt_id, lm);
+            prior_landmarks.emplace(kpt_id);
+
+            // Add Obbservation
+            KeypointObservation<Scalar> kobs;
+            kobs.kpt_id = kpt_id;
+            kobs.pos = kv_obs.second.translation().cast<Scalar>();
+            lmdb.addObservation(tcid_target, kobs);
+          }
+        }
+        else {
+          /// TODO:@brunozanotti what happend if the kpt_id is in the persistent database? (recall)
+          unconnected_obs[i].emplace(kpt_id);
+          if (kpt_id == 966)
+            std::cout << "[" << opt_flow_meas->frame_id << "_" << i << "] Landmark " << kpt_id << " not found" << std::endl;
+        }
       }
     }
+
+    take_priorkf = false;
   }
 
   if (Scalar(connected[0]) / (connected[0] + unconnected_obs[0].size()) < Scalar(config.vio_new_kf_keypoints_thresh) &&
@@ -469,6 +549,16 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
     if (!kf_ids.empty()) {  // Move newest kf to ltkfs
       auto last_kf_it = std::prev(kf_ids.end());
       ltkfs.emplace(*last_kf_it);
+
+      if (frame_states_ids.find(*last_kf_it) != frame_states_ids.end()) {
+        ltkfs_ids[*last_kf_it] = frame_states_ids[*last_kf_it];
+        frame_states_ids.erase(*last_kf_it);
+      }
+      else if (frame_poses_ids.find(*last_kf_it) != frame_poses_ids.end()) {
+        ltkfs_ids[*last_kf_it] = frame_poses_ids[*last_kf_it];
+        frame_poses_ids.erase(*last_kf_it);
+      }
+
       kf_ids.erase(last_kf_it);
     }
     take_ltkf = false;
@@ -542,8 +632,11 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
             lm_pos.direction = StereographicParam<Scalar>::project(p0_triangulated);
             lm_pos.inv_dist = p0_triangulated[3];
             /// TODO:@brunozanotti getPoseStateWithLin of getPoseState??
+            lmdb.addLandmark(lm_id, lm_pos);
+            if (lm_id == 966)
+              std::cout << "[" << opt_flow_meas->frame_id << "_" << i << "] Landmark " << lm_id << " stored in lmdb (host " << frame_states_ids[tcidl.frame_id] << ")" << std::endl;
+
             const SE3 pos = getPoseStateWithLin(tcidl.frame_id).getPose();
-            lmdb.addLandmarkWithPose(lm_id, lm_pos, tcidl.frame_id, pos);
             persistent_lmdb.addLandmarkWithPose(lm_id, lm_pos, tcidl.frame_id, pos);
 
             num_points_added++;
@@ -656,6 +749,9 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
 
   if (out_vis_queue) {
     for (const auto& [ts, p] : frame_states) visual_data->states[ts] = p.getState().T_w_i.template cast<double>();
+
+    for (const auto& kv : frame_states_ids)
+      visual_data->states_ids.emplace_back(kv.second);
 
     for (const auto& [ts, pstate] : frame_poses) {
       auto& frames = kf_ids.count(ts) ? visual_data->frames : visual_data->ltframes;
@@ -1096,6 +1192,13 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
       frame_states.at(last_state_to_marg).setLinTrue();
     }
 
+    for (const int64_t id : kfs_to_marg) {
+      if (frame_poses_ids.find(id) != frame_poses_ids.end())
+        std::cout << "Removing keyframe " << frame_poses_ids[id] << std::endl;
+      if (frame_states_ids.find(id) != frame_states_ids.end())
+        std::cout << "Removing frame " << frame_states_ids[id] << std::endl;
+    }
+
     for (const int64_t id : states_to_marg_all) {
       if (visual_data) visual_data->marginalized_idx[id] = frame_idx.at(id);
       frame_states.erase(id);
@@ -1109,7 +1212,10 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
       PoseStateWithLin<Scalar> pose(state);
 
       frame_poses[id] = pose;
+      if (frame_states_ids.find(id) != frame_states_ids.end())
+        frame_poses_ids[id] = frame_states_ids[id];
       frame_states.erase(id);
+      frame_states_ids.erase(id);
       imu_meas.erase(id);
     }
 
@@ -1231,7 +1337,8 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
       aom.abs_order_map[kv.first] = std::make_pair(aom.total_size, POSE_SIZE);
 
       // Check that we have the same order as marginalization
-      BASALT_ASSERT(marg_data.order.abs_order_map.at(kv.first) == aom.abs_order_map.at(kv.first));
+      /// TODO:@brunozanotti ASSERT commented to add prior keyframes
+      // BASALT_ASSERT(marg_data.order.abs_order_map.at(kv.first) == aom.abs_order_map.at(kv.first));
 
       aom.total_size += POSE_SIZE;
       aom.items++;
@@ -1616,6 +1723,7 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize_and_marg(const OpticalFlowInput
                                                           const std::unordered_set<KeypointId>& lost_landmaks) {
   optimize();
   input_images->addTime("optimized");
+  removePriorKeyframe();
   marginalize(num_points_connected, lost_landmaks);
   input_images->addTime("marginalized");
 }

@@ -151,6 +151,30 @@ Sophus::SE3<Scalar_> &LandmarkDatabase<Scalar_>::getFramePose(int64_t frame_id) 
 }
 
 template <class Scalar_>
+std::set<FrameId> LandmarkDatabase<Scalar_>::getCovisibleKeyframes(FrameId frame_id){
+  // auto pos = getFramePose(frame_id);
+
+  // get co-visible keyframes..
+  // Just for now return all the frames..
+  std::set<FrameId> keyframes;
+  int c = 0;
+  for (auto it = frame_poses.begin(); it != frame_poses.end(); ++it) {
+    c++;
+    if (c == 1)
+      keyframes.emplace(it->first);
+    if (c == 5)
+      keyframes.emplace(it->first);
+    if (c == 10)
+      keyframes.emplace(it->first);
+    if (c == 15)
+      keyframes.emplace(it->first);
+    if (c == 20)
+      keyframes.emplace(it->first);
+  }
+  return keyframes;
+}
+
+template <class Scalar_>
 Landmark<Scalar_> &LandmarkDatabase<Scalar_>::getLandmark(LandmarkId lm_id) {
   return kpts.at(lm_id);
 }
