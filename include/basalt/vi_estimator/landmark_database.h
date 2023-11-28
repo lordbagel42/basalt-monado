@@ -115,7 +115,7 @@ class LandmarkDatabase {
 
   SE3 &getFramePose(FrameId frame_id);
 
-  std::set<FrameId> getCovisibleKeyframes(FrameId frame_id);
+  std::set<FrameId> getCovisibleKeyframes(FrameId frame_id, Keypoints keypoints);
 
   // Const
   const Landmark<Scalar>& getLandmark(LandmarkId lm_id) const;
