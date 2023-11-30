@@ -244,11 +244,8 @@ bool follow_highlight_vio(size_t frame_id, const VioDatasetPtr& vio_dataset,
                           bool smooth_zoom);
 
 struct VIOUIBase {
-  // TODO@mateosss: remove F and T params from Var<bool>s
   // TODO@mateosss: move definitions of methods into vis_utils.cpp
   // TODO@mateosss: move above UI functions into this class
-  static constexpr double F = (double)false;
-  static constexpr double T = (double)true;
   static constexpr int UI_WIDTH_PIX = 200;
   const pangolin::Attach UI_WIDTH = pangolin::Attach::Pix(UI_WIDTH_PIX);
 
@@ -261,44 +258,44 @@ struct VIOUIBase {
 
   Var<int> show_frame{"ui.show_frame", 0, META_FLAG_READONLY};
 
-  Var<bool> show_flow{"ui.show_flow", false, F, T};
-  Var<bool> show_responses{"ui.show_responses", false, F, T};
-  Var<bool> show_tracking_guess{"ui.show_tracking_guess", false, F, T};
-  Var<bool> show_matching_guess{"ui.show_matching_guess", false, F, T};
-  Var<bool> show_recall_guess{"ui.show_recall_guess", false, F, T};
-  Var<bool> show_obs{"ui.show_obs", true, F, T};
-  Var<bool> show_ids{"ui.show_ids", false, F, T};
-  Var<bool> show_depth{"ui.show_depth", false, F, T};
+  Var<bool> show_flow{"ui.show_flow", false, true};
+  Var<bool> show_responses{"ui.show_responses", false, true};
+  Var<bool> show_tracking_guess{"ui.show_tracking_guess", false, true};
+  Var<bool> show_matching_guess{"ui.show_matching_guess", false, true};
+  Var<bool> show_recall_guess{"ui.show_recall_guess", false, true};
+  Var<bool> show_obs{"ui.show_obs", true, true};
+  Var<bool> show_ids{"ui.show_ids", false, true};
+  Var<bool> show_depth{"ui.show_depth", false, true};
 
   Var<std::string> highlight_landmarks{"ui.Highlight", ""};
-  Var<bool> filter_highlights{"ui.filter_highlights", false, F, T};
-  Var<bool> show_highlights{"ui.show_highlights", false, F, T};
-  Var<bool> follow_highlight{"ui.follow_highlight", false, F, T};
+  Var<bool> filter_highlights{"ui.filter_highlights", false, true};
+  Var<bool> show_highlights{"ui.show_highlights", false, true};
+  Var<bool> follow_highlight{"ui.follow_highlight", false, true};
   Button highlight_frame_btn{"ui.highlight_frame", [this]() { highligh_frame(); }};
 
   Button toggle_blocks_btn{"ui.toggle_blocks", [this]() { toggle_blocks(); }};
-  Var<bool> show_block_vals{"ui.show_block_vals", false, F, T};
+  Var<bool> show_block_vals{"ui.show_block_vals", false, true};
 
-  Var<bool> show_grid{"ui.show_grid", false, F, T};
-  Var<bool> show_safe_radius{"ui.show_safe_radius", false, F, T};
-  Var<bool> show_cam0_proj{"ui.show_cam0_proj", false, F, T};
-  Var<bool> show_masks{"ui.show_masks", false, F, T};
+  Var<bool> show_grid{"ui.show_grid", false, true};
+  Var<bool> show_safe_radius{"ui.show_safe_radius", false, true};
+  Var<bool> show_cam0_proj{"ui.show_cam0_proj", false, true};
+  Var<bool> show_masks{"ui.show_masks", false, true};
 
-  Var<bool> show_guesses{"ui.Show matching guesses", false, F, T};
-  Var<bool> show_same_pixel_guess{"ui.SAME_PIXEL", true, F, T};
-  Var<bool> show_reproj_avg_depth_guess{"ui.REPROJ_AVG_DEPTH", true, F, T};
-  Var<bool> show_reproj_fix_depth_guess{"ui.REPROJ_FIX_DEPTH", true, F, T};
+  Var<bool> show_guesses{"ui.Show matching guesses", false, true};
+  Var<bool> show_same_pixel_guess{"ui.SAME_PIXEL", true, true};
+  Var<bool> show_reproj_avg_depth_guess{"ui.REPROJ_AVG_DEPTH", true, true};
+  Var<bool> show_reproj_fix_depth_guess{"ui.REPROJ_FIX_DEPTH", true, true};
   Var<double> fixed_depth{"ui.FIX_DEPTH", 2, 0, 3};
-  Var<bool> show_active_guess{"ui.Active Guess", true, F, T};
+  Var<bool> show_active_guess{"ui.Active Guess", true, true};
 
   Var<double> depth_guess{"ui.depth_guess", 2, META_FLAG_READONLY};
 
-  Var<bool> show_est_pos{"ui.show_est_pos", true, F, T};
-  Var<bool> show_est_vel{"ui.show_est_vel", false, F, T};
-  Var<bool> show_est_bg{"ui.show_est_bg", false, F, T};
-  Var<bool> show_est_ba{"ui.show_est_ba", false, F, T};
+  Var<bool> show_est_pos{"ui.show_est_pos", true, true};
+  Var<bool> show_est_vel{"ui.show_est_vel", false, true};
+  Var<bool> show_est_bg{"ui.show_est_bg", false, true};
+  Var<bool> show_est_ba{"ui.show_est_ba", false, true};
 
-  Var<bool> follow{"ui.follow", true, F, T};
+  Var<bool> follow{"ui.follow", true, true};
 
   virtual VioVisualizationData::Ptr get_curr_vis_data() = 0;
 

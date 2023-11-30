@@ -137,21 +137,21 @@ struct basalt_vio_ui : vis::VIOUIBase {
   thread state_consumer_thread;
   thread queues_printer_thread;
 
-  Var<bool> show_gt{"ui.show_gt", true, F, T};
+  Var<bool> show_gt{"ui.show_gt", true, true};
 
   Button next_step_btn{"ui.next_step", [this]() { next_step(); }};
   Button prev_step_btn{"ui.prev_step", [this]() { prev_step(); }};
   Button take_ltkf_btn{"ui.Take Keyframe", [this]() { take_ltkf(); }};
 
-  Var<bool> continue_btn{"ui.continue", false, F, T};
-  Var<bool> continue_fast{"ui.continue_fast", true, F, T};
+  Var<bool> continue_btn{"ui.continue", false, true};
+  Var<bool> continue_fast{"ui.continue_fast", true, true};
 
   Button align_se3_btn{"ui.align_se3", [this]() { alignButton(); }};
 
-  Var<bool> euroc_fmt{"ui.euroc_fmt", true, F, T};
-  Var<bool> tum_rgbd_fmt{"ui.tum_rgbd_fmt", false, F, T};
-  Var<bool> kitti_fmt{"ui.kitti_fmt", false, F, T};
-  Var<bool> save_groundtruth{"ui.save_groundtruth", false, F, T};
+  Var<bool> euroc_fmt{"ui.euroc_fmt", true, true};
+  Var<bool> tum_rgbd_fmt{"ui.tum_rgbd_fmt", false, true};
+  Var<bool> kitti_fmt{"ui.kitti_fmt", false, true};
+  Var<bool> save_groundtruth{"ui.save_groundtruth", false, true};
   Button save_traj_btn{"ui.save_traj", [this]() { saveTrajectoryButton(); }};
 
   int start(int argc, char** argv) {
