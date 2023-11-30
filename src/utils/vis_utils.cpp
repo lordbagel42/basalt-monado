@@ -36,6 +36,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/optical_flow/optical_flow.h>
 #include <basalt/utils/vis_utils.h>
 #include <pangolin/gl/glfont.h>
+#include <pangolin/var/var.h>
 
 namespace pangolin {
 extern "C" const unsigned char AnonymousPro_ttf[];
@@ -44,13 +45,6 @@ extern "C" const unsigned char AnonymousPro_ttf[];
 namespace basalt::vis {
 
 pangolin::GlFont SMALL_FONT(pangolin::AnonymousPro_ttf, 11);
-
-using Eigen::MatrixXf;
-using Eigen::Vector2d;
-using Eigen::Vector2f;
-using Eigen::Vector4d;
-using std::string;
-using std::vector;
 
 bool try_draw_image_text(pangolin::ImageView& view, float x, float y, const pangolin::GlText& text) {
   float xwin = -1;

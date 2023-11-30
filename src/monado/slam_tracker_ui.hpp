@@ -46,9 +46,8 @@ using std::to_string;
 using std::vector;
 using namespace basalt;
 using namespace Eigen;
-using Button = pangolin::Var<std::function<void(void)>>;
 
-class slam_tracker_ui {
+class slam_tracker_ui : vis::VIOUIBase {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
  private:
@@ -60,19 +59,12 @@ class slam_tracker_ui {
   size_t num_cams = 0;
   std::atomic<bool> running = false;
 
-  pangolin::View *img_view_display;
-  pangolin::View *plot_display;
-  pangolin::View *blocks_display;
-  std::vector<std::shared_ptr<pangolin::ImageView>> img_view;
-  bool show_blocks = false;
-
-  int UI_WIDTH_PIX = 200;
-  const pangolin::Attach UI_WIDTH = pangolin::Attach::Pix(UI_WIDTH_PIX);
-
  public:
   tbb::concurrent_bounded_queue<VioVisualizationData::Ptr> out_vis_queue{};
   tbb::concurrent_queue<double> *opt_flow_depth_queue = nullptr;
   OpticalFlowBase::Ptr opt_flow;
+
+  VioVisualizationData::Ptr get_curr_vis_data() override { return curr_vis_data; }
 
   void initialize(int ncams) {
     vio_data_log.Clear();
@@ -107,9 +99,6 @@ class slam_tracker_ui {
       cout << "Finished vis_thread\n";
     });
   }
-
-  vis::Selection highlights{};
-  bool is_highlighted(size_t lmid) const { return vis::is_selected(highlights, lmid); }
 
   int64_t start_t_ns = -1;
   std::vector<int64_t> vio_t_ns;
@@ -152,16 +141,10 @@ class slam_tracker_ui {
     ui_runner_thread = thread(&slam_tracker_ui::ui_runner, this, T_w_i_init, cal, conf);
   }
 
-  pangolin::Var<bool> follow{"ui.follow", true, false, true};
-  pangolin::Var<bool> show_est_pos{"ui.show_est_pos", true, false, true};
-  pangolin::Var<bool> show_est_vel{"ui.show_est_vel", false, false, true};
-  pangolin::Var<bool> show_est_bg{"ui.show_est_bg", false, false, true};
-  pangolin::Var<bool> show_est_ba{"ui.show_est_ba", false, false, true};
-
   void ui_runner(const Sophus::SE3d &T_w_i_init, const Calibration<double> &cal, const VioConfig &conf) {
     calib = cal;
     config = conf;
-    string window_name = "Basalt 6DoF Tracker for Monado";
+    string window_name = "Basalt";
     pangolin::CreateWindowAndBind(window_name, 1800, 1000);
 
     glEnable(GL_DEPTH_TEST);
@@ -277,60 +260,6 @@ class slam_tracker_ui {
     pangolin::QuitAll();
     cout << "Finished ui_runner\n";
   }
-
-  bool toggle_blocks() {
-    show_blocks = vis::toggle_blocks(blocks_display, plot_display, img_view_display, UI_WIDTH);
-    return show_blocks;
-  }
-
-  bool highlight_frame() {
-    std::set<KeypointId> kpids;
-    for (const auto &kps : curr_vis_data->opt_flow_res->keypoints)
-      for (const auto &[kpid, kp] : kps) kpids.insert(kpid);
-
-    std::string str = highlight_landmarks;
-    str.reserve(str.size() + kpids.size() * 10);
-    for (const KeypointId &kpid : kpids) str += std::to_string(kpid) + ",";
-    if (!str.empty()) str.pop_back();
-
-    highlight_landmarks = str;
-    highlight_landmarks.Meta().gui_changed = true;
-
-    return true;
-  }
-
-  pangolin::Var<int> show_frame{"ui.show_frame", 0, pangolin::META_FLAG_READONLY};
-  pangolin::Var<bool> show_flow{"ui.show_flow", false, false, true};
-  pangolin::Var<bool> show_responses{"ui.show_responses", false, false, true};
-  pangolin::Var<bool> show_tracking_guess{"ui.show_tracking_guess", false, false, true};
-  pangolin::Var<bool> show_matching_guess{"ui.show_matching_guess", false, false, true};
-  pangolin::Var<bool> show_recall_guess{"ui.show_recall_guess", false, false, true};
-  pangolin::Var<bool> show_obs{"ui.show_obs", true, false, true};
-  pangolin::Var<bool> show_ids{"ui.show_ids", false, false, true};
-  pangolin::Var<bool> show_depth{"ui.show_depth", false, false, true};
-
-  pangolin::Var<std::string> highlight_landmarks{"ui.Highlight", ""};
-  pangolin::Var<bool> filter_highlights{"ui.filter_highlights", false, false, true};
-  pangolin::Var<bool> show_highlights{"ui.show_highlights", false, false, true};
-  pangolin::Var<bool> follow_highlight{"ui.follow_highlight", false, false, true};
-  Button highlight_frame_btn{"ui.highlight_frame", [this]() { highlight_frame(); }};
-
-  Button toggle_blocks_btn{"ui.toggle_blocks", [this]() { toggle_blocks(); }};
-  pangolin::Var<bool> show_block_vals{"ui.show_block_vals", false, false, true};
-
-  pangolin::Var<bool> show_grid{"ui.show_grid", false, false, true};
-  pangolin::Var<bool> show_safe_radius{"ui.show_safe_radius", false, false, true};
-  pangolin::Var<bool> show_cam0_proj{"ui.show_cam0_proj", false, false, true};
-  pangolin::Var<bool> show_masks{"ui.show_masks", false, false, true};
-
-  pangolin::Var<bool> show_guesses{"ui.Show matching guesses", false, false, true};
-  pangolin::Var<bool> show_same_pixel_guess{"ui.SAME_PIXEL", true, false, true};
-  pangolin::Var<bool> show_reproj_avg_depth_guess{"ui.REPROJ_AVG_DEPTH", true, false, true};
-  pangolin::Var<bool> show_reproj_fix_depth_guess{"ui.REPROJ_FIX_DEPTH", true, false, true};
-  pangolin::Var<double> fixed_depth{"ui.FIX_DEPTH", 2, 0, 3};
-  pangolin::Var<bool> show_active_guess{"ui.Active Guess", true, false, true};
-
-  pangolin::Var<double> depth_guess{"ui.depth_guess", 2, pangolin::META_FLAG_READONLY};
 
   void draw_image_overlay(pangolin::ImageView &v, size_t cam_id) {
     if (!curr_vis_data ||                                               //

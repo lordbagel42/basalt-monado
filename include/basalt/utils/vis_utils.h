@@ -41,6 +41,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pangolin/gl/glfont.h>
 
 #include <basalt/vi_estimator/vio_estimator.h>
+#include <pangolin/var/var.h>
+#include <pangolin/var/varvaluegeneric.h>
 #include <basalt/utils/sophus_utils.hpp>
 #include <tuple>
 
@@ -144,6 +146,19 @@ void glDrawCirclePerimeters(const std::vector<Eigen::Matrix<P, N, 1>, Allocator>
 
 namespace basalt::vis {
 
+using Eigen::MatrixXf;
+using Eigen::Vector2d;
+using Eigen::Vector2f;
+using Eigen::Vector4d;
+using pangolin::ImageView;
+using pangolin::META_FLAG_READONLY;
+using pangolin::Var;
+using pangolin::View;
+using std::shared_ptr;
+using std::string;
+using std::vector;
+using Button = Var<std::function<void(void)>>;
+
 extern pangolin::GlFont SMALL_FONT;
 
 const uint8_t BLUE[4]{0x21, 0x96, 0xF3, 0xFF};
@@ -227,5 +242,91 @@ bool follow_highlight_vio(size_t frame_id, const VioDatasetPtr& vio_dataset,
                           const std::unordered_map<int64_t, VioVisualizationData::Ptr>& vis_map,
                           std::vector<std::shared_ptr<pangolin::ImageView>>& img_views, const Selection& highlights,
                           bool smooth_zoom);
+
+struct VIOUIBase {
+  // TODO@mateosss: remove F and T params from Var<bool>s
+  // TODO@mateosss: move definitions of methods into vis_utils.cpp
+  // TODO@mateosss: move above UI functions into this class
+  static constexpr double F = (double)false;
+  static constexpr double T = (double)true;
+  static constexpr int UI_WIDTH_PIX = 200;
+  const pangolin::Attach UI_WIDTH = pangolin::Attach::Pix(UI_WIDTH_PIX);
+
+  View* img_view_display;
+  View* plot_display;
+  View* blocks_display;
+  vector<shared_ptr<ImageView>> img_view;
+  bool show_blocks = false;
+  Selection highlights{};
+
+  Var<int> show_frame{"ui.show_frame", 0, META_FLAG_READONLY};
+
+  Var<bool> show_flow{"ui.show_flow", false, F, T};
+  Var<bool> show_responses{"ui.show_responses", false, F, T};
+  Var<bool> show_tracking_guess{"ui.show_tracking_guess", false, F, T};
+  Var<bool> show_matching_guess{"ui.show_matching_guess", false, F, T};
+  Var<bool> show_recall_guess{"ui.show_recall_guess", false, F, T};
+  Var<bool> show_obs{"ui.show_obs", true, F, T};
+  Var<bool> show_ids{"ui.show_ids", false, F, T};
+  Var<bool> show_depth{"ui.show_depth", false, F, T};
+
+  Var<std::string> highlight_landmarks{"ui.Highlight", ""};
+  Var<bool> filter_highlights{"ui.filter_highlights", false, F, T};
+  Var<bool> show_highlights{"ui.show_highlights", false, F, T};
+  Var<bool> follow_highlight{"ui.follow_highlight", false, F, T};
+  Button highlight_frame_btn{"ui.highlight_frame", [this]() { highligh_frame(); }};
+
+  Button toggle_blocks_btn{"ui.toggle_blocks", [this]() { toggle_blocks(); }};
+  Var<bool> show_block_vals{"ui.show_block_vals", false, F, T};
+
+  Var<bool> show_grid{"ui.show_grid", false, F, T};
+  Var<bool> show_safe_radius{"ui.show_safe_radius", false, F, T};
+  Var<bool> show_cam0_proj{"ui.show_cam0_proj", false, F, T};
+  Var<bool> show_masks{"ui.show_masks", false, F, T};
+
+  Var<bool> show_guesses{"ui.Show matching guesses", false, F, T};
+  Var<bool> show_same_pixel_guess{"ui.SAME_PIXEL", true, F, T};
+  Var<bool> show_reproj_avg_depth_guess{"ui.REPROJ_AVG_DEPTH", true, F, T};
+  Var<bool> show_reproj_fix_depth_guess{"ui.REPROJ_FIX_DEPTH", true, F, T};
+  Var<double> fixed_depth{"ui.FIX_DEPTH", 2, 0, 3};
+  Var<bool> show_active_guess{"ui.Active Guess", true, F, T};
+
+  Var<double> depth_guess{"ui.depth_guess", 2, META_FLAG_READONLY};
+
+  Var<bool> show_est_pos{"ui.show_est_pos", true, F, T};
+  Var<bool> show_est_vel{"ui.show_est_vel", false, F, T};
+  Var<bool> show_est_bg{"ui.show_est_bg", false, F, T};
+  Var<bool> show_est_ba{"ui.show_est_ba", false, F, T};
+
+  Var<bool> follow{"ui.follow", true, F, T};
+
+  virtual VioVisualizationData::Ptr get_curr_vis_data() = 0;
+
+  bool is_highlighted(size_t lmid) { return vis::is_selected(highlights, lmid); }
+
+  bool highligh_frame() {
+    VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+    if (curr_vis_data == nullptr) return false;
+
+    std::set<KeypointId> kpids;
+    for (const auto& kps : get_curr_vis_data()->opt_flow_res->keypoints)
+      for (const auto& [kpid, kp] : kps) kpids.insert(kpid);
+
+    std::string str = highlight_landmarks;
+    str.reserve(str.size() + kpids.size() * 10);
+    for (const KeypointId& kpid : kpids) str += std::to_string(kpid) + ",";
+    if (!str.empty()) str.pop_back();
+
+    highlight_landmarks = str;
+    highlight_landmarks.Meta().gui_changed = true;
+
+    return true;
+  }
+
+  bool toggle_blocks() {
+    show_blocks = vis::toggle_blocks(blocks_display, plot_display, img_view_display, UI_WIDTH);
+    return show_blocks;
+  }
+};
 
 }  // namespace basalt::vis
