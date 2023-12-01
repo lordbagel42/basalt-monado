@@ -135,8 +135,6 @@ class slam_tracker_ui : vis::VIOUIBase {
 
   std::shared_ptr<pangolin::Plotter> plotter;
   pangolin::DataLog imu_data_log{};
-  Calibration<double> calib;
-  VioConfig config;
   void start_ui(const Sophus::SE3d &T_w_i_init, const Calibration<double> &cal, const VioConfig &conf) {
     ui_runner_thread = thread(&slam_tracker_ui::ui_runner, this, T_w_i_init, cal, conf);
   }
@@ -161,8 +159,7 @@ class slam_tracker_ui : vis::VIOUIBase {
     auto blocks_view = std::make_shared<pangolin::ImageView>();
     blocks_view->UseNN() = true;  // Disable antialiasing, can be toggled with N key
     blocks_view->extern_draw_function = [this](pangolin::View &v) {
-      vis::draw_blocks_overlay(curr_vis_data, dynamic_cast<pangolin::ImageView &>(v), highlights, filter_highlights,
-                               show_highlights, show_block_vals, show_ids);
+      draw_blocks_overlay(dynamic_cast<pangolin::ImageView &>(v));
     };
     const int DEFAULT_W = 480;
     blocks_display = &pangolin::CreateDisplay();
@@ -238,13 +235,13 @@ class slam_tracker_ui : vis::VIOUIBase {
                                        img_data[cam_id].img->pitch, fmt);
           }
         }
-        if (follow_highlight) vis::follow_highlight(curr_vis_data, img_view, highlights, false);
+        if (follow_highlight) do_follow_highlight(false);
       }
 
       if (highlight_landmarks.GuiChanged() || filter_highlights.GuiChanged() || show_highlights.GuiChanged()) {
         highlights = vis::parse_selection(highlight_landmarks);
         filter_highlights = filter_highlights && !highlights.empty();
-        if (show_blocks) vis::show_blocks(curr_vis_data, blocks_view, highlights, filter_highlights);
+        if (show_blocks) do_show_blocks(blocks_view);
       }
 
       if (follow_highlight.GuiChanged())
@@ -252,7 +249,7 @@ class slam_tracker_ui : vis::VIOUIBase {
 
       draw_plots();
 
-      if (show_blocks) vis::show_blocks(curr_vis_data, blocks_view, highlights, filter_highlights);
+      if (show_blocks) do_show_blocks(blocks_view);
 
       pangolin::FinishFrame();
     }
@@ -262,39 +259,19 @@ class slam_tracker_ui : vis::VIOUIBase {
   }
 
   void draw_image_overlay(pangolin::ImageView &v, size_t cam_id) {
-    if (!curr_vis_data ||                                               //
-        !curr_vis_data->opt_flow_res ||                                 //
-        !curr_vis_data->opt_flow_res->input_images ||                   //
-        curr_vis_data->opt_flow_res->input_images->img_data.empty() ||  //
-        !curr_vis_data->opt_flow_res->input_images->img_data.at(0).img) {
-      return;
-    }
+    UNUSED(v);
+    if (curr_vis_data == nullptr) return;
 
-    if (show_obs) {
-      vis::show_obs(cam_id, curr_vis_data, v, config, calib, highlights, filter_highlights, show_same_pixel_guess,
-                    show_reproj_fix_depth_guess, show_reproj_avg_depth_guess, show_active_guess, fixed_depth, show_ids,
-                    show_depth, show_guesses);
-    }
-
-    if (show_flow)
-      vis::show_flow(cam_id, curr_vis_data, v, opt_flow, highlights, filter_highlights, show_ids, show_responses);
-
-    if (show_highlights) vis::show_highlights(cam_id, curr_vis_data, highlights, v, show_ids);
-
-    if (show_tracking_guess)
-      vis::show_tracking_guess(cam_id, show_frame, curr_vis_data, prev_vis_data, highlights, filter_highlights);
-
-    if (show_matching_guess) vis::show_matching_guesses(cam_id, curr_vis_data, highlights, filter_highlights);
-
-    if (show_recall_guess) vis::show_recall_guesses(cam_id, curr_vis_data, highlights, filter_highlights);
-
-    if (show_masks) vis::show_masks(cam_id, curr_vis_data);
-
-    if (show_cam0_proj) vis::show_cam0_proj(cam_id, depth_guess, config, calib);
-
-    if (show_grid) vis::show_grid(config, calib);
-
-    if (show_safe_radius) vis::show_safe_radius(config, calib);
+    if (show_obs) do_show_obs(cam_id);
+    if (show_flow) do_show_flow(cam_id, opt_flow);
+    if (show_highlights) do_show_highlights(cam_id);
+    if (show_tracking_guess) do_show_tracking_guess(cam_id, show_frame, prev_vis_data);
+    if (show_matching_guess) do_show_matching_guesses(cam_id);
+    if (show_recall_guess) do_show_recall_guesses(cam_id);
+    if (show_masks) do_show_masks(cam_id);
+    if (show_cam0_proj) do_show_cam0_proj(cam_id, depth_guess);
+    if (show_grid) do_show_grid();
+    if (show_safe_radius) do_show_safe_radius();
   }
 
   void draw_scene() {

@@ -126,8 +126,6 @@ struct basalt_vio_ui : vis::VIOUIBase {
   std::chrono::high_resolution_clock::time_point time_start;
   bool aborted = false;
 
-  Calibration<double> calib;
-  VioConfig vio_config;
   OpticalFlowBase::Ptr opt_flow_ptr;
   VioEstimatorBase::Ptr vio;
 
@@ -200,11 +198,11 @@ struct basalt_vio_ui : vis::VIOUIBase {
     }
 
     if (!config_path.empty()) {
-      vio_config.load(config_path);
+      config.load(config_path);
 
-      if (vio_config.vio_enforce_realtime) {
-        vio_config.vio_enforce_realtime = false;
-        std::cout << "The option vio_config.vio_enforce_realtime was enabled, "
+      if (config.vio_enforce_realtime) {
+        config.vio_enforce_realtime = false;
+        std::cout << "The option config.vio_enforce_realtime was enabled, "
                      "but it should only be used with the live executables (supply "
                      "images at a constant framerate). This executable runs on the "
                      "datasets and processes images as fast as it can, so the option "
@@ -225,7 +223,7 @@ struct basalt_vio_ui : vis::VIOUIBase {
       show_frame.Meta().range[1] = vio_dataset->get_image_timestamps().size() - 1;
       show_frame.Meta().gui_changed = true;
 
-      opt_flow_ptr = basalt::OpticalFlowFactory::getOpticalFlow(vio_config, calib);
+      opt_flow_ptr = basalt::OpticalFlowFactory::getOpticalFlow(config, calib);
       opt_flow_ptr->start();
 
       for (size_t i = 0; i < vio_dataset->get_gt_pose_data().size(); i++) {
@@ -236,7 +234,7 @@ struct basalt_vio_ui : vis::VIOUIBase {
 
     const int64_t start_t_ns = vio_dataset->get_image_timestamps().front();
     {
-      vio = basalt::VioEstimatorFactory::getVioEstimator(vio_config, calib, basalt::constants::g, use_imu, use_double);
+      vio = basalt::VioEstimatorFactory::getVioEstimator(config, calib, basalt::constants::g, use_imu, use_double);
       vio->initialize(Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
 
       opt_flow_ptr->output_queue = &vio->vision_data_queue;
@@ -372,8 +370,7 @@ struct basalt_vio_ui : vis::VIOUIBase {
       auto blocks_view = std::make_shared<pangolin::ImageView>();
       blocks_view->UseNN() = true;  // Disable antialiasing, can be toggled with N key
       blocks_view->extern_draw_function = [this](View& v) {
-        vis::draw_blocks_overlay_vio(show_frame, vio_dataset, vis_map, dynamic_cast<pangolin::ImageView&>(v),
-                                     highlights, filter_highlights, show_highlights, show_block_vals, show_ids);
+        draw_blocks_overlay(dynamic_cast<pangolin::ImageView&>(v));
       };
       const int DEFAULT_W = 480;
       blocks_display = &pangolin::CreateDisplay();
@@ -460,10 +457,9 @@ struct basalt_vio_ui : vis::VIOUIBase {
               img_view[cam_id]->SetImage(img_vec[cam_id].img->ptr, img_vec[cam_id].img->w, img_vec[cam_id].img->h,
                                          img_vec[cam_id].img->pitch, fmt);
           }
-          if (follow_highlight) vis::follow_highlight_vio(frame_id, vio_dataset, vis_map, img_view, highlights, false);
+          if (follow_highlight) do_follow_highlight(false);
 
-          if (show_blocks && it != vis_map.end())
-            vis::show_blocks(it->second, blocks_view, highlights, filter_highlights);
+          if (show_blocks) do_show_blocks(blocks_view);
 
           draw_plots();
         }
@@ -477,14 +473,13 @@ struct basalt_vio_ui : vis::VIOUIBase {
           highlights = vis::parse_selection(highlight_landmarks);
           filter_highlights = filter_highlights && !highlights.empty();
           for (const auto& [ts, vis] : vis_map) vis->mat = nullptr;  // Regenerate lmbs
-          if (show_blocks && it != vis_map.end())
-            vis::show_blocks(it->second, blocks_view, highlights, filter_highlights);
+          if (show_blocks) do_show_blocks(blocks_view);
         }
 
         if (follow_highlight.GuiChanged()) {
           follow_highlight = follow_highlight && highlights.size() == 1 && !highlights[0].is_range;
           if (follow_highlight)
-            vis::follow_highlight_vio(frame_id, vio_dataset, vis_map, img_view, highlights, true);
+            do_follow_highlight(true);
           else
             for (auto& v : img_view) v->ResetView();
         }
@@ -698,41 +693,20 @@ struct basalt_vio_ui : vis::VIOUIBase {
   }
 
   void draw_image_overlay(pangolin::ImageView& v, size_t cam_id) {
+    UNUSED(v);
     VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+    if (curr_vis_data == nullptr) return;
 
-    if (!curr_vis_data ||                                               //
-        !curr_vis_data->opt_flow_res ||                                 //
-        !curr_vis_data->opt_flow_res->input_images ||                   //
-        curr_vis_data->opt_flow_res->input_images->img_data.empty() ||  //
-        !curr_vis_data->opt_flow_res->input_images->img_data.at(0).img) {
-      return;
-    }
-
-    if (show_obs) {
-      vis::show_obs(cam_id, curr_vis_data, v, vio_config, calib, highlights, filter_highlights, show_same_pixel_guess,
-                    show_reproj_fix_depth_guess, show_reproj_avg_depth_guess, show_active_guess, fixed_depth, show_ids,
-                    show_depth, show_guesses);
-    }
-
-    if (show_flow)
-      vis::show_flow(cam_id, curr_vis_data, v, opt_flow_ptr, highlights, filter_highlights, show_ids, show_responses);
-
-    if (show_highlights) vis::show_highlights(cam_id, curr_vis_data, highlights, v, show_ids);
-
-    if (show_tracking_guess)
-      vis::show_tracking_guess_vio(cam_id, show_frame, vio_dataset, vis_map, highlights, filter_highlights);
-
-    if (show_matching_guess) vis::show_matching_guesses(cam_id, curr_vis_data, highlights, filter_highlights);
-
-    if (show_recall_guess) vis::show_recall_guesses(cam_id, curr_vis_data, highlights, filter_highlights);
-
-    if (show_masks) vis::show_masks(cam_id, curr_vis_data);
-
-    if (show_cam0_proj) vis::show_cam0_proj(cam_id, depth_guess, vio_config, calib);
-
-    if (show_grid) vis::show_grid(vio_config, calib);
-
-    if (show_safe_radius) vis::show_safe_radius(vio_config, calib);
+    if (show_obs) do_show_obs(cam_id);
+    if (show_flow) do_show_flow(cam_id, opt_flow_ptr);
+    if (show_highlights) do_show_highlights(cam_id);
+    if (show_tracking_guess) do_show_tracking_guess_vio(cam_id, show_frame, vio_dataset, vis_map);
+    if (show_matching_guess) do_show_matching_guesses(cam_id);
+    if (show_recall_guess) do_show_recall_guesses(cam_id);
+    if (show_masks) do_show_masks(cam_id);
+    if (show_cam0_proj) do_show_cam0_proj(cam_id, depth_guess);
+    if (show_grid) do_show_grid();
+    if (show_safe_radius) do_show_safe_radius();
   }
 
   void draw_scene(View& view) {

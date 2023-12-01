@@ -56,9 +56,36 @@ bool try_draw_image_text(pangolin::ImageView& view, float x, float y, const pang
   return in_bounds;
 }
 
-void show_flow(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, pangolin::ImageView& view,
-               const OpticalFlowBase::Ptr& opt_flow, const Selection& highlights, bool filter_highlights, bool show_ids,
-               bool show_responses) {
+bool VIOUIBase::highligh_frame() {
+  VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return false;
+
+  std::set<KeypointId> kpids;
+  for (const auto& kps : get_curr_vis_data()->opt_flow_res->keypoints)
+    for (const auto& [kpid, kp] : kps) kpids.insert(kpid);
+
+  std::string str = highlight_landmarks;
+  str.reserve(str.size() + kpids.size() * 10);
+  for (const KeypointId& kpid : kpids) str += std::to_string(kpid) + ",";
+  if (!str.empty()) str.pop_back();
+
+  highlight_landmarks = str;
+  highlight_landmarks.Meta().gui_changed = true;
+
+  return true;
+}
+
+bool VIOUIBase::toggle_blocks() {
+  show_blocks = do_toggle_blocks(blocks_display, plot_display, img_view_display, UI_WIDTH);
+  return show_blocks;
+}
+
+void VIOUIBase::do_show_flow(size_t cam_id, const OpticalFlowBase::Ptr& opt_flow) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
+  pangolin::ImageView& view = *img_view.at(cam_id);
+
   glLineWidth(1.0);
   glColor3ubv(RED);
   glEnable(GL_BLEND);
@@ -92,8 +119,12 @@ void show_flow(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, pa
   pangolin::GlFont::I().Text("Detected %d keypoints", kp_map.size()).Draw(5, 40);
 }
 
-void show_highlights(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const Selection& highlights,
-                     pangolin::ImageView& view, bool show_ids) {
+void VIOUIBase::do_show_highlights(size_t cam_id) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
+  pangolin::ImageView& view = *img_view.at(cam_id);
+
   glColor3ubv(vis::GREEN);
 
   const std::vector<Keypoints>& keypoints = curr_vis_data->opt_flow_res->keypoints;
@@ -110,9 +141,10 @@ void show_highlights(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_da
   }
 }
 
-void show_tracking_guess(size_t cam_id, size_t frame_id, const VioVisualizationData::Ptr& curr_vis_data,
-                         const VioVisualizationData::Ptr& prev_vis_data, const Selection& highlights,
-                         bool filter_highlights) {
+void VIOUIBase::do_show_tracking_guess(size_t cam_id, size_t frame_id, const VioVisualizationData::Ptr& prev_vis_data) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
   if (frame_id < 1) return;
 
   auto new_kpts = curr_vis_data->opt_flow_res->keypoints[cam_id];
@@ -168,8 +200,10 @@ void show_tracking_guess(size_t cam_id, size_t frame_id, const VioVisualizationD
   glDrawCirclePerimeters(guess_points, radius);
 }
 
-void show_recall_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const Selection& highlights,
-                         bool filter_highlights) {
+void VIOUIBase::do_show_recall_guesses(size_t cam_id) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
   auto new_kpts = curr_vis_data->opt_flow_res->keypoints.at(cam_id);
   auto guess_obs = curr_vis_data->opt_flow_res->recall_guesses.at(cam_id);
 
@@ -202,28 +236,22 @@ void show_recall_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vi
   glDrawCirclePerimeters(guess_points, radius);
 }
 
-void show_tracking_guess_vio(size_t cam_id, size_t frame_id, const VioDatasetPtr& vio_dataset,
-                             const std::unordered_map<int64_t, VioVisualizationData::Ptr>& vis_map,
-                             const Selection& highlights, bool filter_highlights) {
+void VIOUIBase::do_show_tracking_guess_vio(size_t cam_id, size_t frame_id, const VioDatasetPtr& vio_dataset,
+                                           const std::unordered_map<int64_t, VioVisualizationData::Ptr>& vis_map) {
   if (frame_id < 1) return;
 
-  int64_t now_ts = vio_dataset->get_image_timestamps().at(frame_id);
   int64_t prev_ts = vio_dataset->get_image_timestamps().at(frame_id - 1);
-
-  auto now_it = vis_map.find(now_ts);
   auto prev_it = vis_map.find(prev_ts);
-
-  auto end_it = vis_map.end();
-  if (now_it == end_it || prev_it == end_it) return;
-
-  const VioVisualizationData::Ptr& curr_vis_data = now_it->second;
+  if (prev_it == vis_map.end()) return;
   const VioVisualizationData::Ptr& prev_vis_data = prev_it->second;
 
-  show_tracking_guess(cam_id, frame_id, curr_vis_data, prev_vis_data, highlights, filter_highlights);
+  do_show_tracking_guess(cam_id, frame_id, prev_vis_data);
 }
 
-void show_matching_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const Selection& highlights,
-                           bool filter_highlights) {
+void VIOUIBase::do_show_matching_guesses(size_t cam_id) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
   auto new_kpts = curr_vis_data->opt_flow_res->keypoints.at(cam_id);
   auto cam0_kpts = curr_vis_data->opt_flow_res->keypoints.at(0);
   auto guess_obs = curr_vis_data->opt_flow_res->matching_guesses.at(cam_id);
@@ -277,14 +305,17 @@ void show_matching_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_
   glDrawCirclePerimeters(guess_points, radius);
 }
 
-void show_masks(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data) {
+void VIOUIBase::do_show_masks(size_t cam_id) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
   glColor4f(0.0, 1.0, 1.0, 0.1);
   for (const Rect& m : curr_vis_data->opt_flow_res->input_images->masks[cam_id].masks) {
     pangolin::glDrawRect(m.x, m.y, m.x + m.w, m.y + m.h);
   }
 }
 
-void show_cam0_proj(size_t cam_id, double depth_guess, const VioConfig& config, const Calibration<double>& calib) {
+void VIOUIBase::do_show_cam0_proj(size_t cam_id, double depth_guess) {
   int C = config.optical_flow_detection_grid_size;
 
   int w = calib.resolution.at(0).x();
@@ -300,7 +331,7 @@ void show_cam0_proj(size_t cam_id, double depth_guess, const VioConfig& config, 
   int y_last = y_stop + C / 2;
 
   std::vector<Vector2d> points;
-  auto drawPoint = [&points, &calib, w, h, depth_guess](float u, float v, int j, bool draw_c0_uv) {
+  auto drawPoint = [&points, this, w, h, depth_guess](float u, float v, int j, bool draw_c0_uv) {
     Vector2d ci_uv{u, v};
     Vector2d c0_uv;
     double _;
@@ -366,7 +397,7 @@ void show_cam0_proj(size_t cam_id, double depth_guess, const VioConfig& config, 
   }
 }
 
-void show_grid(const VioConfig& config, const Calibration<double>& calib) {
+void VIOUIBase::do_show_grid() {
   glColor4f(1.0, 0.0, 1.0, 0.25);
 
   int C = config.optical_flow_detection_grid_size;
@@ -393,17 +424,18 @@ void show_grid(const VioConfig& config, const Calibration<double>& calib) {
   pangolin::glDrawLines(grid_lines);
 }
 
-void show_safe_radius(const VioConfig& config, const Calibration<double>& calib) {
+void VIOUIBase::do_show_safe_radius() {
+  if (config.optical_flow_image_safe_radius == 0) return;
   glColor4f(1.0, 0.0, 1.0, 0.25);
   int w = calib.resolution.at(0).x();
   int h = calib.resolution.at(0).y();
   pangolin::glDrawCirclePerimeter(w / 2, h / 2, config.optical_flow_image_safe_radius);
 }
 
-void show_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, const VioConfig& config,
-                  const Calibration<double>& calib, const Selection& highlights, bool filter_highlights,
-                  bool show_same_pixel_guess, bool show_reproj_fix_depth_guess, bool show_reproj_avg_depth_guess,
-                  bool show_active_guess, double fixed_depth) {
+void VIOUIBase::do_show_guesses(size_t cam_id) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
   if (cam_id == 0) return;
 
   const auto keypoints0 = curr_vis_data->projections->at(0);
@@ -478,11 +510,12 @@ void show_guesses(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data,
   }
 }
 
-void show_obs(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, pangolin::ImageView& view,
-              const VioConfig& config, const Calibration<double>& calib, const Selection& highlights,
-              bool filter_highlights, bool show_same_pixel_guess, bool show_reproj_fix_depth_guess,
-              bool show_reproj_avg_depth_guess, bool show_active_guess, double fixed_depth, bool show_ids,
-              bool show_depth, bool show_guesses) {
+void VIOUIBase::do_show_obs(size_t cam_id) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
+  pangolin::ImageView& view = *img_view.at(cam_id);
+
   glLineWidth(1.0);
   glColor3f(1.0, 0.0, 0.0);
   glEnable(GL_BLEND);
@@ -541,19 +574,17 @@ void show_obs(size_t cam_id, const VioVisualizationData::Ptr& curr_vis_data, pan
       }
     }
 
-    if (show_guesses) {
-      vis::show_guesses(cam_id, curr_vis_data, config, calib, highlights, filter_highlights, show_same_pixel_guess,
-                        show_reproj_fix_depth_guess, show_reproj_avg_depth_guess, show_active_guess, fixed_depth);
-    }
+    if (show_guesses) do_show_guesses(cam_id);
 
     glColor3f(0.0, 1.0, 0.0);
     pangolin::GlFont::I().Text("Tracked %d points", points.size()).Draw(5, 20);
   }
 }
 
-void draw_blocks_overlay(const VioVisualizationData::Ptr& curr_vis_data, pangolin::ImageView& blocks_view,
-                         const Selection& highlights, bool filter_highlights, bool show_highlights,
-                         bool show_block_vals, bool show_ids) {
+void VIOUIBase::draw_blocks_overlay(pangolin::ImageView& blocks_view) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
   const auto& uibs = filter_highlights ? curr_vis_data->hl_landmark_blocks : curr_vis_data->landmark_blocks;
   if (!uibs) return;
 
@@ -609,20 +640,8 @@ void draw_blocks_overlay(const VioVisualizationData::Ptr& curr_vis_data, pangoli
   }
 }
 
-void draw_blocks_overlay_vio(size_t frame_id, const VioDatasetPtr& vio_dataset,
-                             const std::unordered_map<int64_t, VioVisualizationData::Ptr>& vis_map,
-                             pangolin::ImageView& blocks_view, const Selection& highlights, bool filter_highlights,
-                             bool show_highlights, bool show_block_vals, bool show_ids) {
-  int64_t curr_ts = vio_dataset->get_image_timestamps().at(frame_id);
-  auto it = vis_map.find(curr_ts);
-  if (it == vis_map.end()) return;
-  VioVisualizationData::Ptr curr_vis_data = it->second;
-  draw_blocks_overlay(curr_vis_data, blocks_view, highlights, filter_highlights, show_highlights, show_block_vals,
-                      show_ids);
-}
-
-bool toggle_blocks(pangolin::View* blocks_display, pangolin::View* plot_display, pangolin::View* img_view_display,
-                   pangolin::Attach UI_WIDTH) {
+bool VIOUIBase::do_toggle_blocks(pangolin::View* blocks_display, pangolin::View* plot_display,
+                                 pangolin::View* img_view_display, pangolin::Attach UI_WIDTH) {
   blocks_display->ToggleShow();
   bool show_blocks = blocks_display->IsShown();
 
@@ -648,9 +667,10 @@ bool toggle_blocks(pangolin::View* blocks_display, pangolin::View* plot_display,
   return show_blocks;
 }
 
-void show_blocks(const VioVisualizationData::Ptr& curr_vis_data,
-                 const std::shared_ptr<pangolin::ImageView>& blocks_view, const Selection& highlights,
-                 bool filter_highlights) {
+void VIOUIBase::do_show_blocks(const shared_ptr<ImageView>& blocks_view) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
   UILandmarkBlocks::Ptr uibs = curr_vis_data->landmark_blocks;
   if (uibs && uibs->blocks.empty()) return;
 
@@ -748,11 +768,12 @@ bool is_selected(const Selection& selection, size_t n) {
   return false;
 }
 
-bool follow_highlight(const VioVisualizationData::Ptr& curr_vis_data,
-                      std::vector<std::shared_ptr<pangolin::ImageView>>& img_views, const Selection& highlights,
-                      bool smooth_zoom) {
-  for (size_t cam_id = 0; cam_id < img_views.size(); cam_id++) {
-    std::shared_ptr<pangolin::ImageView> v = img_views.at(cam_id);
+bool VIOUIBase::do_follow_highlight(bool smooth_zoom) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return false;
+
+  for (size_t cam_id = 0; cam_id < img_view.size(); cam_id++) {
+    std::shared_ptr<pangolin::ImageView> v = img_view.at(cam_id);
     if (v == nullptr) continue;
 
     if (highlights.size() != 1 || highlights[0].is_range) {
@@ -793,17 +814,6 @@ bool follow_highlight(const VioVisualizationData::Ptr& curr_vis_data,
       v->SetView(zoomed_range);
   }
   return true;
-}
-
-bool follow_highlight_vio(size_t frame_id, const VioDatasetPtr& vio_dataset,
-                          const std::unordered_map<int64_t, VioVisualizationData::Ptr>& vis_map,
-                          std::vector<std::shared_ptr<pangolin::ImageView>>& img_views, const Selection& highlights,
-                          bool smooth_zoom) {
-  int64_t curr_ts = vio_dataset->get_image_timestamps().at(frame_id);
-  auto it = vis_map.find(curr_ts);
-  if (it == vis_map.end()) return false;
-  VioVisualizationData::Ptr curr_vis_data = it->second;
-  return follow_highlight(curr_vis_data, img_views, highlights, smooth_zoom);
 }
 
 }  // namespace basalt::vis
