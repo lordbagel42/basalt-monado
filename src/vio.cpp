@@ -472,7 +472,8 @@ struct basalt_vio_ui : vis::VIOUIBase {
           draw_plots();
         }
 
-        if (highlight_landmarks.GuiChanged() || filter_highlights.GuiChanged() || show_highlights.GuiChanged()) {
+        if (highlight_landmarks.GuiChanged() || filter_highlights.GuiChanged() || show_highlights.GuiChanged() ||
+            show_ids.GuiChanged()) {
           highlights = vis::parse_selection(highlight_landmarks);
           filter_highlights = filter_highlights && !highlights.empty();
           for (const auto& [ts, vis] : vis_map) vis->get_mat_img((UIMAT)mat_to_show.Get()) = nullptr;

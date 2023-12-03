@@ -610,34 +610,39 @@ void VIOUIBase::draw_jacobian_overlay(pangolin::ImageView& blocks_view, const UI
   const std::vector<UILandmarkBlock>& lmbs = uibs->blocks;
   if (lmbs.empty()) return;
 
+  size_t pad = show_ids ? 12 : 0;
   size_t w = uibs->getW();
   size_t h = uibs->getH();
-  size_t side = max(w, h);
-  long xoff = int((side - w) / 2);  // Offset to center view
+  size_t W = w + pad;
+  size_t H = h + pad;
+  size_t side = max(W, H);
+  long xoffh = int((side - W) / 2);  // Offset to center view
+  long xoff = xoffh + pad;           // Offset plus padding for ids
+  long yoff = pad;                   // Offset plus padding for ids
   const auto& aom = uibs->aom.abs_order_map;
 
   // Draw column separators
   glLineWidth(0.25);
   glColor3ubv(BLUE);
-  pangolin::glDrawLine(xoff - 0.5, -0.5, xoff - 0.5, h - 0.5);  // Matrix start
+  pangolin::glDrawLine(xoff - 0.5, -0.5, xoff - 0.5, H - 0.5);  // Matrix start
   for (const auto& [ts, idx_size] : aom) {                      // Keyframe/frame end
     const auto [idx, size] = idx_size;
-    pangolin::glDrawLine(xoff + idx + size - 0.5, -0.5, xoff + idx + size - 0.5, h - 0.5);
+    pangolin::glDrawLine(xoff + idx + size - 0.5, -0.5, xoff + idx + size - 0.5, H - 0.5);
   }
-  pangolin::glDrawLine(xoff + w - 4 - 0.5, -0.5, xoff + w - 4 - 0.5, h - 0.5);  // Landmark start
-  pangolin::glDrawLine(xoff + w - 1 - 0.5, -0.5, xoff + w - 1 - 0.5, h - 0.5);  // Residual start
-  pangolin::glDrawLine(xoff + w - 0 - 0.5, -0.5, xoff + w - 0 - 0.5, h - 0.5);  // Matrix end
+  pangolin::glDrawLine(xoff + w - 4 - 0.5, -0.5, xoff + w - 4 - 0.5, H - 0.5);  // Landmark start
+  pangolin::glDrawLine(xoff + w - 1 - 0.5, -0.5, xoff + w - 1 - 0.5, H - 0.5);  // Residual start
+  pangolin::glDrawLine(xoff + w - 0 - 0.5, -0.5, xoff + w - 0 - 0.5, H - 0.5);  // Matrix end
 
   // Draw row separators
   size_t i = 0;
   for (const UILandmarkBlock& b : lmbs) {
     bool highlighted = show_highlights && is_selected(highlights, b.lmid);
     glColor3ubv(highlighted ? GREEN : BLUE);
-    pangolin::glDrawLine(xoff - 0.5, i - 0.5, xoff + w - 0.5, i - 0.5);
+    pangolin::glDrawLine(xoffh - 0.5, yoff + i - 0.5, xoffh + W - 0.5, yoff + i - 0.5);
 
     if (show_ids) {
       auto text = pangolin::GlFont::I().Text("%lu", b.lmid);
-      try_draw_image_text(blocks_view, xoff + w / 2, i + b.storage->rows() / 2.0F, text);
+      try_draw_image_text(blocks_view, xoffh + 2, yoff + i + b.storage->rows() / 2.0F, text);
     }
 
     if (show_block_vals) {  // Draw cell values
@@ -813,12 +818,17 @@ void VIOUIBase::do_show_jacobian(const shared_ptr<ImageView>& blocks_view, UIJac
 
     const UILandmarkBlocks::Ptr u = filter_highlights ? hluibs : uibs;
     const std::vector<UILandmarkBlock>& lmbs = u->blocks;
+    size_t pad = show_ids ? 12 : 0;
     size_t w = u->getW();
     size_t h = u->getH();
-    size_t side = max(w, h);
+    size_t W = w + pad;
+    size_t H = h + pad;
+    size_t side = max(W, H);
     mat = std::make_shared<ManagedImage<uint8_t>>(side, side);
     mat->Memset(0);
-    long xoff = int((side - w) / 2);  // Offset to center view
+    long xoffh = int((side - W) / 2);  // Offset to center view
+    long xoff = xoffh + pad;           // Offset plus padding for ids
+    long yoff = pad;                   // Offset plus padding for ids
 
     size_t i = 0;
     float min = MAXFLOAT;
@@ -843,11 +853,19 @@ void VIOUIBase::do_show_jacobian(const shared_ptr<ImageView>& blocks_view, UIJac
           bool is_not_zero = value > 0;
           uint8_t pixel = (1 - value / max) * 255.0F;
           if (pixel > max_pixel && is_not_zero) pixel = max_pixel;
-          (*mat)(x + xoff, i + y) = pixel;
+          (*mat)(x + xoff, i + yoff + y) = pixel;
         }
       }
       i += b.storage->rows();
     }
+
+    // Fill in row and height title borders
+    uint8_t fill_color = 150;
+    for (size_t i = 0; i < pad; i++)
+      for (size_t j = 0; j < u->getW(); j++) (*mat)(xoff + j, i) = fill_color;
+
+    for (size_t i = 0; i < H; i++)
+      for (size_t j = 0; j < pad; j++) (*mat)(xoffh + j, i) = fill_color;
 
     uij.img = mat;
   }
