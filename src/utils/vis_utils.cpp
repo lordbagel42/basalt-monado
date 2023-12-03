@@ -587,7 +587,7 @@ void VIOUIBase::draw_blocks_overlay(pangolin::ImageView& blocks_view) {
   if (curr_vis_data == nullptr) return;
 
   UIMAT m = (UIMAT)mat_to_show.Get();
-  bool show_jacobian = m == UIMAT::Jr;
+  bool show_jacobian = m == UIMAT::Jr || m == UIMAT::Jr_QR;
   if (show_jacobian) {
     int idx = (int)m;
     UIJacobians& uijac = curr_vis_data->Jr[idx];
@@ -685,7 +685,7 @@ void VIOUIBase::do_show_blocks(const shared_ptr<ImageView>& blocks_view) {
   if (curr_vis_data == nullptr) return;
 
   UIMAT m = (UIMAT)mat_to_show.Get();
-  bool show_jacobian = m == UIMAT::Jr;
+  bool show_jacobian = m == UIMAT::Jr || m == UIMAT::Jr_QR;
   if (show_jacobian) {
     int idx = (int)m;
     UIJacobians& uijac = curr_vis_data->Jr[idx];

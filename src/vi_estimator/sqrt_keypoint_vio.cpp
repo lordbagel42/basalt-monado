@@ -1282,6 +1282,8 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
 
         // marginalize points in place
         lqr->performQR();
+
+        if (out_vis_queue) visual_data->Jr[1].Jr = lqr->getUILandmarkBlocks();
         stats.add("performQR", t.reset()).format("ms");
       }
 
