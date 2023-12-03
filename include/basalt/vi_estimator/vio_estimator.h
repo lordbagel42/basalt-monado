@@ -58,9 +58,21 @@ struct VioVisualizationData {
 
   std::shared_ptr<std::vector<Eigen::aligned_vector<Eigen::Vector4d>>> projections;
 
-  UILandmarkBlocks::Ptr landmark_blocks;
-  UILandmarkBlocks::Ptr hl_landmark_blocks;  // Highlighted
-  std::shared_ptr<ManagedImage<uint8_t>> mat;
+  enum class UIMAT {
+    Jr,     // Jacobian J = [Jp Jl] and residual r (landmark blocks)
+    COUNT,
+  };
+
+  std::shared_ptr<ManagedImage<uint8_t>>& get_mat_img(UIMAT m) {
+    std::array imgs = {&Jr[0].img};
+    return *imgs[(int)m];
+  }
+
+  struct UIJacobians {
+    UILandmarkBlocks::Ptr Jr;                    // Landmark blocks
+    UILandmarkBlocks::Ptr Jr_h;                  // Highlighted
+    std::shared_ptr<ManagedImage<uint8_t>> img;  // Current rendered image
+  } Jr[1];                                       // 0: Jr
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };

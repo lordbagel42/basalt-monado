@@ -7,6 +7,8 @@
 #include <string>
 #include <thread>
 
+#include <magic_enum.hpp>
+
 #include <CLI/CLI.hpp>
 
 #include <sophus/se3.hpp>
@@ -46,6 +48,7 @@ using std::to_string;
 using std::vector;
 using namespace basalt;
 using namespace Eigen;
+using UIMAT = VioVisualizationData::UIMAT;
 
 class slam_tracker_ui : vis::VIOUIBase {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -244,12 +247,17 @@ class slam_tracker_ui : vis::VIOUIBase {
         if (show_blocks) do_show_blocks(blocks_view);
       }
 
+      if (mat_to_show.GuiChanged()) {
+        mat_name = std::string(magic_enum::enum_name((UIMAT)mat_to_show.Get()));
+        if (show_blocks) do_show_blocks(blocks_view);
+      }
+
+      if (show_blocks) do_show_blocks(blocks_view);
+
       if (follow_highlight.GuiChanged())
         follow_highlight = follow_highlight && highlights.size() == 1 && !highlights[0].is_range;
 
       draw_plots();
-
-      if (show_blocks) do_show_blocks(blocks_view);
 
       pangolin::FinishFrame();
     }

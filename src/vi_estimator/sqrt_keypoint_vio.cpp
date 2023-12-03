@@ -1263,7 +1263,7 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
         bool numerically_valid;
         error_total = lqr->linearizeProblem(&numerically_valid);
 
-        if (out_vis_queue) visual_data->landmark_blocks = lqr->getUILandmarkBlocks();
+        if (out_vis_queue) visual_data->Jr[0].Jr = lqr->getUILandmarkBlocks();
 
         BASALT_ASSERT_STREAM(numerically_valid, "did not expect numerical failure during linearization");
         stats.add("linearizeProblem", t.reset()).format("ms");

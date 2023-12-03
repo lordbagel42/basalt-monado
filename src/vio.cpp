@@ -40,6 +40,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <iostream>
 #include <thread>
 
+#include <magic_enum.hpp>
+
 #include <fmt/format.h>
 
 #include <sophus/se3.hpp>
@@ -85,6 +87,7 @@ using std::shared_ptr;
 using std::thread;
 using std::unordered_map;
 using vis::Button;
+using UIMAT = VioVisualizationData::UIMAT;
 
 struct basalt_vio_ui : vis::VIOUIBase {
   unordered_map<int64_t, VioVisualizationData::Ptr> vis_map;
@@ -472,7 +475,12 @@ struct basalt_vio_ui : vis::VIOUIBase {
         if (highlight_landmarks.GuiChanged() || filter_highlights.GuiChanged() || show_highlights.GuiChanged()) {
           highlights = vis::parse_selection(highlight_landmarks);
           filter_highlights = filter_highlights && !highlights.empty();
-          for (const auto& [ts, vis] : vis_map) vis->mat = nullptr;  // Regenerate lmbs
+          for (const auto& [ts, vis] : vis_map) vis->get_mat_img((UIMAT)mat_to_show.Get()) = nullptr;
+          if (show_blocks) do_show_blocks(blocks_view);
+        }
+
+        if (mat_to_show.GuiChanged()) {
+          mat_name = std::string(magic_enum::enum_name((UIMAT)mat_to_show.Get()));
           if (show_blocks) do_show_blocks(blocks_view);
         }
 

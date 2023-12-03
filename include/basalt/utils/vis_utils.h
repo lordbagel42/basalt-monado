@@ -158,6 +158,8 @@ using std::shared_ptr;
 using std::string;
 using std::vector;
 using Button = Var<std::function<void(void)>>;
+using UIMAT = VioVisualizationData::UIMAT;
+using UIJacobians = VioVisualizationData::UIJacobians;
 
 extern pangolin::GlFont SMALL_FONT;
 
@@ -212,6 +214,9 @@ struct VIOUIBase {
   Button highlight_frame_btn{"ui.highlight_frame", [this]() { highligh_frame(); }};
 
   Button toggle_blocks_btn{"ui.toggle_blocks", [this]() { toggle_blocks(); }};
+  Var<std::string> mat_name{"ui.mat_name", "Jr", META_FLAG_READONLY};
+  Var<int> mat_to_show{"ui.mat_to_show", (int)UIMAT::Jr, (int)UIMAT::Jr, (int)UIMAT::COUNT - 1};
+
   Var<bool> show_block_vals{"ui.show_block_vals", false, true};
 
   Var<bool> show_grid{"ui.show_grid", false, true};
@@ -254,9 +259,11 @@ struct VIOUIBase {
   void do_show_guesses(size_t cam_id);
   void do_show_obs(size_t cam_id);
   void draw_blocks_overlay(pangolin::ImageView& blocks_view);
+  void draw_jacobian_overlay(pangolin::ImageView& blocks_view, const UIJacobians& uij);
   bool do_toggle_blocks(pangolin::View* blocks_display, pangolin::View* plot_display, pangolin::View* img_view_display,
                         pangolin::Attach UI_WIDTH);
   void do_show_blocks(const shared_ptr<ImageView>& blocks_view);
+  void do_show_jacobian(const shared_ptr<ImageView>& blocks_view, UIJacobians& uij);
   bool do_follow_highlight(bool smooth_zoom);
 };
 

@@ -43,6 +43,7 @@ extern "C" const unsigned char AnonymousPro_ttf[];
 }
 
 namespace basalt::vis {
+using UIJacobians = VioVisualizationData::UIJacobians;
 
 pangolin::GlFont SMALL_FONT(pangolin::AnonymousPro_ttf, 11);
 
@@ -585,7 +586,19 @@ void VIOUIBase::draw_blocks_overlay(pangolin::ImageView& blocks_view) {
   const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
   if (curr_vis_data == nullptr) return;
 
-  const auto& uibs = filter_highlights ? curr_vis_data->hl_landmark_blocks : curr_vis_data->landmark_blocks;
+  UIMAT m = (UIMAT)mat_to_show.Get();
+  bool show_jacobian = m == UIMAT::Jr;
+  if (show_jacobian) {
+    int idx = (int)m;
+    UIJacobians& uijac = curr_vis_data->Jr[idx];
+    draw_jacobian_overlay(blocks_view, uijac);
+  } else {
+    BASALT_ASSERT(false);
+  }
+}
+
+void VIOUIBase::draw_jacobian_overlay(pangolin::ImageView& blocks_view, const UIJacobians& uij) {
+  const auto& uibs = filter_highlights ? uij.Jr_h : uij.Jr;
   if (!uibs) return;
 
   const std::vector<UILandmarkBlock>& lmbs = uibs->blocks;
@@ -630,7 +643,7 @@ void VIOUIBase::draw_blocks_overlay(pangolin::ImageView& blocks_view) {
           float u = x + xoff - 0.25;
           float v = i + y;
           glColor3ubv(c > 0 ? GREEN : RED);
-          auto text = SMALL_FONT.Text("%.2f", c);
+          auto text = SMALL_FONT.Text("%.2f", abs(c));
           try_draw_image_text(blocks_view, u, v, text);
         }
       }
@@ -671,15 +684,27 @@ void VIOUIBase::do_show_blocks(const shared_ptr<ImageView>& blocks_view) {
   const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
   if (curr_vis_data == nullptr) return;
 
-  UILandmarkBlocks::Ptr uibs = curr_vis_data->landmark_blocks;
+  UIMAT m = (UIMAT)mat_to_show.Get();
+  bool show_jacobian = m == UIMAT::Jr;
+  if (show_jacobian) {
+    int idx = (int)m;
+    UIJacobians& uijac = curr_vis_data->Jr[idx];
+    do_show_jacobian(blocks_view, uijac);
+  } else {
+    BASALT_ASSERT(false);
+  }
+}
+
+void VIOUIBase::do_show_jacobian(const shared_ptr<ImageView>& blocks_view, UIJacobians& uij) {
+  UILandmarkBlocks::Ptr uibs = uij.Jr;
   if (uibs && uibs->blocks.empty()) return;
 
   std::shared_ptr<ManagedImage<uint8_t>> mat;
   if (!uibs) {
     mat = std::make_shared<ManagedImage<uint8_t>>(1, 1);
     mat->Memset(127);
-  } else if (curr_vis_data->mat != nullptr) {  // Reuse same image
-    mat = curr_vis_data->mat;
+  } else if (uij.img != nullptr) {  // Reuse same image
+    mat = uij.img;
   } else {
     // Use a different UILandmarkBlocks when landmarks are highlighted
     UILandmarkBlocks::Ptr hluibs;
@@ -688,7 +713,7 @@ void VIOUIBase::do_show_blocks(const shared_ptr<ImageView>& blocks_view) {
       hluibs->aom = uibs->aom;
       for (const UILandmarkBlock& b : uibs->blocks)
         if (is_selected(highlights, b.lmid)) hluibs->blocks.push_back(b);
-      curr_vis_data->hl_landmark_blocks = hluibs;
+      uij.Jr_h = hluibs;
     }
 
     const UILandmarkBlocks::Ptr u = filter_highlights ? hluibs : uibs;
@@ -706,7 +731,7 @@ void VIOUIBase::do_show_blocks(const shared_ptr<ImageView>& blocks_view) {
     for (const UILandmarkBlock& b : lmbs) {
       for (long y = 0; y < b.storage->rows(); y++) {
         for (long x = 0; x < b.storage->cols(); x++) {
-          float v = b.storage->coeff(y, x);
+          float v = std::abs(b.storage->coeff(y, x));
           if (v < min) min = v;
           if (v > max) max = v;
         }
@@ -729,7 +754,7 @@ void VIOUIBase::do_show_blocks(const shared_ptr<ImageView>& blocks_view) {
       i += b.storage->rows();
     }
 
-    curr_vis_data->mat = mat;
+    uij.img = mat;
   }
 
   pangolin::GlPixFormat fmt;
