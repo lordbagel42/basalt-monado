@@ -1383,6 +1383,12 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
           if (!inc_valid) {
             std::cerr << "Still invalid inc after " << max_num_iter << " iterations." << std::endl;
           }
+
+          if (out_vis_queue) {
+            visual_data->Hb[0].H = std::make_shared<MatX>(H.template cast<float>());
+            visual_data->Hb[0].b = std::make_shared<VecX>(b.template cast<float>());
+            visual_data->Hb[0].aom = std::make_shared<AbsOrderMap>(aom);
+          }
         }
 
         // backup state (then apply increment and check cost decrease)

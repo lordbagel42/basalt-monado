@@ -160,6 +160,7 @@ using std::vector;
 using Button = Var<std::function<void(void)>>;
 using UIMAT = VioVisualizationData::UIMAT;
 using UIJacobians = VioVisualizationData::UIJacobians;
+using UIHessians = VioVisualizationData::UIHessians;
 
 extern pangolin::GlFont SMALL_FONT;
 
@@ -260,9 +261,11 @@ struct VIOUIBase {
   void do_show_obs(size_t cam_id);
   void draw_blocks_overlay(pangolin::ImageView& blocks_view);
   void draw_jacobian_overlay(pangolin::ImageView& blocks_view, const UIJacobians& uij);
+  void draw_hessian_overlay(pangolin::ImageView& blocks_view, const UIHessians& uih);
   bool do_toggle_blocks(pangolin::View* blocks_display, pangolin::View* plot_display, pangolin::View* img_view_display,
                         pangolin::Attach UI_WIDTH);
   void do_show_blocks(const shared_ptr<ImageView>& blocks_view);
+  void do_show_hessian(const shared_ptr<ImageView>& blocks_view, UIHessians& uih);
   void do_show_jacobian(const shared_ptr<ImageView>& blocks_view, UIJacobians& uij);
   bool do_follow_highlight(bool smooth_zoom);
 };

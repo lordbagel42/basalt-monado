@@ -43,6 +43,7 @@ extern "C" const unsigned char AnonymousPro_ttf[];
 }
 
 namespace basalt::vis {
+using UIHessians = VioVisualizationData::UIHessians;
 using UIJacobians = VioVisualizationData::UIJacobians;
 
 pangolin::GlFont SMALL_FONT(pangolin::AnonymousPro_ttf, 11);
@@ -587,11 +588,16 @@ void VIOUIBase::draw_blocks_overlay(pangolin::ImageView& blocks_view) {
   if (curr_vis_data == nullptr) return;
 
   UIMAT m = (UIMAT)mat_to_show.Get();
+  bool show_hessian = m == UIMAT::Hb;
   bool show_jacobian = m == UIMAT::Jr || m == UIMAT::Jr_QR;
   if (show_jacobian) {
     int idx = (int)m;
     UIJacobians& uijac = curr_vis_data->Jr[idx];
     draw_jacobian_overlay(blocks_view, uijac);
+  } else if (show_hessian) {
+    int idx = (int)m - (int)UIMAT::Hb;
+    UIHessians& uihes = curr_vis_data->Hb[idx];
+    draw_hessian_overlay(blocks_view, uihes);
   } else {
     BASALT_ASSERT(false);
   }
@@ -653,6 +659,43 @@ void VIOUIBase::draw_jacobian_overlay(pangolin::ImageView& blocks_view, const UI
   }
 }
 
+void VIOUIBase::draw_hessian_overlay(pangolin::ImageView& blocks_view, const UIHessians& uihes) {
+  if (uihes.H == nullptr || uihes.b == nullptr || uihes.aom == nullptr) return;
+
+  const auto H = uihes.H;
+  const auto b = uihes.b;
+  const auto aom = uihes.aom;
+
+  size_t w = H->cols() + 1;
+  size_t h = H->rows();
+  size_t side = max(w, h);
+  long xoff = int((side - w) / 2);  // Offset to center view
+
+  // Draw column and row separators
+  glLineWidth(0.25);
+  glColor3ubv(BLUE);
+  pangolin::glDrawLine(xoff - 0.5, -0.5, xoff - 0.5, h - 0.5);  // Matrix start
+  for (const auto& [ts, idx_size] : aom->abs_order_map) {       // Keyframe/frame end
+    const auto [idx, size] = idx_size;
+    float p = xoff + idx + size - 0.5;
+    pangolin::glDrawLine(p, -0.5, p, h - 0.5);               // Column
+    pangolin::glDrawLine(xoff - 0.5, p, w + xoff - 0.5, p);  // Row
+  }
+  pangolin::glDrawLine(xoff + w - 1 - 0.5, -0.5, xoff + w - 1 - 0.5, h - 0.5);  // Column for b
+
+  if (show_block_vals) {  // Draw cell values
+    for (long y = 0; y < H->rows(); y++) {
+      for (long x = 0; x < H->cols() + 1; x++) {
+        float c = x != H->cols() ? H->coeff(y, x) : b->coeff(y);
+        if (c == 0) continue;
+        glColor3ubv(c > 0 ? GREEN : RED);
+        auto text = SMALL_FONT.Text("%.2f", abs(c));
+        try_draw_image_text(blocks_view, x + xoff - 0.25, y, text);
+      }
+    }
+  }
+}
+
 bool VIOUIBase::do_toggle_blocks(pangolin::View* blocks_display, pangolin::View* plot_display,
                                  pangolin::View* img_view_display, pangolin::Attach UI_WIDTH) {
   blocks_display->ToggleShow();
@@ -685,14 +728,66 @@ void VIOUIBase::do_show_blocks(const shared_ptr<ImageView>& blocks_view) {
   if (curr_vis_data == nullptr) return;
 
   UIMAT m = (UIMAT)mat_to_show.Get();
+  bool show_hessian = m == UIMAT::Hb;
   bool show_jacobian = m == UIMAT::Jr || m == UIMAT::Jr_QR;
   if (show_jacobian) {
     int idx = (int)m;
     UIJacobians& uijac = curr_vis_data->Jr[idx];
     do_show_jacobian(blocks_view, uijac);
+  } else if (show_hessian) {
+    int idx = (int)m - (int)UIMAT::Hb;
+    UIHessians& uihes = curr_vis_data->Hb[idx];
+    do_show_hessian(blocks_view, uihes);
   } else {
     BASALT_ASSERT(false);
   }
+}
+
+void VIOUIBase::do_show_hessian(const shared_ptr<ImageView>& blocks_view, UIHessians& uih) {
+  if (uih.H == nullptr || uih.b == nullptr) return;
+
+  const auto H = uih.H;
+  const auto b = uih.b;
+
+  std::shared_ptr<ManagedImage<uint8_t>> mat;
+  size_t w = H->cols() + 1;
+  size_t h = H->rows();
+  size_t side = max(w, h);
+  mat = std::make_shared<ManagedImage<uint8_t>>(side, side);
+  mat->Memset(0);
+  long xoff = int((side - w) / 2);  // Offset to center view
+
+#if 0
+  float min = MAXFLOAT;
+  float max = -MAXFLOAT;
+  for (long y = 0; y < H->rows(); y++) {
+    for (long x = 0; x < H->cols() + 1; x++) {
+      float v = std::abs(x != H->cols() ? H->coeff(y, x) : b->coeff(y));
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+  }
+#endif
+
+  const float max = 255000.0F;
+  const uint8_t max_pixel = 245;
+  for (long y = 0; y < H->rows(); y++) {
+    for (long x = 0; x < H->cols() + 1; x++) {
+      float value = std::abs(x != H->cols() ? H->coeff(y, x) : b->coeff(y));
+      value = std::min(value, max);
+      bool is_not_zero = value > 0;
+      uint8_t pixel = (1 - value / max) * 255.0F;
+      if (pixel > max_pixel && is_not_zero) pixel = max_pixel;
+      (*mat)(x + xoff, y) = pixel;
+    }
+  }
+  uih.img = mat;
+
+  pangolin::GlPixFormat fmt;
+  fmt.glformat = GL_LUMINANCE;
+  fmt.gltype = GL_UNSIGNED_BYTE;
+  fmt.scalable_internal_format = GL_LUMINANCE8;
+  blocks_view->SetImage(mat->ptr, mat->w, mat->h, mat->pitch, fmt);
 }
 
 void VIOUIBase::do_show_jacobian(const shared_ptr<ImageView>& blocks_view, UIJacobians& uij) {
