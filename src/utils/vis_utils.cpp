@@ -588,8 +588,8 @@ void VIOUIBase::draw_blocks_overlay(pangolin::ImageView& blocks_view) {
   if (curr_vis_data == nullptr) return;
 
   UIMAT m = (UIMAT)mat_to_show.Get();
-  bool show_hessian = m == UIMAT::Hb;
-  bool show_jacobian = m == UIMAT::Jr || m == UIMAT::Jr_QR;
+  bool show_hessian = m == UIMAT::Hb || m == UIMAT::Hb_m;
+  bool show_jacobian = m == UIMAT::Jr || m == UIMAT::Jr_QR || m == UIMAT::Jr_m || m == UIMAT::Jr_m_QR;
   if (show_jacobian) {
     int idx = (int)m;
     UIJacobians& uijac = curr_vis_data->Jr[idx];
@@ -728,8 +728,8 @@ void VIOUIBase::do_show_blocks(const shared_ptr<ImageView>& blocks_view) {
   if (curr_vis_data == nullptr) return;
 
   UIMAT m = (UIMAT)mat_to_show.Get();
-  bool show_hessian = m == UIMAT::Hb;
-  bool show_jacobian = m == UIMAT::Jr || m == UIMAT::Jr_QR;
+  bool show_hessian = m == UIMAT::Hb || m == UIMAT::Hb_m;
+  bool show_jacobian = m == UIMAT::Jr || m == UIMAT::Jr_QR || m == UIMAT::Jr_m || m == UIMAT::Jr_m_QR;
   if (show_jacobian) {
     int idx = (int)m;
     UIJacobians& uijac = curr_vis_data->Jr[idx];

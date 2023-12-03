@@ -909,7 +909,9 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
                                                               &lost_landmaks, last_state_to_marg);
 
       lqr->linearizeProblem();
+      if (out_vis_queue) visual_data->Jr[2].Jr = lqr->getUILandmarkBlocks();
       lqr->performQR();
+      if (out_vis_queue) visual_data->Jr[3].Jr = lqr->getUILandmarkBlocks();
 
       if (is_lin_sqrt && marg_data.is_sqrt) {
         lqr->get_dense_Q2Jp_Q2r(Q2Jp_or_H, Q2r_or_b);
@@ -1110,6 +1112,12 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
     marg_data.H = marg_H_new;
     marg_data.b = marg_b_new;
     marg_data.order = marg_order_new;
+
+    if (out_vis_queue) {
+      visual_data->Hb[1].H = std::make_shared<MatX>(marg_H_new.template cast<float>());
+      visual_data->Hb[1].b = std::make_shared<VecX>(marg_b_new.template cast<float>());
+      visual_data->Hb[1].aom = std::make_shared<AbsOrderMap>(marg_order_new);
+    }
 
     BASALT_ASSERT(size_t(marg_data.H.cols()) == marg_data.order.total_size);
 

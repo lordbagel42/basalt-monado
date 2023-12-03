@@ -59,14 +59,17 @@ struct VioVisualizationData {
   std::shared_ptr<std::vector<Eigen::aligned_vector<Eigen::Vector4d>>> projections;
 
   enum class UIMAT {
-    Jr,     // Jacobian J = [Jp Jl] and residual r (landmark blocks)
-    Jr_QR,  // Landmark blocks after QR factorization
-    Hb,     // Hessian H = J^T J and b = J^T r
+    Jr,       // Jacobian J = [Jp Jl] and residual r (landmark blocks)
+    Jr_QR,    // Landmark blocks after QR factorization
+    Jr_m,     // Marginalized Jr
+    Jr_m_QR,  // Marginalized Jr_QR
+    Hb,       // Hessian H = J^T J and b = J^T r
+    Hb_m,     // Marginalized Hb
     COUNT,
   };
 
   std::shared_ptr<ManagedImage<uint8_t>>& get_mat_img(UIMAT m) {
-    std::array imgs = {&Jr[0].img, &Jr[1].img, &Hb[0].img};
+    std::array imgs = {&Jr[0].img, &Jr[1].img, &Jr[2].img, &Jr[3].img, &Hb[0].img, &Hb[1].img};
     return *imgs[(int)m];
   }
 
@@ -74,14 +77,14 @@ struct VioVisualizationData {
     UILandmarkBlocks::Ptr Jr;                    // Landmark blocks
     UILandmarkBlocks::Ptr Jr_h;                  // Highlighted
     std::shared_ptr<ManagedImage<uint8_t>> img;  // Current rendered image
-  } Jr[2];                                       // 0: Jr, 1: Jr after QR factorization
+  } Jr[4];                                       // 0: Jr, 1: Jr_QR, 2: Jr_m, 3: Jr_m_QR
 
   struct UIHessians {
     std::shared_ptr<Eigen::MatrixXf> H;
     std::shared_ptr<Eigen::VectorXf> b;
     std::shared_ptr<AbsOrderMap> aom;
     std::shared_ptr<ManagedImage<uint8_t>> img;
-  } Hb[1];
+  } Hb[2];  // 0: Hb, 1: Hb_m
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
