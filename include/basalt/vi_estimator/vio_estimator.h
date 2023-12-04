@@ -50,6 +50,9 @@ struct VioVisualizationData {
   Eigen::aligned_vector<Sophus::SE3d> states;
   Eigen::aligned_vector<Sophus::SE3d> frames;
   Eigen::aligned_vector<Sophus::SE3d> ltframes;  // Poses of long-term keyframes
+  std::map<int64_t, size_t> frame_idx{};
+  std::map<int64_t, size_t> keyframed_idx{};
+  std::map<int64_t, size_t> marginalized_idx{};
 
   Eigen::aligned_vector<Eigen::Vector3d> points;
   std::vector<int> point_ids;

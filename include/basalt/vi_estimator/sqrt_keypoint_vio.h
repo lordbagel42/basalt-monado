@@ -206,9 +206,11 @@ class SqrtKeypointVioEstimator : public VioEstimatorBase, public SqrtBundleAdjus
  private:
   bool take_kf;
   int frames_after_kf;
+  size_t frame_count = 0;
   std::set<int64_t> kf_ids;
   std::set<int64_t> ltkfs;  // Long term keyframes
   bool take_ltkf;           // Whether the next keyframe should be made into ltkfs
+  std::map<int64_t, size_t> frame_idx;
 
   int64_t last_state_t_ns;
   Eigen::aligned_map<int64_t, IntegratedImuMeasurement<Scalar>> imu_meas;

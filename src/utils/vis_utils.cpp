@@ -604,6 +604,9 @@ void VIOUIBase::draw_blocks_overlay(pangolin::ImageView& blocks_view) {
 }
 
 void VIOUIBase::draw_jacobian_overlay(pangolin::ImageView& blocks_view, const UIJacobians& uij) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
   const auto& uibs = filter_highlights ? uij.Jr_h : uij.Jr;
   if (!uibs) return;
 
@@ -628,6 +631,20 @@ void VIOUIBase::draw_jacobian_overlay(pangolin::ImageView& blocks_view, const UI
   for (const auto& [ts, idx_size] : aom) {                      // Keyframe/frame end
     const auto [idx, size] = idx_size;
     pangolin::glDrawLine(xoff + idx + size - 0.5, -0.5, xoff + idx + size - 0.5, H - 0.5);
+    if (show_ids) {
+      bool keyframed = curr_vis_data->keyframed_idx.count(ts) > 0;
+      bool marginalized = curr_vis_data->marginalized_idx.count(ts) > 0;
+      bool present = curr_vis_data->frame_idx.count(ts) > 0;
+      if (!keyframed && !marginalized && !present) BASALT_ASSERT(false);
+
+      size_t fid = (keyframed      ? curr_vis_data->keyframed_idx[ts]
+                    : marginalized ? curr_vis_data->marginalized_idx[ts]
+                                   : curr_vis_data->frame_idx[ts]);
+      glColor3ubv(keyframed ? GREEN : marginalized ? RED : BLUE);
+      auto text = pangolin::GlFont::I().Text("%lu", fid);
+      try_draw_image_text(blocks_view, xoff + idx - 0.5, pad / 2 - 0.5, text);
+      glColor3ubv(BLUE);
+    }
   }
   pangolin::glDrawLine(xoff + w - 4 - 0.5, -0.5, xoff + w - 4 - 0.5, H - 0.5);  // Landmark start
   pangolin::glDrawLine(xoff + w - 1 - 0.5, -0.5, xoff + w - 1 - 0.5, H - 0.5);  // Residual start

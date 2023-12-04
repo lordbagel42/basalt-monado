@@ -148,10 +148,12 @@ bool SqrtKeypointVioEstimator<Scalar>::resetState(typename IntegratedImuMeasurem
   // drain_input_queues();
   frame_states.clear();
   frame_poses.clear();
+  frame_idx.clear();
   lmdb.clear();
 
   take_kf = true;
   frames_after_kf = 0;
+  frame_count = 0;
   kf_ids.clear();
   ltkfs.clear();
   imu_meas.clear();
@@ -212,6 +214,7 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(int64_t t_ns, const Sophus::S
   imu_meas[t_ns] = IntegratedImuMeasurement<Scalar>(t_ns, bg.cast<Scalar>(), ba.cast<Scalar>());
   frame_states[t_ns] = PoseVelBiasStateWithLin<Scalar>(t_ns, T_w_i_init, vel_w_i.cast<Scalar>(), bg.cast<Scalar>(),
                                                        ba.cast<Scalar>(), true);
+  frame_idx[t_ns] = frame_count++;
 
   marg_data.order.abs_order_map[t_ns] = std::make_pair(0, POSE_VEL_BIAS_SIZE);
   marg_data.order.total_size = POSE_VEL_BIAS_SIZE;
@@ -289,6 +292,7 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_, c
         imu_meas[last_state_t_ns] = IntegratedImuMeasurement<Scalar>(last_state_t_ns, bg, ba);
         frame_states[last_state_t_ns] =
             PoseVelBiasStateWithLin<Scalar>(last_state_t_ns, T_w_i_init, vel_w_i_init, bg, ba, true);
+        frame_idx[last_state_t_ns] = frame_count++;
 
         marg_data.order.abs_order_map[last_state_t_ns] = std::make_pair(0, POSE_VEL_BIAS_SIZE);
         marg_data.order.total_size = POSE_VEL_BIAS_SIZE;
@@ -408,6 +412,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
     next_state.t_ns = opt_flow_meas->t_ns;
 
     frame_states[last_state_t_ns] = PoseVelBiasStateWithLin<Scalar>(next_state);
+    frame_idx[last_state_t_ns] = frame_count++;
 
     imu_meas[meas->get_start_t_ns()] = *meas;
   }
@@ -474,6 +479,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
     take_kf = false;
     frames_after_kf = 0;
     kf_ids.emplace(last_state_t_ns);
+    if (visual_data) visual_data->keyframed_idx[last_state_t_ns] = frame_idx.at(last_state_t_ns);
 
     int num_points_added = 0;
     for (int i = 0; i < NUM_CAMS; i++) {
@@ -651,6 +657,8 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
       Eigen::aligned_vector<Sophus::SE3d>& frames = kf_ids.count(ts) ? visual_data->frames : visual_data->ltframes;
       frames.emplace_back(pstate.getPose().template cast<double>());
     }
+
+    visual_data->frame_idx = frame_idx;
 
     get_current_points(visual_data->points, visual_data->point_ids);
 
@@ -1069,7 +1077,9 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
     }
 
     for (const int64_t id : states_to_marg_all) {
+      if (visual_data) visual_data->marginalized_idx[id] = frame_idx.at(id);
       frame_states.erase(id);
+      frame_idx.erase(id);
       imu_meas.erase(id);
       prev_opt_flow_res.erase(id);
     }
@@ -1084,7 +1094,9 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
     }
 
     for (const int64_t id : poses_to_marg) {
+      if (visual_data) visual_data->marginalized_idx[id] = frame_idx.at(id);
       frame_poses.erase(id);
+      frame_idx.erase(id);
       prev_opt_flow_res.erase(id);
     }
 
