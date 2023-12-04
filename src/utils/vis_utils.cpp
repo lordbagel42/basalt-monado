@@ -682,28 +682,53 @@ void VIOUIBase::draw_jacobian_overlay(pangolin::ImageView& blocks_view, const UI
 }
 
 void VIOUIBase::draw_hessian_overlay(pangolin::ImageView& blocks_view, const UIHessians& uihes) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
   if (uihes.H == nullptr || uihes.b == nullptr || uihes.aom == nullptr) return;
 
   const auto H = uihes.H;
   const auto b = uihes.b;
   const auto aom = uihes.aom;
 
+  size_t pad = show_ids ? 6 : 0;
   size_t w = H->cols() + 1;
   size_t h = H->rows();
-  size_t side = max(w, h);
-  long xoff = int((side - w) / 2);  // Offset to center view
+  size_t pw = w + pad;
+  size_t ph = h + pad;
+  size_t side = max(pw, ph);
+  long xoffh = int((side - pw) / 2);  // Offset to center view
+  long xoff = xoffh + pad;            // Offset plus padding for ids
+  long yoff = pad;                    // Offset plus padding for ids
 
   // Draw column and row separators
   glLineWidth(0.25);
   glColor3ubv(BLUE);
-  pangolin::glDrawLine(xoff - 0.5, -0.5, xoff - 0.5, h - 0.5);  // Matrix start
-  for (const auto& [ts, idx_size] : aom->abs_order_map) {       // Keyframe/frame end
+  pangolin::glDrawLine(xoff - 0.5, -0.5, xoff - 0.5, ph - 0.5);               // Matrix start col
+  pangolin::glDrawLine(xoffh - 0.5, yoff - 0.5, xoff + w - 0.5, yoff - 0.5);  // Matrix start row
+  for (const auto& [ts, idx_size] : aom->abs_order_map) {                     // Keyframe/frame end
     const auto [idx, size] = idx_size;
     float p = xoff + idx + size - 0.5;
-    pangolin::glDrawLine(p, -0.5, p, h - 0.5);               // Column
-    pangolin::glDrawLine(xoff - 0.5, p, w + xoff - 0.5, p);  // Row
+    pangolin::glDrawLine(p, -0.5, p, ph - 0.5);               // Column
+    pangolin::glDrawLine(xoffh - 0.5, p, xoff + w - 0.5, p);  // Row
+
+    if (show_ids) {
+      bool keyframed = curr_vis_data->keyframed_idx.count(ts) > 0;
+      bool marginalized = curr_vis_data->marginalized_idx.count(ts) > 0;
+      bool present = curr_vis_data->frame_idx.count(ts) > 0;
+      if (!keyframed && !marginalized && !present) BASALT_ASSERT(false);
+
+      size_t fid = (keyframed      ? curr_vis_data->keyframed_idx[ts]
+                    : marginalized ? curr_vis_data->marginalized_idx[ts]
+                                   : curr_vis_data->frame_idx[ts]);
+      glColor3ubv(keyframed ? GREEN : marginalized ? RED : BLUE);
+      auto text = pangolin::GlFont::I().Text("%lu", fid);
+      try_draw_image_text(blocks_view, xoff + idx, pad / 2, text);
+      try_draw_image_text(blocks_view, 0, yoff + idx + pad / 2, text);
+      glColor3ubv(BLUE);
+    }
   }
-  pangolin::glDrawLine(xoff + w - 1 - 0.5, -0.5, xoff + w - 1 - 0.5, h - 0.5);  // Column for b
+  pangolin::glDrawLine(xoff + w - 1 - 0.5, -0.5, xoff + w - 1 - 0.5, ph - 0.5);  // Column for b
 
   if (show_block_vals) {  // Draw cell values
     for (long y = 0; y < H->rows(); y++) {
@@ -712,7 +737,7 @@ void VIOUIBase::draw_hessian_overlay(pangolin::ImageView& blocks_view, const UIH
         if (c == 0) continue;
         glColor3ubv(c > 0 ? GREEN : RED);
         auto text = SMALL_FONT.Text("%.2f", abs(c));
-        try_draw_image_text(blocks_view, x + xoff - 0.25, y, text);
+        try_draw_image_text(blocks_view, x + xoff - 0.25, yoff + y, text);
       }
     }
   }
@@ -774,12 +799,17 @@ void VIOUIBase::do_show_hessian(const shared_ptr<ImageView>& blocks_view, UIHess
   std::shared_ptr<ManagedImage<uint8_t>> mat;
   size_t w = H->cols() + 1;
   size_t h = H->rows();
-  size_t side = max(w, h);
+  size_t pad = show_ids ? 6 : 0;
+  size_t pw = w + pad;
+  size_t ph = h + pad;
+
+  size_t side = max(pw, ph);
   mat = std::make_shared<ManagedImage<uint8_t>>(side, side);
   mat->Memset(0);
-  long xoff = int((side - w) / 2);  // Offset to center view
+  long xoffh = int((side - pw) / 2);  // Offset to center view
+  long xoff = xoffh + pad;            // Offset plus padding for ids
+  long yoff = pad;                    // Offset plus padding for ids
 
-#if 0
   float min = MAXFLOAT;
   float max = -MAXFLOAT;
   for (long y = 0; y < H->rows(); y++) {
@@ -789,9 +819,9 @@ void VIOUIBase::do_show_hessian(const shared_ptr<ImageView>& blocks_view, UIHess
       if (v > max) max = v;
     }
   }
-#endif
 
-  const float max = 255000.0F;
+  max = std::min(max, 255000.0F);
+
   const uint8_t max_pixel = 245;
   for (long y = 0; y < H->rows(); y++) {
     for (long x = 0; x < H->cols() + 1; x++) {
@@ -800,9 +830,18 @@ void VIOUIBase::do_show_hessian(const shared_ptr<ImageView>& blocks_view, UIHess
       bool is_not_zero = value > 0;
       uint8_t pixel = (1 - value / max) * 255.0F;
       if (pixel > max_pixel && is_not_zero) pixel = max_pixel;
-      (*mat)(x + xoff, y) = pixel;
+      (*mat)(x + xoff, yoff + y) = pixel;
     }
   }
+
+  // Fill in row and height title borders
+  uint8_t fill_color = 230;
+  for (size_t i = 0; i < pad; i++)
+    for (size_t j = 0; j < w; j++) (*mat)(xoff + j, i) = fill_color;
+
+  for (size_t i = 0; i < ph; i++)
+    for (size_t j = 0; j < pad; j++) (*mat)(xoffh + j, i) = fill_color;
+
   uih.img = mat;
 
   pangolin::GlPixFormat fmt;
@@ -877,7 +916,7 @@ void VIOUIBase::do_show_jacobian(const shared_ptr<ImageView>& blocks_view, UIJac
     }
 
     // Fill in row and height title borders
-    uint8_t fill_color = 150;
+    uint8_t fill_color = 230;
     for (size_t i = 0; i < pad; i++)
       for (size_t j = 0; j < u->getW(); j++) (*mat)(xoff + j, i) = fill_color;
 
