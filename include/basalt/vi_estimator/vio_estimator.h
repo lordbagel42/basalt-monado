@@ -71,19 +71,21 @@ struct VioVisualizationData {
     Hb_m,     // Marginalized Hb
     COUNT,
   };
+  static constexpr int UIMAT_COUNT_J = (int)UIMAT::Hb;
+  static constexpr int UIMAT_COUNT_H = (int)UIMAT::COUNT - (int)UIMAT::Hb;
 
   struct UIJacobians {
     UILandmarkBlocks::Ptr Jr;                    // Landmark blocks
     UILandmarkBlocks::Ptr Jr_h;                  // Highlighted
     std::shared_ptr<ManagedImage<uint8_t>> img;  // Current rendered image
-  } Jr[4];
+  } Jr[UIMAT_COUNT_J];
 
   struct UIHessians {
     std::shared_ptr<Eigen::MatrixXf> H;
     std::shared_ptr<Eigen::VectorXf> b;
     std::shared_ptr<AbsOrderMap> aom;
     std::shared_ptr<ManagedImage<uint8_t>> img;
-  } Hb[2];
+  } Hb[UIMAT_COUNT_H];
 
   void invalidate_mat_imgs() {
     for (UIJacobians& j : Jr) j.img = nullptr;
