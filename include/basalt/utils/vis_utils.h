@@ -46,7 +46,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/utils/sophus_utils.hpp>
 #include <tuple>
 
-const uint8_t cam_color[3]{250, 0, 26};
+const uint8_t cam_color[3]{250, 0, 125};
 const uint8_t state_color[3]{250, 0, 26};
 const uint8_t pose_color[3]{0, 50, 255};
 const uint8_t gt_color[3]{0, 171, 47};
@@ -56,6 +56,7 @@ const uint8_t MIN_DEPTH_COLOR_UB[3]{69, 201, 255};  // blue
 const uint8_t MAX_DEPTH_COLOR_UB[3]{255, 26, 107};  // pink
 
 inline void render_camera(const Eigen::Matrix4d& T_w_c, float lineWidth, const uint8_t* color, float sizeFactor,
+                          bool show_ids = false, size_t frame_idx = 0, const uint8_t* idx_color = nullptr,
                           bool show_fwd = false) {
   const float sz = sizeFactor;
   const float width = 640, height = 480, fx = 500, fy = 500, cx = 320, cy = 240;
@@ -86,6 +87,10 @@ inline void render_camera(const Eigen::Matrix4d& T_w_c, float lineWidth, const u
   glColor3ubv(color);
   glLineWidth(lineWidth);
   pangolin::glDrawLines(lines);
+  if (show_ids) {
+    glColor3ubv(idx_color);
+    pangolin::GlFont::I().Text("%d", frame_idx).Draw(0, 0, -0.01F);
+  }
   glPopMatrix();
 }
 
@@ -268,6 +273,8 @@ struct VIOUIBase {
   void do_show_hessian(const shared_ptr<ImageView>& blocks_view, UIHessians& uih);
   void do_show_jacobian(const shared_ptr<ImageView>& blocks_view, UIJacobians& uij);
   bool do_follow_highlight(bool smooth_zoom);
+
+  void do_render_camera(const Sophus::SE3d& T_w_c, size_t i, size_t ts, const uint8_t* color);
 };
 
 }  // namespace basalt::vis

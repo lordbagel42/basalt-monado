@@ -651,13 +651,11 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
   }
 
   if (out_vis_queue) {
-    for (const auto& kv : frame_states) {
-      visual_data->states.emplace_back(kv.second.getState().T_w_i.template cast<double>());
-    }
+    for (const auto& [ts, p] : frame_states) visual_data->states[ts] = p.getState().T_w_i.template cast<double>();
 
     for (const auto& [ts, pstate] : frame_poses) {
-      Eigen::aligned_vector<Sophus::SE3d>& frames = kf_ids.count(ts) ? visual_data->frames : visual_data->ltframes;
-      frames.emplace_back(pstate.getPose().template cast<double>());
+      auto& frames = kf_ids.count(ts) ? visual_data->frames : visual_data->ltframes;
+      frames[ts] = pstate.getPose().template cast<double>();
     }
 
     visual_data->frame_idx = frame_idx;

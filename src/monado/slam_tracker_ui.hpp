@@ -205,7 +205,7 @@ class slam_tracker_ui : vis::VIOUIBase {
         // TODO: There is a small race condition here over
         // curr_vis_data that is also present in the original basalt examples
         if (curr_vis_data) {
-          auto T_w_i = curr_vis_data->states.back();
+          auto T_w_i = curr_vis_data->states.rbegin()->second;
           T_w_i.so3() = Sophus::SO3d();
 
           camera.Follow(T_w_i.matrix());
@@ -296,14 +296,23 @@ class slam_tracker_ui : vis::VIOUIBase {
 
     if (!curr_vis_data) return;
 
-    for (const auto &p : curr_vis_data->states)
-      for (const auto &t_i_c : calib.T_i_c) render_camera((p * t_i_c).matrix(), 2.0, state_color, 0.1);
+    for (size_t i = 0; i < calib.T_i_c.size(); i++)
+      if (!curr_vis_data->states.empty()) {
+        const auto &[ts, p] = *curr_vis_data->states.rbegin();
+        do_render_camera(p * calib.T_i_c[i], i, ts, cam_color);
+      } else if (!curr_vis_data->frames.empty()) {
+        const auto &[ts, p] = *curr_vis_data->frames.rbegin();
+        do_render_camera(p * calib.T_i_c[i], i, ts, cam_color);
+      }
 
-    for (const auto &p : curr_vis_data->frames)
-      for (const auto &t_i_c : calib.T_i_c) render_camera((p * t_i_c).matrix(), 2.0, pose_color, 0.1);
+    for (const auto &[ts, p] : curr_vis_data->states)
+      for (size_t i = 0; i < calib.T_i_c.size(); i++) do_render_camera(p * calib.T_i_c[i], i, ts, state_color);
 
-    for (const auto &t_i_c : calib.T_i_c)
-      render_camera((curr_vis_data->states.back() * t_i_c).matrix(), 2.0, cam_color, 0.1);
+    for (const auto &[ts, p] : curr_vis_data->frames)
+      for (size_t i = 0; i < calib.T_i_c.size(); i++) do_render_camera(p * calib.T_i_c[i], i, ts, pose_color);
+
+    for (const auto &[ts, p] : curr_vis_data->ltframes)
+      for (size_t i = 0; i < calib.T_i_c.size(); i++) do_render_camera(p * calib.T_i_c[i], i, ts, pose_color);
 
     glColor3ubv(pose_color);
     if (!filter_highlights) pangolin::glDrawPoints(curr_vis_data->points);

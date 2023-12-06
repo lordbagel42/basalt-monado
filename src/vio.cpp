@@ -423,9 +423,9 @@ struct basalt_vio_ui : vis::VIOUIBase {
           if (it != vis_map.end()) {
             Sophus::SE3d T_w_i;
             if (!it->second->states.empty()) {
-              T_w_i = it->second->states.back();
+              T_w_i = it->second->states.rbegin()->second;
             } else if (!it->second->frames.empty()) {
-              T_w_i = it->second->frames.back();
+              T_w_i = it->second->frames.rbegin()->second;
             }
             T_w_i.so3() = Sophus::SO3d();
 
@@ -741,24 +741,24 @@ struct basalt_vio_ui : vis::VIOUIBase {
     VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
     if (curr_vis_data == nullptr) return;
 
-    for (size_t i = 0; i < calib.T_i_c.size(); i++)
+    for (size_t i = 0; i < calib.T_i_c.size(); i++) {
       if (!curr_vis_data->states.empty()) {
-        render_camera((curr_vis_data->states.back() * calib.T_i_c[i]).matrix(), 2.0f, cam_color, 0.1f);
+        const auto& [ts, p] = *curr_vis_data->states.rbegin();
+        do_render_camera(p * calib.T_i_c[i], i, ts, cam_color);
       } else if (!curr_vis_data->frames.empty()) {
-        render_camera((curr_vis_data->frames.back() * calib.T_i_c[i]).matrix(), 2.0f, cam_color, 0.1f);
+        const auto& [ts, p] = *curr_vis_data->frames.rbegin();
+        do_render_camera(p * calib.T_i_c[i], i, ts, cam_color);
       }
+    }
 
-    for (const auto& p : curr_vis_data->states)
-      for (size_t i = 0; i < calib.T_i_c.size(); i++)
-        render_camera((p * calib.T_i_c[i]).matrix(), 2.0f, state_color, 0.1f);
+    for (const auto& [ts, p] : curr_vis_data->states)
+      for (size_t i = 0; i < calib.T_i_c.size(); i++) do_render_camera(p * calib.T_i_c[i], i, ts, state_color);
 
-    for (const auto& p : curr_vis_data->frames)
-      for (size_t i = 0; i < calib.T_i_c.size(); i++)
-        render_camera((p * calib.T_i_c[i]).matrix(), 2.0f, pose_color, 0.1f);
+    for (const auto& [ts, p] : curr_vis_data->frames)
+      for (size_t i = 0; i < calib.T_i_c.size(); i++) do_render_camera(p * calib.T_i_c[i], i, ts, pose_color);
 
-    for (const auto& p : curr_vis_data->ltframes)
-      for (size_t i = 0; i < calib.T_i_c.size(); i++)
-        render_camera((p * calib.T_i_c[i]).matrix(), 2.0f, vis::BLUE, 0.1f);
+    for (const auto& [ts, p] : curr_vis_data->ltframes)
+      for (size_t i = 0; i < calib.T_i_c.size(); i++) do_render_camera(p * calib.T_i_c[i], i, ts, vis::BLUE);
 
     glColor3ubv(pose_color);
     if (!filter_highlights) pangolin::glDrawPoints(curr_vis_data->points);

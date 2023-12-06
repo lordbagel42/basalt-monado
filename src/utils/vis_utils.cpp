@@ -1003,4 +1003,20 @@ bool VIOUIBase::do_follow_highlight(bool smooth_zoom) {
   return true;
 }
 
+void VIOUIBase::do_render_camera(const Sophus::SE3d& T_w_c, size_t i, size_t ts, const uint8_t* color) {
+  VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return;
+
+  bool keyframed = curr_vis_data->keyframed_idx.count(ts) > 0;
+  bool marginalized = curr_vis_data->marginalized_idx.count(ts) > 0;
+  bool present = curr_vis_data->frame_idx.count(ts) > 0;
+  if (!keyframed && !marginalized && !present) BASALT_ASSERT(false);
+
+  size_t fid = (keyframed      ? curr_vis_data->keyframed_idx[ts]
+                : marginalized ? curr_vis_data->marginalized_idx[ts]
+                               : curr_vis_data->frame_idx[ts]);
+  const uint8_t* fid_color = keyframed ? GREEN : marginalized ? RED : BLUE;
+  render_camera(T_w_c.matrix(), 2.0F, color, 0.1F, show_ids && i == 0, fid, fid_color);
+}
+
 }  // namespace basalt::vis
