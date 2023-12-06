@@ -218,7 +218,8 @@ class SqrtKeypointVioEstimator : public VioEstimatorBase, public SqrtBundleAdjus
   std::set<int64_t> kf_ids;
   std::set<int64_t> ltkfs;  // Long term keyframes
   Eigen::aligned_map<int64_t, size_t> ltkfs_ids;
-  std::set<int64_t> priorkfs; // Prior keyframes to add to the window
+  std::set<FrameId> covisible_keyframes;
+  std::set<LandmarkId> covisible_landmarks;
   bool take_ltkf;           // Whether the next keyframe should be made into ltkfs
   Eigen::aligned_map<int64_t, size_t> frame_idx;
   bool take_priorkf;

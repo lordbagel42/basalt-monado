@@ -54,6 +54,7 @@ void LandmarkDatabase<Scalar_>::addLandmarkWithPose(LandmarkId lm_id, const Land
   kpt.direction = pos.direction;
   kpt.inv_dist = pos.inv_dist;
   kpt.host_kf_id = pos.host_kf_id;
+  kpt.id = lm_id;
   frame_poses[frame_id] = frame_pose;
 }
 
@@ -151,21 +152,25 @@ Sophus::SE3<Scalar_> &LandmarkDatabase<Scalar_>::getFramePose(int64_t frame_id) 
 }
 
 template <class Scalar_>
-std::set<FrameId> LandmarkDatabase<Scalar_>::getCovisibleKeyframes(FrameId frame_id, Keypoints keypoints){
-  std::set<FrameId> covisible_frames;
+void LandmarkDatabase<Scalar_>::getCovisibleMap(Keypoints keypoints, std::set<FrameId>& covisible_keyframes, std::set<LandmarkId>& covisible_landmarks){
   for (const auto& kv_obs : keypoints) {
     int kpt_id = kv_obs.first;
     if (landmarkExists(kpt_id)) {
       auto lm = getLandmark(kpt_id);
-      covisible_frames.emplace(lm.host_kf_id.frame_id);
+      covisible_keyframes.emplace(lm.host_kf_id.frame_id);
+      covisible_landmarks.emplace(lm.id);
     }
   }
-  return covisible_frames;
 }
 
 template <class Scalar_>
 Landmark<Scalar_> &LandmarkDatabase<Scalar_>::getLandmark(LandmarkId lm_id) {
   return kpts.at(lm_id);
+}
+
+template <class Scalar_>
+const TimeCamId &LandmarkDatabase<Scalar_>::getLandmarkHost(LandmarkId lm_id) const {
+  return kpts.at(lm_id).host_kf_id;
 }
 
 template <class Scalar_>
@@ -226,6 +231,8 @@ typename LandmarkDatabase<Scalar_>::MapIter LandmarkDatabase<Scalar_>::removeLan
 
   if (host_it->second.empty()) observations.erase(host_it);
 
+  if (it->first == 966)
+    std::cout << "Removing landmark 966" << std::endl;
   return kpts.erase(it);
 }
 

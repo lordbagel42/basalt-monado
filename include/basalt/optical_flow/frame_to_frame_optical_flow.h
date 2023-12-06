@@ -355,6 +355,9 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
         Scalar dist2 = (t1 - t1_recovered).squaredNorm();
 
         if (dist2 < config.optical_flow_max_recovered_dist2) {
+          if (id == 966) {
+            std::cout << "[" << frame_counter << "_" << cam2 << "] Keypoint 966 traked" << std::endl;
+          }
           result[id] = transform_2;
         }
       }
@@ -597,6 +600,9 @@ class FrameToFrameOpticalFlow : public OpticalFlowTyped<Scalar, Pattern> {
 
       addKeypoint(cam_id, last_keypoint_id, transform, response);
       new_kpts[last_keypoint_id] = transform;
+      if (last_keypoint_id == 966) {
+        std::cout << "[" << frame_counter << "_" << cam_id << "] Keypoint 966 seen for the first time" << std::endl;
+      }
 
       last_keypoint_id++;
     }

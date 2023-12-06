@@ -115,9 +115,11 @@ class LandmarkDatabase {
 
   SE3 &getFramePose(FrameId frame_id);
 
-  std::set<FrameId> getCovisibleKeyframes(FrameId frame_id, Keypoints keypoints);
+  void getCovisibleMap(Keypoints keypoints, std::set<FrameId>& covisible_keyframes, std::set<LandmarkId>& covisible_landmarks);
 
   // Const
+  const TimeCamId & getLandmarkHost(LandmarkId lm_id) const;
+
   const Landmark<Scalar>& getLandmark(LandmarkId lm_id) const;
 
   std::vector<TimeCamId> getHostKfs() const;
