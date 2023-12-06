@@ -221,7 +221,7 @@ struct VIOUIBase {
 
   Button toggle_blocks_btn{"ui.toggle_blocks", [this]() { toggle_blocks(); }};
   Var<std::string> mat_name{"ui.mat_name", "Jr", META_FLAG_READONLY};
-  Var<int> mat_to_show{"ui.mat_to_show", (int)UIMAT::Jr, (int)UIMAT::Jr, (int)UIMAT::COUNT - 1};
+  Var<int> mat_to_show{"ui.mat_to_show", (int)UIMAT::JR, (int)UIMAT::JR, (int)UIMAT::COUNT - 1};
 
   Var<bool> show_block_vals{"ui.show_block_vals", false, true};
 

@@ -63,16 +63,16 @@ struct VioVisualizationData {
 
   // Indices in Jr and Hb fields
   enum class UIMAT {
-    Jr,       // Jacobian J = [Jp Jl] and residual r (landmark blocks)
-    Jr_QR,    // Landmark blocks after QR factorization
-    Jr_m,     // Marginalized Jr
-    Jr_m_QR,  // Marginalized Jr_QR
-    Hb,       // Hessian H = J^T J and b = J^T r
-    Hb_m,     // Marginalized Hb
+    JR,       // Jacobian J = [Jp Jl] and residual r (landmark blocks)
+    JR_QR,    // Landmark blocks after QR factorization
+    JR_M,     // Marginalized Jr
+    JR_M_QR,  // Marginalized Jr_QR
+    HB,       // Hessian H = J^T J and b = J^T r
+    HB_M,     // Marginalized Hb
     COUNT,
   };
-  static constexpr int UIMAT_COUNT_J = (int)UIMAT::Hb;
-  static constexpr int UIMAT_COUNT_H = (int)UIMAT::COUNT - (int)UIMAT::Hb;
+  static constexpr int UIMAT_COUNT_J = (int)UIMAT::HB;
+  static constexpr int UIMAT_COUNT_H = (int)UIMAT::COUNT - (int)UIMAT::HB;
 
   struct UIJacobians {
     UILandmarkBlocks::Ptr Jr;                    // Landmark blocks
@@ -92,10 +92,10 @@ struct VioVisualizationData {
     for (UIHessians& h : Hb) h.img = nullptr;
   }
 
-  static bool is_jacobian(UIMAT u) { return UIMAT::Jr <= u && u < UIMAT::Hb; }
-  static bool is_hessian(UIMAT u) { return UIMAT::Hb <= u && u < UIMAT::COUNT; }
+  static bool is_jacobian(UIMAT u) { return UIMAT::JR <= u && u < UIMAT::HB; }
+  static bool is_hessian(UIMAT u) { return UIMAT::HB <= u && u < UIMAT::COUNT; }
   UIJacobians& getj(UIMAT u) { return Jr[(int)u]; };
-  UIHessians& geth(UIMAT u) { return Hb[(int)u - (int)UIMAT::Hb]; };
+  UIHessians& geth(UIMAT u) { return Hb[(int)u - (int)UIMAT::HB]; };
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };
