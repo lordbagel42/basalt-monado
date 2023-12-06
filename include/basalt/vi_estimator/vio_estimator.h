@@ -61,6 +61,7 @@ struct VioVisualizationData {
 
   std::shared_ptr<std::vector<Eigen::aligned_vector<Eigen::Vector4d>>> projections;
 
+  // Indices in Jr and Hb fields
   enum class UIMAT {
     Jr,       // Jacobian J = [Jp Jl] and residual r (landmark blocks)
     Jr_QR,    // Landmark blocks after QR factorization
@@ -71,23 +72,28 @@ struct VioVisualizationData {
     COUNT,
   };
 
-  std::shared_ptr<ManagedImage<uint8_t>>& get_mat_img(UIMAT m) {
-    std::array imgs = {&Jr[0].img, &Jr[1].img, &Jr[2].img, &Jr[3].img, &Hb[0].img, &Hb[1].img};
-    return *imgs[(int)m];
-  }
-
   struct UIJacobians {
     UILandmarkBlocks::Ptr Jr;                    // Landmark blocks
     UILandmarkBlocks::Ptr Jr_h;                  // Highlighted
     std::shared_ptr<ManagedImage<uint8_t>> img;  // Current rendered image
-  } Jr[4];                                       // 0: Jr, 1: Jr_QR, 2: Jr_m, 3: Jr_m_QR
+  } Jr[4];
 
   struct UIHessians {
     std::shared_ptr<Eigen::MatrixXf> H;
     std::shared_ptr<Eigen::VectorXf> b;
     std::shared_ptr<AbsOrderMap> aom;
     std::shared_ptr<ManagedImage<uint8_t>> img;
-  } Hb[2];  // 0: Hb, 1: Hb_m
+  } Hb[2];
+
+  void invalidate_mat_imgs() {
+    for (UIJacobians& j : Jr) j.img = nullptr;
+    for (UIHessians& h : Hb) h.img = nullptr;
+  }
+
+  static bool is_jacobian(UIMAT u) { return UIMAT::Jr <= u && u < UIMAT::Hb; }
+  static bool is_hessian(UIMAT u) { return UIMAT::Hb <= u && u < UIMAT::COUNT; }
+  UIJacobians& getj(UIMAT u) { return Jr[(int)u]; };
+  UIHessians& geth(UIMAT u) { return Hb[(int)u - (int)UIMAT::Hb]; };
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };

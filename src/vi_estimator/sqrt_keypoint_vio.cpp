@@ -58,6 +58,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace basalt {
 
+using UIMAT = VioVisualizationData::UIMAT;
+
 template <class Scalar_>
 SqrtKeypointVioEstimator<Scalar_>::SqrtKeypointVioEstimator(const Eigen::Vector3d& g_,
                                                             const basalt::Calibration<double>& calib_,
@@ -917,9 +919,10 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
                                                               &lost_landmaks, last_state_to_marg);
 
       lqr->linearizeProblem();
-      if (out_vis_queue) visual_data->Jr[2].Jr = lqr->getUILandmarkBlocks();
+      if (out_vis_queue) visual_data->getj(UIMAT::Jr_m).Jr = lqr->getUILandmarkBlocks();
+
       lqr->performQR();
-      if (out_vis_queue) visual_data->Jr[3].Jr = lqr->getUILandmarkBlocks();
+      if (out_vis_queue) visual_data->getj(UIMAT::Jr_m_QR).Jr = lqr->getUILandmarkBlocks();
 
       if (is_lin_sqrt && marg_data.is_sqrt) {
         lqr->get_dense_Q2Jp_Q2r(Q2Jp_or_H, Q2r_or_b);
@@ -1126,9 +1129,9 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
     marg_data.order = marg_order_new;
 
     if (out_vis_queue) {
-      visual_data->Hb[1].H = std::make_shared<MatX>(marg_H_new.template cast<float>());
-      visual_data->Hb[1].b = std::make_shared<VecX>(marg_b_new.template cast<float>());
-      visual_data->Hb[1].aom = std::make_shared<AbsOrderMap>(marg_order_new);
+      visual_data->geth(UIMAT::Hb_m).H = std::make_shared<Eigen::MatrixXf>(marg_H_new.template cast<float>());
+      visual_data->geth(UIMAT::Hb_m).b = std::make_shared<Eigen::VectorXf>(marg_b_new.template cast<float>());
+      visual_data->geth(UIMAT::Hb_m).aom = std::make_shared<AbsOrderMap>(marg_order_new);
     }
 
     BASALT_ASSERT(size_t(marg_data.H.cols()) == marg_data.order.total_size);
@@ -1282,8 +1285,7 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
         // linearize residuals
         bool numerically_valid;
         error_total = lqr->linearizeProblem(&numerically_valid);
-
-        if (out_vis_queue) visual_data->Jr[0].Jr = lqr->getUILandmarkBlocks();
+        if (out_vis_queue) visual_data->getj(UIMAT::Jr).Jr = lqr->getUILandmarkBlocks();
 
         BASALT_ASSERT_STREAM(numerically_valid, "did not expect numerical failure during linearization");
         stats.add("linearizeProblem", t.reset()).format("ms");
@@ -1302,8 +1304,8 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
 
         // marginalize points in place
         lqr->performQR();
+        if (out_vis_queue) visual_data->getj(UIMAT::Jr_QR).Jr = lqr->getUILandmarkBlocks();
 
-        if (out_vis_queue) visual_data->Jr[1].Jr = lqr->getUILandmarkBlocks();
         stats.add("performQR", t.reset()).format("ms");
       }
 
@@ -1405,9 +1407,9 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
           }
 
           if (out_vis_queue) {
-            visual_data->Hb[0].H = std::make_shared<MatX>(H.template cast<float>());
-            visual_data->Hb[0].b = std::make_shared<VecX>(b.template cast<float>());
-            visual_data->Hb[0].aom = std::make_shared<AbsOrderMap>(aom);
+            visual_data->geth(UIMAT::Hb).H = std::make_shared<Eigen::MatrixXf>(H.template cast<float>());
+            visual_data->geth(UIMAT::Hb).b = std::make_shared<Eigen::VectorXf>(b.template cast<float>());
+            visual_data->geth(UIMAT::Hb).aom = std::make_shared<AbsOrderMap>(aom);
           }
         }
 

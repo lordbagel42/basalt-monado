@@ -476,7 +476,7 @@ struct basalt_vio_ui : vis::VIOUIBase {
             show_ids.GuiChanged()) {
           highlights = vis::parse_selection(highlight_landmarks);
           filter_highlights = filter_highlights && !highlights.empty();
-          for (const auto& [ts, vis] : vis_map) vis->get_mat_img((UIMAT)mat_to_show.Get()) = nullptr;
+          for (const auto& [ts, vis] : vis_map) vis->invalidate_mat_imgs();
           if (show_blocks) do_show_blocks(blocks_view);
         }
 

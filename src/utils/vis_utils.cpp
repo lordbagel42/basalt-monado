@@ -45,6 +45,8 @@ extern "C" const unsigned char AnonymousPro_ttf[];
 namespace basalt::vis {
 using UIHessians = VioVisualizationData::UIHessians;
 using UIJacobians = VioVisualizationData::UIJacobians;
+auto is_hessian = VioVisualizationData::is_hessian;
+auto is_jacobian = VioVisualizationData::is_jacobian;
 
 pangolin::GlFont SMALL_FONT(pangolin::AnonymousPro_ttf, 11);
 
@@ -588,15 +590,11 @@ void VIOUIBase::draw_blocks_overlay(pangolin::ImageView& blocks_view) {
   if (curr_vis_data == nullptr) return;
 
   UIMAT m = (UIMAT)mat_to_show.Get();
-  bool show_hessian = m == UIMAT::Hb || m == UIMAT::Hb_m;
-  bool show_jacobian = m == UIMAT::Jr || m == UIMAT::Jr_QR || m == UIMAT::Jr_m || m == UIMAT::Jr_m_QR;
-  if (show_jacobian) {
-    int idx = (int)m;
-    UIJacobians& uijac = curr_vis_data->Jr[idx];
+  if (is_jacobian(m)) {
+    UIJacobians& uijac = curr_vis_data->getj(m);
     draw_jacobian_overlay(blocks_view, uijac);
-  } else if (show_hessian) {
-    int idx = (int)m - (int)UIMAT::Hb;
-    UIHessians& uihes = curr_vis_data->Hb[idx];
+  } else if (is_hessian(m)) {
+    UIHessians& uihes = curr_vis_data->geth(m);
     draw_hessian_overlay(blocks_view, uihes);
   } else {
     BASALT_ASSERT(false);
@@ -642,7 +640,7 @@ void VIOUIBase::draw_jacobian_overlay(pangolin::ImageView& blocks_view, const UI
                                    : curr_vis_data->frame_idx[ts]);
       glColor3ubv(keyframed ? GREEN : marginalized ? RED : BLUE);
       auto text = pangolin::GlFont::I().Text("%lu", fid);
-      try_draw_image_text(blocks_view, xoff + idx - 0.5, pad / 2 - 0.5, text);
+      try_draw_image_text(blocks_view, xoff + idx, pad / 2, text);
       glColor3ubv(BLUE);
     }
   }
@@ -669,7 +667,7 @@ void VIOUIBase::draw_jacobian_overlay(pangolin::ImageView& blocks_view, const UI
           if (c == 0) continue;
 
           float u = x + xoff - 0.25;
-          float v = i + y;
+          float v = i + y + yoff;
           glColor3ubv(c > 0 ? GREEN : RED);
           auto text = SMALL_FONT.Text("%.2f", abs(c));
           try_draw_image_text(blocks_view, u, v, text);
@@ -775,15 +773,11 @@ void VIOUIBase::do_show_blocks(const shared_ptr<ImageView>& blocks_view) {
   if (curr_vis_data == nullptr) return;
 
   UIMAT m = (UIMAT)mat_to_show.Get();
-  bool show_hessian = m == UIMAT::Hb || m == UIMAT::Hb_m;
-  bool show_jacobian = m == UIMAT::Jr || m == UIMAT::Jr_QR || m == UIMAT::Jr_m || m == UIMAT::Jr_m_QR;
-  if (show_jacobian) {
-    int idx = (int)m;
-    UIJacobians& uijac = curr_vis_data->Jr[idx];
+  if (is_jacobian(m)) {
+    UIJacobians& uijac = curr_vis_data->getj(m);
     do_show_jacobian(blocks_view, uijac);
-  } else if (show_hessian) {
-    int idx = (int)m - (int)UIMAT::Hb;
-    UIHessians& uihes = curr_vis_data->Hb[idx];
+  } else if (is_hessian(m)) {
+    UIHessians& uihes = curr_vis_data->geth(m);
     do_show_hessian(blocks_view, uihes);
   } else {
     BASALT_ASSERT(false);
@@ -853,10 +847,9 @@ void VIOUIBase::do_show_hessian(const shared_ptr<ImageView>& blocks_view, UIHess
 
 void VIOUIBase::do_show_jacobian(const shared_ptr<ImageView>& blocks_view, UIJacobians& uij) {
   UILandmarkBlocks::Ptr uibs = uij.Jr;
-  if (uibs && uibs->blocks.empty()) return;
-
   std::shared_ptr<ManagedImage<uint8_t>> mat;
-  if (!uibs) {
+
+  if (!uibs || (uibs && uibs->blocks.empty())) {
     mat = std::make_shared<ManagedImage<uint8_t>>(1, 1);
     mat->Memset(127);
   } else if (uij.img != nullptr) {  // Reuse same image
