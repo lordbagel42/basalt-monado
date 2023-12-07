@@ -42,7 +42,8 @@ class LinearizationAbsQR : public LinearizationBase<Scalar_, POSE_SIZE_> {
                      const MargLinData<Scalar>* marg_lin_data = nullptr,
                      const ImuLinData<Scalar>* imu_lin_data = nullptr, const std::set<FrameId>* used_frames = nullptr,
                      const std::unordered_set<KeypointId>* lost_landmarks = nullptr,
-                     int64_t last_state_to_marg = std::numeric_limits<int64_t>::max());
+                     int64_t last_state_to_marg = std::numeric_limits<int64_t>::max(),
+                     const std::set<FrameId>* fixed_frames = nullptr);
 
   // destructor defined in cpp b/c of unique_ptr destructor (ImuBlock)
   // copy/move constructor/assignment-operator for rule-of-five
@@ -117,6 +118,7 @@ class LinearizationAbsQR : public LinearizationBase<Scalar_, POSE_SIZE_> {
 
   const AbsOrderMap& aom;
   const std::set<FrameId>* used_frames;
+  const std::set<FrameId>* fixed_frames = nullptr;
 
   const MargLinData<Scalar>* marg_lin_data;
   const ImuLinData<Scalar>* imu_lin_data;

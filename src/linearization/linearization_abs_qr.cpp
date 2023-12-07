@@ -47,13 +47,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace basalt {
 
 template <typename Scalar, int POSE_SIZE>
-LinearizationAbsQR<Scalar, POSE_SIZE>::LinearizationAbsQR(BundleAdjustmentBase<Scalar>* estimator,
-                                                          const AbsOrderMap& aom, const Options& options,
-                                                          const MargLinData<Scalar>* marg_lin_data,
-                                                          const ImuLinData<Scalar>* imu_lin_data,
-                                                          const std::set<FrameId>* used_frames,
-                                                          const std::unordered_set<KeypointId>* lost_landmarks,
-                                                          int64_t last_state_to_marg)
+LinearizationAbsQR<Scalar, POSE_SIZE>::LinearizationAbsQR(
+    BundleAdjustmentBase<Scalar>* estimator, const AbsOrderMap& aom, const Options& options,
+    const MargLinData<Scalar>* marg_lin_data, const ImuLinData<Scalar>* imu_lin_data,
+    const std::set<FrameId>* used_frames, const std::unordered_set<KeypointId>* lost_landmarks,
+    int64_t last_state_to_marg, const std::set<FrameId>* fixed_frames)
     : options_(options),
       estimator(estimator),
       lmdb_(estimator->lmdb),
@@ -61,6 +59,7 @@ LinearizationAbsQR<Scalar, POSE_SIZE>::LinearizationAbsQR(BundleAdjustmentBase<S
       calib(estimator->calib),
       aom(aom),
       used_frames(used_frames),
+      fixed_frames(fixed_frames),
       marg_lin_data(marg_lin_data),
       imu_lin_data(imu_lin_data),
       pose_damping_diagonal(0),
@@ -137,10 +136,11 @@ LinearizationAbsQR<Scalar, POSE_SIZE>::LinearizationAbsQR(BundleAdjustmentBase<S
         KeypointId lm_id = landmark_ids[r];
         auto& lb = landmark_blocks[r];
         auto& landmark = lmdb_.getLandmark(lm_id);
+        bool is_fixed = fixed_frames && fixed_frames->count(landmark.host_kf_id.frame_id) > 0;
 
         lb = LandmarkBlock<Scalar>::template createLandmarkBlock<POSE_SIZE>();
 
-        lb->allocateLandmark(landmark, relative_pose_lin, calib, aom, options.lb_options);
+        lb->allocateLandmark(landmark, relative_pose_lin, calib, aom, options.lb_options, is_fixed);
       }
     };
 

@@ -34,7 +34,7 @@ class LandmarkBlockAbsDynamic : public LandmarkBlock<Scalar> {
   virtual inline void allocateLandmark(
       Landmark<Scalar>& lm,
       const Eigen::aligned_unordered_map<std::pair<TimeCamId, TimeCamId>, RelPoseLin<Scalar>>& relative_pose_lin,
-      const Calibration<Scalar>& calib, const AbsOrderMap& aom, const Options& options,
+      const Calibration<Scalar>& calib, const AbsOrderMap& aom, const Options& options, bool is_fixed = false,
       const std::map<TimeCamId, size_t>* rel_order = nullptr) override {
     // some of the logic assumes the members are at their initial values
     BASALT_ASSERT(state == State::Uninitialized);
@@ -44,6 +44,7 @@ class LandmarkBlockAbsDynamic : public LandmarkBlock<Scalar> {
     lm_ptr = &lm;
     options_ = &options;
     calib_ = &calib;
+    is_fixed_ = is_fixed;
 
     // TODO: consider for VIO that we have a lot of 0 columns if we just use aom
     // --> add option to use different AOM with reduced size and/or just
@@ -537,6 +538,7 @@ class LandmarkBlockAbsDynamic : public LandmarkBlock<Scalar> {
   Landmark<Scalar>* lm_ptr = nullptr;
   const Calibration<Scalar>* calib_ = nullptr;
   const AbsOrderMap* aom_ = nullptr;
+  bool is_fixed_ = false;
 
   std::map<int64_t, std::set<int>> res_idx_by_abs_pose_;
 };

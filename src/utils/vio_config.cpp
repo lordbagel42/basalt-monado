@@ -102,7 +102,8 @@ VioConfig::VioConfig() {
   vio_init_ba_weight = 1e1;
   vio_init_bg_weight = 1e2;
 
-  vio_marg_lost_landmarks = false;
+  vio_marg_lost_landmarks = true;
+  vio_fix_long_term_keyframes = false;
 
   vio_kf_marg_feature_ratio = 0.1;
   vio_kf_marg_criteria = KeyframeMargCriteria::KF_MARG_DEFAULT;
@@ -268,6 +269,7 @@ void serialize(Archive& ar, basalt::VioConfig& config) {
   ar(CEREAL_NVP(config.vio_init_bg_weight));
 
   ar(CEREAL_NVP(config.vio_marg_lost_landmarks));
+  ar(CEREAL_NVP(config.vio_fix_long_term_keyframes));
   ar(CEREAL_NVP(config.vio_kf_marg_feature_ratio));
   ar(CEREAL_NVP(config.vio_kf_marg_criteria));
 

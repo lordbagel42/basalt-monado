@@ -103,6 +103,7 @@ struct VioConfig {
   double vio_init_bg_weight;
 
   bool vio_marg_lost_landmarks;
+  bool vio_fix_long_term_keyframes;
   double vio_kf_marg_feature_ratio;
   KeyframeMargCriteria vio_kf_marg_criteria;  // Keyframe removal criteria
 

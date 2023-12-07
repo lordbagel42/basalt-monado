@@ -47,13 +47,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 namespace basalt {
 
 template <typename Scalar, int POSE_SIZE>
-LinearizationRelSC<Scalar, POSE_SIZE>::LinearizationRelSC(BundleAdjustmentBase<Scalar>* estimator,
-                                                          const AbsOrderMap& aom, const Options& options,
-                                                          const MargLinData<Scalar>* marg_lin_data,
-                                                          const ImuLinData<Scalar>* imu_lin_data,
-                                                          const std::set<FrameId>* used_frames,
-                                                          const std::unordered_set<KeypointId>* lost_landmarks,
-                                                          int64_t last_state_to_marg)
+LinearizationRelSC<Scalar, POSE_SIZE>::LinearizationRelSC(
+    BundleAdjustmentBase<Scalar>* estimator, const AbsOrderMap& aom, const Options& options,
+    const MargLinData<Scalar>* marg_lin_data, const ImuLinData<Scalar>* imu_lin_data,
+    const std::set<FrameId>* used_frames, const std::unordered_set<KeypointId>* lost_landmarks,
+    int64_t last_state_to_marg, const std::set<FrameId>* fixed_frames)
     : options_(options),
       estimator(estimator),
       lmdb_(estimator->lmdb),
@@ -66,6 +64,7 @@ LinearizationRelSC<Scalar, POSE_SIZE>::LinearizationRelSC(BundleAdjustmentBase<S
       last_state_to_marg(last_state_to_marg),
       pose_damping_diagonal(0),
       pose_damping_diagonal_sqrt(0) {
+  UNUSED(fixed_frames);
   BASALT_ASSERT_STREAM(options.lb_options.huber_parameter == estimator->huber_thresh,
                        "Huber threshold should be set to the same value");
 

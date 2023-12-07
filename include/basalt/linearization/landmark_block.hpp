@@ -68,7 +68,7 @@ class LandmarkBlock {
   virtual void allocateLandmark(
       Landmark<Scalar>& lm,
       const Eigen::aligned_unordered_map<std::pair<TimeCamId, TimeCamId>, RelPoseLin<Scalar>>& relative_pose_lin,
-      const Calibration<Scalar>& calib, const AbsOrderMap& aom, const Options& options,
+      const Calibration<Scalar>& calib, const AbsOrderMap& aom, const Options& options, bool is_fixed = false,
       const std::map<TimeCamId, size_t>* rel_order = nullptr) = 0;
 
   // may set state to NumericalFailure --> linearization at this state is

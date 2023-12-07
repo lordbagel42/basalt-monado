@@ -925,8 +925,9 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
         ild.imu_meas[kv.first] = &kv.second;
       }
 
+      std::set<FrameId> fixed_kfs = config.vio_fix_long_term_keyframes ? ltkfs : std::set<FrameId>{};
       auto lqr = LinearizationBase<Scalar, POSE_SIZE>::create(this, aom, lqr_options, &marg_data, &ild, &kfs_to_marg,
-                                                              &lost_landmaks, last_state_to_marg);
+                                                              &lost_landmaks, last_state_to_marg, &fixed_kfs);
 
       lqr->linearizeProblem();
 
@@ -1036,8 +1037,10 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
         ild.imu_meas[kv.first] = &kv.second;
       }
 
-      auto lqr = LinearizationBase<Scalar, POSE_SIZE>::create(this, aom, lqr_options, &nullspace_marg_data, &ild,
-                                                              &kfs_to_marg, &lost_landmaks, last_state_to_marg);
+      std::set<FrameId> fixed_kfs = config.vio_fix_long_term_keyframes ? ltkfs : std::set<FrameId>{};
+      auto lqr =
+          LinearizationBase<Scalar, POSE_SIZE>::create(this, aom, lqr_options, &nullspace_marg_data, &ild, &kfs_to_marg,
+                                                       &lost_landmaks, last_state_to_marg, &fixed_kfs);
 
       lqr->linearizeProblem();
       lqr->performQR();
@@ -1267,9 +1270,12 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
       ild.imu_meas[kv.first] = &kv.second;
     }
 
+    std::set<FrameId> fixed_kfs = config.vio_fix_long_term_keyframes ? ltkfs : std::set<FrameId>{};
+
     {
       Timer t;
-      lqr = LinearizationBase<Scalar, POSE_SIZE>::create(this, aom, lqr_options, &marg_data, &ild);
+      lqr = LinearizationBase<Scalar, POSE_SIZE>::create(this, aom, lqr_options, &marg_data, &ild, nullptr, nullptr,
+                                                         std::numeric_limits<int64_t>::max(), &fixed_kfs);
       stats.add("allocateLMB", t.reset()).format("ms");
       lqr->log_problem_stats(stats);
     }
