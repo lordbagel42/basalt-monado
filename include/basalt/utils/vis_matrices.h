@@ -68,12 +68,15 @@ struct UILandmarkBlocks {
 };
 
 enum class UIMAT {
-  JR,       //!< Jacobian J = [Jp Jl] and residual r (landmark blocks)
-  JR_QR,    //!< Landmark blocks after QR factorization
-  JR_M,     //!< Marginalized Jr
-  JR_M_QR,  //!< Marginalized Jr_QR
-  HB,       //!< Hessian H = J^T J and b = J^T r
-  HB_M,     //!< Marginalized Hb
+  JR,            //!< Jacobian J = [Jp Jl] and residual r (landmark blocks)
+  JR_QR,         //!< Landmark blocks after QR factorization
+  JR_M,          //!< Marginalized Jr
+  JR_M_QR,       //!< Marginalized Jr_QR
+  HB,            //!< Hessian H = J^T J and b = J^T r
+  HB_M0_PREV,    //!< Previous frame marginal Hb
+  HB_M1_LINED,   //!< Current frame marginal Hb linarized
+  HB_M2_HELPER,  //!< Current frame marginal Hb QR decomposed
+  HB_M3_NEW,     //!< New frame marginal Hb
   COUNT,
   NONE,  //!< Special value to symbolize no UIMATs
   ALL,   //!< Special value to symbolize all UIMATs
