@@ -470,6 +470,9 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
       ltkfs.emplace(*last_kf_it);
       kf_ids.erase(last_kf_it);
     }
+    if (config.vio_fix_long_term_keyframes) {
+      // TODO@mateosss: remove observations shared between this ltkf and other ltkfs
+    }
     take_ltkf = false;
   }
 
@@ -1394,6 +1397,19 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize() {
           VecX b;
 
           lqr->get_dense_H_b(H, b);
+
+          if (config.vio_fix_long_term_keyframes) {
+            for (const int64_t& ts : ltkfs) {
+              if (aom.abs_order_map.count(ts) < 0) {
+                printf("UNEXPECTED: ltkf ts=%ld not in aom\n", ts);
+                continue;
+              }
+              const auto& [idx, size] = aom.abs_order_map.at(ts);
+              H.template block(0, idx, H.rows(), size).setZero();
+              H.template block(idx, 0, size, H.cols()).setZero();
+              b.template segment(idx, size).setZero();
+            }
+          }
 
           stats.add("get_dense_H_b", t.reset()).format("ms");
 

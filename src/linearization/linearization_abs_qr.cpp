@@ -124,6 +124,7 @@ LinearizationAbsQR<Scalar, POSE_SIZE>::LinearizationAbsQR(
       landmark_ids.emplace_back(k);
     }
   }
+  std::sort(landmark_ids.begin(), landmark_ids.end()); // TODO@mateosss: this is nice for visualizing but unuseful
   size_t num_landmakrs = landmark_ids.size();
 
   // std::cout << "num_landmakrs " << num_landmakrs << std::endl;
@@ -218,6 +219,9 @@ Scalar LinearizationAbsQR<Scalar, POSE_SIZE>::linearizeProblem(bool* numerically
         Sophus::SE3<Scalar> T_t_h_sophus =
             computeRelPose(state_h.getPoseLin(), calib.T_i_c[tcid_h.cam_id], state_t.getPoseLin(),
                            calib.T_i_c[tcid_t.cam_id], &rpl.d_rel_d_h, &rpl.d_rel_d_t);
+
+        if (fixed_frames && fixed_frames->count(tcid_h.frame_id)) rpl.d_rel_d_h.setZero();
+        if (fixed_frames && fixed_frames->count(tcid_t.frame_id)) rpl.d_rel_d_t.setZero();
 
         // if either state is already linearized, then the current state
         // estimate is different from the linearization point, so recompute
@@ -575,7 +579,7 @@ void LinearizationAbsQR<Scalar, POSE_SIZE>::get_dense_H_b(MatX& H, VecX& b) cons
   add_dense_H_b_pose_damping(r.H_);
 
   // Add marginalization
-  add_dense_H_b_marg_prior(r.H_, r.b_);
+  add_dense_H_b_marg_prior(r.H_, r.b_); // TODO@mateosss: This is making H fixed states not be zero
 
   H = std::move(r.H_);
   b = std::move(r.b_);

@@ -150,6 +150,8 @@ class LandmarkBlockAbsDynamic : public LandmarkBlock<Scalar> {
               bool valid =
                   linearizePoint<Scalar, CamT>(obs, *lm_ptr, pose_lin_vec[i]->T_t_h, cam, res, &d_res_d_xi, &d_res_d_p);
 
+              if (is_fixed_) d_res_d_p.setZero();
+
               if (!options_->use_valid_projections_only || valid) {
                 numerically_valid =
                     numerically_valid && d_res_d_xi.array().isFinite().all() && d_res_d_p.array().isFinite().all();
@@ -245,6 +247,8 @@ class LandmarkBlockAbsDynamic : public LandmarkBlock<Scalar> {
   // lambda < 0 means computing exact model cost change
   virtual inline void backSubstitute(const VecX& pose_inc, Scalar& l_diff) override {
     BASALT_ASSERT(state == State::Marginalized);
+
+    if (is_fixed_) return;
 
     // For now we include all columns in LMB
     BASALT_ASSERT(pose_inc.size() == signed_cast(padding_idx));

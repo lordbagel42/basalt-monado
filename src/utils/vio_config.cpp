@@ -48,7 +48,7 @@ namespace basalt {
 VioConfig::VioConfig() {
   // optical_flow_type = "patch";
   optical_flow_type = "frame_to_frame";
-  optical_flow_detection_grid_size = 50;
+  optical_flow_detection_grid_size = 64;
   optical_flow_detection_num_points_cell = 1;
   optical_flow_detection_min_threshold = 5;
   optical_flow_detection_max_threshold = 40;
@@ -62,9 +62,9 @@ VioConfig::VioConfig() {
   optical_flow_matching_guess_type = MatchingGuessType::REPROJ_AVG_DEPTH;
   optical_flow_matching_default_depth = 2.0;
   optical_flow_image_safe_radius = 0.0;
-  optical_flow_recall_enable = false;
-  optical_flow_recall_all_cams = false;
-  optical_flow_recall_num_points_cell = true;
+  optical_flow_recall_enable = true;
+  optical_flow_recall_all_cams = true;
+  optical_flow_recall_num_points_cell = false;
   optical_flow_recall_over_tracking = false;
   optical_flow_recall_update_patch_viewpoint = false;
   optical_flow_recall_max_patch_dist = 3;
@@ -102,8 +102,8 @@ VioConfig::VioConfig() {
   vio_init_ba_weight = 1e1;
   vio_init_bg_weight = 1e2;
 
-  vio_marg_lost_landmarks = true;
-  vio_fix_long_term_keyframes = false;
+  vio_marg_lost_landmarks = false;
+  vio_fix_long_term_keyframes = true;
 
   vio_kf_marg_feature_ratio = 0.1;
   vio_kf_marg_criteria = KeyframeMargCriteria::KF_MARG_DEFAULT;
