@@ -65,7 +65,6 @@ class slam_tracker_ui : vis::VIOUIBase {
  public:
   tbb::concurrent_bounded_queue<VioVisualizationData::Ptr> out_vis_queue{};
   tbb::concurrent_queue<double> *opt_flow_depth_queue = nullptr;
-  OpticalFlowBase::Ptr opt_flow;
 
   VioVisualizationData::Ptr get_curr_vis_data() override { return curr_vis_data; }
 
@@ -76,9 +75,10 @@ class slam_tracker_ui : vis::VIOUIBase {
   }
 
   void start(const Sophus::SE3d &T_w_i_init, const Calibration<double> &calib, const VioConfig &config,
-             tbb::concurrent_queue<double> *ofq_depth, OpticalFlowBase::Ptr of) {
-    opt_flow_depth_queue = ofq_depth;
+             OpticalFlowBase::Ptr of, VioEstimatorBase::Ptr ve) {
+    opt_flow_depth_queue = &of->input_depth_queue;
     opt_flow = of;
+    vio = ve;
     running = true;
     start_visualization_thread();
     start_ui(T_w_i_init, calib, config);
@@ -271,7 +271,7 @@ class slam_tracker_ui : vis::VIOUIBase {
     if (curr_vis_data == nullptr) return;
 
     if (show_obs) do_show_obs(cam_id);
-    if (show_flow) do_show_flow(cam_id, opt_flow);
+    if (show_flow) do_show_flow(cam_id);
     if (show_highlights) do_show_highlights(cam_id);
     if (show_tracking_guess) do_show_tracking_guess(cam_id, show_frame, prev_vis_data);
     if (show_matching_guess) do_show_matching_guesses(cam_id);
@@ -312,7 +312,7 @@ class slam_tracker_ui : vis::VIOUIBase {
       for (size_t i = 0; i < calib.T_i_c.size(); i++) do_render_camera(p * calib.T_i_c[i], i, ts, pose_color);
 
     for (const auto &[ts, p] : curr_vis_data->ltframes)
-      for (size_t i = 0; i < calib.T_i_c.size(); i++) do_render_camera(p * calib.T_i_c[i], i, ts, pose_color);
+      for (size_t i = 0; i < calib.T_i_c.size(); i++) do_render_camera(p * calib.T_i_c[i], i, ts, vis::BLUE);
 
     glColor3ubv(pose_color);
     if (!filter_highlights) pangolin::glDrawPoints(curr_vis_data->points);

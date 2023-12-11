@@ -129,9 +129,6 @@ struct basalt_vio_ui : vis::VIOUIBase {
   std::chrono::high_resolution_clock::time_point time_start;
   bool aborted = false;
 
-  OpticalFlowBase::Ptr opt_flow_ptr;
-  VioEstimatorBase::Ptr vio;
-
   thread feed_images_thread;
   thread feed_imu_thread;
   thread vis_thread;
@@ -142,7 +139,6 @@ struct basalt_vio_ui : vis::VIOUIBase {
 
   Button next_step_btn{"ui.next_step", [this]() { next_step(); }};
   Button prev_step_btn{"ui.prev_step", [this]() { prev_step(); }};
-  Button take_ltkf_btn{"ui.Take Keyframe", [this]() { take_ltkf(); }};
 
   Var<bool> continue_btn{"ui.continue", false, true};
   Var<bool> continue_fast{"ui.continue_fast", true, true};
@@ -226,8 +222,8 @@ struct basalt_vio_ui : vis::VIOUIBase {
       show_frame.Meta().range[1] = vio_dataset->get_image_timestamps().size() - 1;
       show_frame.Meta().gui_changed = true;
 
-      opt_flow_ptr = basalt::OpticalFlowFactory::getOpticalFlow(config, calib);
-      opt_flow_ptr->start();
+      opt_flow = basalt::OpticalFlowFactory::getOpticalFlow(config, calib);
+      opt_flow->start();
 
       for (size_t i = 0; i < vio_dataset->get_gt_pose_data().size(); i++) {
         gt_t_ns.push_back(vio_dataset->get_gt_timestamps()[i]);
@@ -240,13 +236,13 @@ struct basalt_vio_ui : vis::VIOUIBase {
       vio = basalt::VioEstimatorFactory::getVioEstimator(config, calib, basalt::constants::g, use_imu, use_double);
       vio->initialize(Eigen::Vector3d::Zero(), Eigen::Vector3d::Zero());
 
-      opt_flow_ptr->output_queue = &vio->vision_data_queue;
-      opt_flow_ptr->show_gui = show_gui;
+      opt_flow->output_queue = &vio->vision_data_queue;
+      opt_flow->show_gui = show_gui;
       if (show_gui) vio->out_vis_queue = &out_vis_queue;
       vio->out_state_queue = &out_state_queue;
-      vio->opt_flow_depth_guess_queue = &opt_flow_ptr->input_depth_queue;
-      vio->opt_flow_state_queue = &opt_flow_ptr->input_state_queue;
-      vio->opt_flow_lm_bundle_queue = &opt_flow_ptr->input_lm_bundle_queue;
+      vio->opt_flow_depth_guess_queue = &opt_flow->input_depth_queue;
+      vio->opt_flow_state_queue = &opt_flow->input_state_queue;
+      vio->opt_flow_lm_bundle_queue = &opt_flow->input_lm_bundle_queue;
     }
 
     basalt::MargDataSaver::Ptr marg_data_saver;
@@ -347,9 +343,9 @@ struct basalt_vio_ui : vis::VIOUIBase {
   }
 
   void print_queue_fn() {
-    std::cout << "opt_flow_ptr->input_img_queue " << opt_flow_ptr->input_img_queue.size()
-              << " opt_flow_ptr->output_queue " << opt_flow_ptr->output_queue->size() << " out_state_queue "
-              << out_state_queue.size() << " imu_data_queue " << vio->imu_data_queue.size() << std::endl;
+    std::cout << "opt_flow->input_img_queue " << opt_flow->input_img_queue.size() << " opt_flow->output_queue "
+              << opt_flow->output_queue->size() << " out_state_queue " << out_state_queue.size() << " imu_data_queue "
+              << vio->imu_data_queue.size() << std::endl;
   }
 
   void run_ui() {
@@ -557,7 +553,7 @@ struct basalt_vio_ui : vis::VIOUIBase {
     // input threads will abort when vio is finished, but might be stuck in full
     // push to full queue, so drain queue now
     vio->drain_input_queues();
-    opt_flow_ptr->drain_input_queues();
+    opt_flow->drain_input_queues();
 
     // join input threads
     feed_images_thread.join();
@@ -673,11 +669,11 @@ struct basalt_vio_ui : vis::VIOUIBase {
 
       timestamp_to_id[img->t_ns] = i;
 
-      opt_flow_ptr->input_img_queue.push(img);
+      opt_flow->input_img_queue.push(img);
     }
 
     // Indicate the end of the sequence
-    opt_flow_ptr->input_img_queue.push(nullptr);
+    opt_flow->input_img_queue.push(nullptr);
 
     std::cout << "Finished input_data thread " << std::endl;
   }
@@ -695,10 +691,10 @@ struct basalt_vio_ui : vis::VIOUIBase {
       data->gyro = vio_dataset->get_gyro_data()[i].data;
 
       vio->imu_data_queue.push(data);
-      opt_flow_ptr->input_imu_queue.push(data);
+      opt_flow->input_imu_queue.push(data);
     }
     vio->imu_data_queue.push(nullptr);
-    opt_flow_ptr->input_imu_queue.push(nullptr);
+    opt_flow->input_imu_queue.push(nullptr);
   }
 
   void draw_image_overlay(pangolin::ImageView& v, size_t cam_id) {
@@ -707,7 +703,7 @@ struct basalt_vio_ui : vis::VIOUIBase {
     if (curr_vis_data == nullptr) return;
 
     if (show_obs) do_show_obs(cam_id);
-    if (show_flow) do_show_flow(cam_id, opt_flow_ptr);
+    if (show_flow) do_show_flow(cam_id);
     if (show_highlights) do_show_highlights(cam_id);
     if (show_tracking_guess) do_show_tracking_guess_vio(cam_id, show_frame, vio_dataset, vis_map);
     if (show_matching_guess) do_show_matching_guesses(cam_id);
@@ -831,12 +827,6 @@ struct basalt_vio_ui : vis::VIOUIBase {
     } else {
       return false;
     }
-  }
-
-  bool take_ltkf() {
-    std::cout << "Take long term keyframe" << std::endl;
-    vio->takeLongTermKeyframe();
-    return true;
   }
 
   void draw_plots() {

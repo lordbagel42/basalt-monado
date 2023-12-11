@@ -201,6 +201,8 @@ struct VIOUIBase {
   Selection highlights{};
   VioConfig config;
   Calibration<double> calib;
+  OpticalFlowBase::Ptr opt_flow;
+  VioEstimatorBase::Ptr vio;
 
   Var<int> show_frame{"ui.show_frame", 0, META_FLAG_READONLY};
 
@@ -224,6 +226,8 @@ struct VIOUIBase {
   Var<int> mat_to_show{"ui.mat_to_show", (int)UIMAT::JR, (int)UIMAT::JR, (int)UIMAT::COUNT - 1};
 
   Var<bool> show_block_vals{"ui.show_block_vals", false, true};
+
+  Button take_ltkf_btn{"ui.Take Keyframe", [this]() { take_ltkf(); }};
 
   Var<bool> show_grid{"ui.show_grid", false, true};
   Var<bool> show_safe_radius{"ui.show_safe_radius", false, true};
@@ -251,7 +255,8 @@ struct VIOUIBase {
   bool is_highlighted(size_t lmid) const { return vis::is_selected(highlights, lmid); }
   bool highligh_frame();
   bool toggle_blocks();
-  void do_show_flow(size_t cam_id, const OpticalFlowBase::Ptr& opt_flow);
+  bool take_ltkf();
+  void do_show_flow(size_t cam_id);
   void do_show_highlights(size_t cam_id);
   void do_show_tracking_guess(size_t cam_id, size_t frame_id, const VioVisualizationData::Ptr& prev_vis_data);
   void do_show_tracking_guess_vio(size_t cam_id, size_t frame_id, const VioDatasetPtr& vio_dataset,

@@ -84,7 +84,12 @@ bool VIOUIBase::toggle_blocks() {
   return show_blocks;
 }
 
-void VIOUIBase::do_show_flow(size_t cam_id, const OpticalFlowBase::Ptr& opt_flow) {
+bool VIOUIBase::take_ltkf() {
+  vio->takeLongTermKeyframe();
+  return true;
+}
+
+void VIOUIBase::do_show_flow(size_t cam_id) {
   const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
   if (curr_vis_data == nullptr) return;
 
