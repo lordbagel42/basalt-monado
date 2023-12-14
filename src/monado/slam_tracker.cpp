@@ -188,7 +188,7 @@ struct slam_tracker::implementation {
     }
   }
 
-  pose get_pose_from_state(const PoseVelBiasState<double>::Ptr &state) const {
+  static pose get_pose_from_state(const PoseVelBiasState<double>::Ptr &state) {
     pose p;
     Sophus::SE3d T_w_i = state->T_w_i;
     p.px = T_w_i.translation().x();
@@ -393,10 +393,7 @@ struct slam_tracker::implementation {
     auto &mimg = partial_frame->img_data[i].img;
     mimg.reset(new ManagedImage<uint16_t>(width, height));
 
-    for (size_t j = 0; j < s.masks.size(); j++) {
-      auto &r = s.masks[j];
-      partial_frame->masks[i].masks.emplace_back(r.x, r.y, r.w, r.h);
-    }
+    for (auto r : s.masks) partial_frame->masks[i].masks.emplace_back(r.x, r.y, r.w, r.h);
 
     // TODO: We could avoid this copy. Maybe by writing a custom
     // allocator for ManagedImage that ties the OpenCV allocator
@@ -458,12 +455,12 @@ struct slam_tracker::implementation {
     Eigen::Quaterniond q(ric);
     Eigen::Vector3d p{tic(0, 3), tic(1, 3), tic(2, 3)};
     ASSERT_(calib.T_i_c.size() == i);
-    calib.T_i_c.push_back(Calibration<Scalar>::SE3(q, p));
+    calib.T_i_c.emplace_back(q, p);
 
     GenericCamera<double> model;
     const vector<Scalar> &d = cam_calib.distortion;
     if (cam_calib.distortion_model == "none") {
-      ASSERT_(d.size() == 0);
+      ASSERT_(d.empty());
       PinholeCamera<Scalar>::VecN mp;
       mp << cam_calib.fx, cam_calib.fy, cam_calib.cx, cam_calib.cy;
       PinholeCamera pinhole(mp);
@@ -488,7 +485,7 @@ struct slam_tracker::implementation {
     calib.intrinsics.push_back(model);
 
     ASSERT_(calib.resolution.size() == i);
-    calib.resolution.push_back({cam_calib.width, cam_calib.height});
+    calib.resolution.emplace_back(cam_calib.width, cam_calib.height);
 
     calib_data_ready.cam.at(i) = true;
   }

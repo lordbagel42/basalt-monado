@@ -124,7 +124,7 @@ struct basalt_vio_ui : vis::VIOUIBase {
   bool show_gui = true;
   std::string trajectory_fmt;
   std::string result_path;
-  bool trajectory_groundtruth;
+  bool trajectory_groundtruth{};
   bool print_queue = false;
   std::chrono::high_resolution_clock::time_point time_start;
   bool aborted = false;
@@ -442,7 +442,7 @@ struct basalt_vio_ui : vis::VIOUIBase {
 
         if (show_frame.GuiChanged()) {
           for (size_t cam_id = 0; cam_id < calib.intrinsics.size(); cam_id++) {
-            size_t frame_id = static_cast<size_t>(show_frame);
+            auto frame_id = static_cast<size_t>(show_frame);
             int64_t timestamp = vio_dataset->get_image_timestamps()[frame_id];
 
             std::vector<basalt::ImageData> img_vec = vio_dataset->get_image_data(timestamp);
