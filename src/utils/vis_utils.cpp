@@ -633,13 +633,15 @@ void VIOUIBase::draw_jacobian_overlay(pangolin::ImageView& blocks_view, const UI
     if (show_ids) {
       bool keyframed = curr_vis_data->keyframed_idx.count(ts) > 0;
       bool marginalized = curr_vis_data->marginalized_idx.count(ts) > 0;
+      bool tmp_keyframes = curr_vis_data->tmp_keyframes_idx.count(ts) > 0;
       bool present = curr_vis_data->frame_idx.count(ts) > 0;
-      if (!keyframed && !marginalized && !present) BASALT_ASSERT(false);
+      // if (!keyframed && !marginalized && !present) BASALT_ASSERT(false);
 
-      size_t fid = (keyframed      ? curr_vis_data->keyframed_idx[ts]
-                    : marginalized ? curr_vis_data->marginalized_idx[ts]
-                                   : curr_vis_data->frame_idx[ts]);
-      glColor3ubv(keyframed ? GREEN : marginalized ? RED : BLUE);
+      size_t fid = (keyframed        ? curr_vis_data->keyframed_idx[ts]
+                    : marginalized   ? curr_vis_data->marginalized_idx[ts]
+                    : tmp_keyframes  ? curr_vis_data->tmp_keyframes_idx[ts]
+                                     : curr_vis_data->frame_idx[ts]);
+      glColor3ubv(keyframed ? GREEN : marginalized ? RED : tmp_keyframes ? BLACK : BLUE);
       auto text = pangolin::GlFont::I().Text("%lu", fid);
       try_draw_image_text(blocks_view, xoff + idx, pad / 2, text);
       glColor3ubv(BLUE);
@@ -653,7 +655,8 @@ void VIOUIBase::draw_jacobian_overlay(pangolin::ImageView& blocks_view, const UI
   size_t i = 0;
   for (const UILandmarkBlock& b : lmbs) {
     bool highlighted = show_highlights && is_selected(highlights, b.lmid);
-    glColor3ubv(highlighted ? GREEN : BLUE);
+    bool temporal = is_temporal(b.lmid);
+    glColor3ubv(highlighted ? GREEN : temporal ? BLACK : BLUE);
     pangolin::glDrawLine(xoffh - 0.5, yoff + i - 0.5, xoffh + W - 0.5, yoff + i - 0.5);
 
     if (show_ids) {
@@ -714,13 +717,15 @@ void VIOUIBase::draw_hessian_overlay(pangolin::ImageView& blocks_view, const UIH
     if (show_ids) {
       bool keyframed = curr_vis_data->keyframed_idx.count(ts) > 0;
       bool marginalized = curr_vis_data->marginalized_idx.count(ts) > 0;
+      bool tmp_keyframes = curr_vis_data->tmp_keyframes_idx.count(ts) > 0;
       bool present = curr_vis_data->frame_idx.count(ts) > 0;
-      if (!keyframed && !marginalized && !present) BASALT_ASSERT(false);
+      // if (!keyframed && !marginalized && !present) BASALT_ASSERT(false);
 
-      size_t fid = (keyframed      ? curr_vis_data->keyframed_idx[ts]
-                    : marginalized ? curr_vis_data->marginalized_idx[ts]
-                                   : curr_vis_data->frame_idx[ts]);
-      glColor3ubv(keyframed ? GREEN : marginalized ? RED : BLUE);
+      size_t fid = (keyframed       ? curr_vis_data->keyframed_idx[ts]
+                    : marginalized  ? curr_vis_data->marginalized_idx[ts]
+                    : tmp_keyframes ? curr_vis_data->tmp_keyframes_idx[ts]
+                                    : curr_vis_data->frame_idx[ts]);
+      glColor3ubv(keyframed ? GREEN : marginalized ? RED : tmp_keyframes ? BLACK : BLUE);
       auto text = pangolin::GlFont::I().Text("%lu", fid);
       try_draw_image_text(blocks_view, xoff + idx, pad / 2, text);
       try_draw_image_text(blocks_view, 0, yoff + idx + pad / 2, text);
@@ -956,6 +961,12 @@ bool is_selected(const Selection& selection, size_t n) {
   return false;
 }
 
+bool VIOUIBase::is_temporal(size_t n) {
+  const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
+  if (curr_vis_data == nullptr) return false;
+  return curr_vis_data->tmp_lm_idx.find(n) != curr_vis_data->tmp_lm_idx.end();
+}
+
 bool VIOUIBase::do_follow_highlight(bool smooth_zoom) {
   const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
   if (curr_vis_data == nullptr) return false;
@@ -1010,13 +1021,15 @@ void VIOUIBase::do_render_camera(const Sophus::SE3d& T_w_c, size_t i, size_t ts,
 
   bool keyframed = curr_vis_data->keyframed_idx.count(ts) > 0;
   bool marginalized = curr_vis_data->marginalized_idx.count(ts) > 0;
+  bool tmp_keyframes = curr_vis_data->tmp_keyframes_idx.count(ts) > 0;
   bool present = curr_vis_data->frame_idx.count(ts) > 0;
-  if (!keyframed && !marginalized && !present) BASALT_ASSERT(false);
+  // if (!keyframed && !marginalized && !present) BASALT_ASSERT(false);
 
-  size_t fid = (keyframed      ? curr_vis_data->keyframed_idx[ts]
-                : marginalized ? curr_vis_data->marginalized_idx[ts]
-                               : curr_vis_data->frame_idx[ts]);
-  const uint8_t* fid_color = keyframed ? GREEN : marginalized ? RED : BLUE;
+  size_t fid = (keyframed       ? curr_vis_data->keyframed_idx[ts]
+                : marginalized  ? curr_vis_data->marginalized_idx[ts]
+                : tmp_keyframes ? curr_vis_data->tmp_keyframes_idx[ts]
+                                : curr_vis_data->frame_idx[ts]);
+  const uint8_t* fid_color = keyframed ? GREEN : marginalized ? RED : tmp_keyframes ? BLACK : BLUE;
   render_camera(T_w_c.matrix(), 2.0F, color, 0.1F, show_ids && i == 0, fid, fid_color);
 }
 

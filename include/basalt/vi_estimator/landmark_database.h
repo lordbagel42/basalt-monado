@@ -91,6 +91,7 @@ class LandmarkDatabase {
  public:
   using Scalar = Scalar_;
   using SE3 = Sophus::SE3<Scalar>;
+  using Vec2 = Eigen::Matrix<Scalar, 2, 1>;
 
   // Non-const
   void addLandmark(LandmarkId lm_id, const Landmark<Scalar>& pos);
@@ -113,12 +114,14 @@ class LandmarkDatabase {
 
   Landmark<Scalar>& getLandmark(LandmarkId lm_id);
 
-  SE3 &getFramePose(FrameId frame_id);
+  SE3& getFramePose(FrameId frame_id);
 
-  void getCovisibleMap(Keypoints keypoints, std::set<FrameId>& covisible_keyframes, std::set<LandmarkId>& covisible_landmarks);
+  void getCovisibleMap(std::set<KeypointId> kpids, std::set<TimeCamId>& covisible_keyframes,
+                       std::map<LandmarkId, Landmark<Scalar>>& covisible_landmarks,
+                       std::map<LandmarkId, std::map<TimeCamId, Vec2>>& map_observations);
 
   // Const
-  const TimeCamId & getLandmarkHost(LandmarkId lm_id) const;
+  const TimeCamId& getLandmarkHost(LandmarkId lm_id) const;
 
   const Landmark<Scalar>& getLandmark(LandmarkId lm_id) const;
 

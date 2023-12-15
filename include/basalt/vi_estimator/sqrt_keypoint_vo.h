@@ -65,6 +65,7 @@ class SqrtKeypointVoEstimator : public VioEstimatorBase, public SqrtBundleAdjust
 
   using BundleAdjustmentBase<Scalar>::computeError;
   using BundleAdjustmentBase<Scalar>::get_current_points;
+  using BundleAdjustmentBase<Scalar>::get_map_points;
   using BundleAdjustmentBase<Scalar>::computeDelta;
   using BundleAdjustmentBase<Scalar>::computeProjections;
   using BundleAdjustmentBase<Scalar>::triangulate;

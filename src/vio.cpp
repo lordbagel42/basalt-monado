@@ -792,6 +792,16 @@ struct basalt_vio_ui : vis::VIOUIBase {
       }
     }
 
+    glColor3ubv(vis::BLACK);
+    pangolin::glDrawPoints(curr_vis_data->map_points);
+    if (show_ids) {
+      for (size_t i = 0; i < curr_vis_data->map_points.size(); i++) {
+        Vector3d pos = curr_vis_data->map_points.at(i);
+        int id = curr_vis_data->map_point_ids.at(i);
+        pangolin::GlFont::I().Text("%d", id).Draw(pos.x(), pos.y(), pos.z());
+      }
+    }
+
     pangolin::glDrawAxis(Sophus::SE3d().matrix(), 1.0);
   }
 

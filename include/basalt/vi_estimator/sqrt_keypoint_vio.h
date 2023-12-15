@@ -70,6 +70,7 @@ class SqrtKeypointVioEstimator : public VioEstimatorBase, public SqrtBundleAdjus
 
   using BundleAdjustmentBase<Scalar>::computeError;
   using BundleAdjustmentBase<Scalar>::get_current_points;
+  using BundleAdjustmentBase<Scalar>::get_map_points;
   using BundleAdjustmentBase<Scalar>::computeDelta;
   using BundleAdjustmentBase<Scalar>::computeProjections;
   using BundleAdjustmentBase<Scalar>::triangulate;
@@ -218,9 +219,11 @@ class SqrtKeypointVioEstimator : public VioEstimatorBase, public SqrtBundleAdjus
   std::set<int64_t> kf_ids;
   std::set<int64_t> ltkfs;  // Long term keyframes
   Eigen::aligned_map<int64_t, size_t> ltkfs_ids;
-  std::set<FrameId> covisible_keyframes;
-  std::set<LandmarkId> covisible_landmarks;
+  std::set<TimeCamId> covisible_keyframes;
+  std::map<LandmarkId, Landmark<Scalar>> covisible_landmarks;
+  std::map<LandmarkId, std::map<TimeCamId, Vec2>> map_observations;
   bool take_ltkf;           // Whether the next keyframe should be made into ltkfs
+  bool take_map;           // Whether the next keyframe should be made into ltkfs
   Eigen::aligned_map<int64_t, size_t> frame_idx;
   bool take_priorkf;
 

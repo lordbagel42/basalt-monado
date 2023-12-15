@@ -65,6 +65,10 @@ class BundleAdjustmentBase {
   template <class Scalar2>
   void get_current_points(Eigen::aligned_vector<Eigen::Matrix<Scalar2, 3, 1>>& points, std::vector<int>& ids) const;
 
+  template <class Scalar2>
+  void get_map_points(std::map<LandmarkId, Landmark<Scalar>>& landmarks,
+                      Eigen::aligned_vector<Eigen::Matrix<Scalar2, 3, 1>>& points, std::vector<int>& ids);
+
   void computeDelta(const AbsOrderMap& marg_order, VecX& delta) const;
 
   void linearizeMargPrior(const MargLinData<Scalar>& mld, const AbsOrderMap& aom, MatX& abs_H, VecX& abs_b,

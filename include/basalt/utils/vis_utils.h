@@ -170,6 +170,7 @@ extern pangolin::GlFont SMALL_FONT;
 const uint8_t BLUE[4]{0x21, 0x96, 0xF3, 0xFF};
 const uint8_t GREEN[4]{0x4C, 0xAF, 0x50, 0xFF};
 const uint8_t RED[4]{0xF4, 0x43, 0x36, 0xFF};
+const uint8_t BLACK[4]{0x00, 0x00, 0x00, 0xFF};
 
 struct SelectionNode {
   bool is_range;
@@ -184,6 +185,7 @@ using Selection = std::vector<SelectionNode>;
 Selection parse_selection(const std::string& str);
 
 bool is_selected(const Selection& selection, size_t n);
+
 
 struct VIOUIBase {
   static constexpr int UI_WIDTH_PIX = 200;
@@ -274,6 +276,7 @@ struct VIOUIBase {
   void do_show_hessian(const shared_ptr<ImageView>& blocks_view, UIHessians& uih);
   void do_show_jacobian(const shared_ptr<ImageView>& blocks_view, UIJacobians& uij);
   bool do_follow_highlight(bool smooth_zoom);
+  bool is_temporal(size_t n);
 
   void do_render_camera(const Sophus::SE3d& T_w_c, size_t i, size_t ts, const uint8_t* color);
 };

@@ -59,9 +59,13 @@ struct VioVisualizationData {
   Eigen::aligned_map<int64_t, size_t> frame_idx{};
   Eigen::aligned_map<int64_t, size_t> keyframed_idx{};
   Eigen::aligned_map<int64_t, size_t> marginalized_idx{};
+  Eigen::aligned_map<int64_t, size_t> tmp_keyframes_idx{};
+  std::set<size_t> tmp_lm_idx{};
 
   Eigen::aligned_vector<Eigen::Vector3d> points;
+  Eigen::aligned_vector<Eigen::Vector3d> map_points;
   std::vector<int> point_ids;
+  std::vector<int> map_point_ids;
 
   OpticalFlowResult::Ptr opt_flow_res;
 
@@ -134,7 +138,7 @@ class VioEstimatorBase {
   virtual void scheduleResetState(){};
   virtual void takeLongTermKeyframe(){};
   virtual void takePriorKeyframe(){};
-  virtual void addPriorKeyframe(){};
+  virtual void addPriorKeyframe() {};
   virtual void removePriorKeyframe(){};
 
   virtual inline void debug_finalize() {}

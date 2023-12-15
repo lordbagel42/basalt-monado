@@ -248,6 +248,31 @@ void BundleAdjustmentBase<Scalar_>::get_current_points(Eigen::aligned_vector<Eig
 }
 
 template <class Scalar_>
+template <class Scalar2>
+void BundleAdjustmentBase<Scalar_>::get_map_points(std::map<LandmarkId, Landmark<Scalar_>>& landmarks,
+                                                   Eigen::aligned_vector<Eigen::Matrix<Scalar2, 3, 1>>& points,
+                                                   std::vector<int>& ids) {
+  points.clear();
+  ids.clear();
+  for (const auto& [lm_id, lm] : landmarks) {
+    Sophus::SE3<Scalar_> T_w_i;
+
+    T_w_i = persistent_lmdb.getFramePose(lm.host_kf_id.frame_id);
+
+    const Sophus::SE3<Scalar>& T_i_c = calib.T_i_c[lm.host_kf_id.cam_id];
+    Mat4 T_w_c = (T_w_i * T_i_c).matrix();
+
+    Vec4 pt_cam = StereographicParam<Scalar>::unproject(lm.direction);
+    pt_cam[3] = lm.inv_dist;
+
+    Vec4 pt_w = T_w_c * pt_cam;
+
+    points.emplace_back((pt_w.template head<3>() / pt_w[3]).template cast<Scalar2>());
+    ids.emplace_back(lm_id);
+  }
+}
+
+template <class Scalar_>
 void BundleAdjustmentBase<Scalar_>::filterOutliers(Scalar outlier_threshold, int min_num_obs) {
   Scalar error;
   std::map<int, std::vector<std::pair<TimeCamId, Scalar>>> outliers;
@@ -544,6 +569,10 @@ template class BundleAdjustmentBase<double>;
 template void BundleAdjustmentBase<double>::get_current_points<double>(
     Eigen::aligned_vector<Eigen::Matrix<double, 3, 1>>& points, std::vector<int>& ids) const;
 
+template void BundleAdjustmentBase<double>::get_map_points<double>(
+    std::map<LandmarkId, Landmark<double>>& landmarks, Eigen::aligned_vector<Eigen::Matrix<double, 3, 1>>& points,
+    std::vector<int>& ids);
+
 template void BundleAdjustmentBase<double>::computeProjections<double>(
     std::vector<Eigen::aligned_vector<Eigen::Matrix<double, 4, 1>>>& data, FrameId last_state_t_ns) const;
 // #endif
@@ -557,6 +586,10 @@ template class BundleAdjustmentBase<float>;
 
 template void BundleAdjustmentBase<float>::get_current_points<double>(
     Eigen::aligned_vector<Eigen::Matrix<double, 3, 1>>& points, std::vector<int>& ids) const;
+
+template void BundleAdjustmentBase<float>::get_map_points<double>(
+    std::map<LandmarkId, Landmark<float>>& landmarks, Eigen::aligned_vector<Eigen::Matrix<double, 3, 1>>& points,
+    std::vector<int>& ids);
 
 // template void BundleAdjustmentBase<float>::computeProjections<float>(
 //    std::vector<Eigen::aligned_vector<Eigen::Matrix<float, 4, 1>>>& data,

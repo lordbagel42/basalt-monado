@@ -49,7 +49,8 @@ void LandmarkDatabase<Scalar_>::addLandmark(LandmarkId lm_id, const Landmark<Sca
 }
 
 template <class Scalar_>
-void LandmarkDatabase<Scalar_>::addLandmarkWithPose(LandmarkId lm_id, const Landmark<Scalar> &pos, int64_t frame_id, const SE3& frame_pose) {
+void LandmarkDatabase<Scalar_>::addLandmarkWithPose(LandmarkId lm_id, const Landmark<Scalar> &pos, int64_t frame_id,
+                                                    const SE3 &frame_pose) {
   auto &kpt = kpts[lm_id];
   kpt.direction = pos.direction;
   kpt.inv_dist = pos.inv_dist;
@@ -142,7 +143,7 @@ void LandmarkDatabase<Scalar_>::addObservation(const TimeCamId &tcid_target, con
 }
 
 template <class Scalar_>
-void LandmarkDatabase<Scalar_>::addFramePose(int64_t frame_id, const SE3& frame_pose) {
+void LandmarkDatabase<Scalar_>::addFramePose(int64_t frame_id, const SE3 &frame_pose) {
   frame_poses[frame_id] = frame_pose;
 }
 
@@ -152,15 +153,65 @@ Sophus::SE3<Scalar_> &LandmarkDatabase<Scalar_>::getFramePose(int64_t frame_id) 
 }
 
 template <class Scalar_>
-void LandmarkDatabase<Scalar_>::getCovisibleMap(Keypoints keypoints, std::set<FrameId>& covisible_keyframes, std::set<LandmarkId>& covisible_landmarks){
-  for (const auto& kv_obs : keypoints) {
-    int kpt_id = kv_obs.first;
+void LandmarkDatabase<Scalar_>::getCovisibleMap(
+    std::set<KeypointId> kpids, std::set<TimeCamId> &keyframes,
+    std::map<LandmarkId, Landmark<Scalar>> &landmarks,
+    std::map<LandmarkId, std::map<TimeCamId, Vec2>> &obs) {
+  // getCovisibleMap:: pose -> (keyframes, landmarks, observaciones de esos lms entre esos kfs)
+  // 1. keyframes = relevant (covisible) keyframes
+  // 2. landmarks = landmarks hosted/targeted by kfs in keyframes
+  // 3. keyframes.add(targets/hosts of landmarks not in keyframes)
+  // 4.
+  // lmdb.observations: (host -> target -> lmid)
+  // lm.obs: (target -> uv)
+  // kpts: (lmid -> lm)
+  // frame_poses: (frameid -> pose)
+  /*
+    hosts = relevant (covisible) keyframes
+    targets = {}
+    landmarks = {}
+    obs: (host -> target -> lmid) = {}
+    for each host in hosts:
+      for each [target, lmid] in lmdb.observations[keyframe]:
+        lm = kpts[lmid]
+        targets.add(target)
+        landmarks[lmid] = lm
+        obs[host][target][lmid] = lm.obs[target]
+  */
+
+  keyframes.clear();
+  landmarks.clear();
+  obs.clear();
+  size_t max_keyframes = 500;
+  size_t max_landmaks = 10000;
+
+  // 1. keyframes = relevant keyframes (for now the hosts of the landmarks seen by the frame)
+  for (const auto &kpt_id : kpids) {
     if (landmarkExists(kpt_id)) {
       auto lm = getLandmark(kpt_id);
-      covisible_keyframes.emplace(lm.host_kf_id.frame_id);
-      covisible_landmarks.emplace(lm.id);
+      keyframes.emplace(lm.host_kf_id);
+      if (keyframes.size() == max_keyframes) break;
     }
   }
+
+  // 2. landmarks = landmarks hosted/targeted by kfs in keyframes
+  for (const auto &kf_tcid : keyframes) {
+    for (const auto &[lmid, lm] : kpts) {
+      if (lm.host_kf_id == kf_tcid || lm.obs.count(kf_tcid) > 0) landmarks[lmid] = lm;
+      if (landmarks.size() == max_landmaks) break;
+    }
+  }
+
+  // 3. keyframes.add(targets/hosts of landmarks not in keyframes)
+  for (const auto &[lmid, lm] : landmarks) {
+    if (keyframes.find(lm.host_kf_id) == keyframes.end()) keyframes.emplace(lm.host_kf_id);
+    // 4. obs: observations of covisible landmarks between covisible keyframes
+    for (const auto &[target_tcid, uv] : lm.obs) {
+      if (keyframes.find(target_tcid) == keyframes.end()) keyframes.emplace(target_tcid);
+      if (keyframes.find(target_tcid) != keyframes.end() && target_tcid != lm.host_kf_id) obs[lmid][target_tcid] = uv;
+    }
+  }
+
 }
 
 template <class Scalar_>
@@ -229,10 +280,9 @@ typename LandmarkDatabase<Scalar_>::MapIter LandmarkDatabase<Scalar_>::removeLan
     if (target_it->second.empty()) host_it->second.erase(target_it);
   }
 
-  if (host_it->second.empty()) observations.erase(host_it);
+  /// TODO:@brunozanotti why I have to add this host_it != observations.end()?
+  if (host_it != observations.end() && host_it->second.empty()) observations.erase(host_it);
 
-  if (it->first == 966)
-    std::cout << "Removing landmark 966" << std::endl;
   return kpts.erase(it);
 }
 
