@@ -49,4 +49,12 @@ if [ $MAJOR_VERSION_DETECTED -lt $MAJOR_VERSION_NEEDED ]; then
     exit 1
 fi
 
-find $FOLDER -iname "*.?pp" -or -iname "*.h" | xargs $CLANG_TIDY_CMD -verbose -i
+find $FOLDER -iname "*.?pp" -or -iname "*.h" | xargs $CLANG_TIDY_CMD --config-file=.clang-tidy -p build
+https://clang.llvm.org/extra/doxygen/run-clang-tidy_8py_source.html
+
+
+    run-clang-tidy.py: useful to run clang-tidy on a compilation database
+
+    clang-tidy-diff.py: useful to run clang-tidy on a diff output
+
+https://sarcasm.github.io/notes/dev/clang-tidy.html

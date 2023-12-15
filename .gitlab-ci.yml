@@ -3,9 +3,13 @@
 
 variables:
   GIT_SUBMODULE_STRATEGY: recursive
+  CLANG_VERSION: "15"
+  CLANG_TIDY: "clang-tidy-$CLANG_VERSION"
+  CLANG_FORMAT: "clang-format-$CLANG_VERSION"
 
 stages:
   - build
+  - analyze
   - release
 
 build-ubuntu-2204:
@@ -25,6 +29,34 @@ build-ubuntu-2204:
       - "basalt-monado-ubuntu-22.04-haswell-amd64.deb"
     reports:
       dotenv: release.env
+
+clang-tidy:
+  stage: analyze
+  image: registry.freedesktop.org/mateosss/basalt/ubuntu/22.04
+  when: manual
+  script:
+    - apt-get update && apt-get install -y $CLANG_TIDY
+    - $CLANG_TIDY --version
+    - cmake -B build
+    - echo $CI_DEFAULT_BRANCH
+    - git diff $CI_DEFAULT_BRANCH
+    - |-
+      if git diff main..HEAD --name-only --exit-code; then # If on the main branch, analyze all files
+        ./scripts/clang-tidy-all.sh || true
+      else # # Otherwise analyze only changed files that were not deleted
+        git diff --name-only --diff-filter=d $CI_DEFAULT_BRANCH...HEAD | grep -E '\.cpp|\.hpp|\.h$' | xargs $CLANG_TIDY --config-file=.clang-tidy -p build || true
+      fi
+    - echo Done
+
+clang-format:
+  stage: analyze
+  image: registry.freedesktop.org/mateosss/basalt/ubuntu/22.04
+  when: manual
+  script:
+    - apt-get update && apt-get install -y $CLANG_FORMAT
+    - $CLANG_FORMAT --version
+    - ./scripts/clang-format-all.sh
+    - git diff --exit-code
 
 release:
   stage: release
