@@ -27,14 +27,17 @@
 #include <basalt/vi_estimator/vio_estimator.h>
 
 #define ASSERT(cond, ...)                                      \
+  /* NOLINTBEGIN */                                            \
   do {                                                         \
     if (!(cond)) {                                             \
       printf("Assertion failed @%s:%d\n", __func__, __LINE__); \
       printf(__VA_ARGS__);                                     \
       printf("\n");                                            \
-      exit(EXIT_FAILURE);                                      \
+      exit(EXIT_FAILURE); /* NOLINT */                         \
     }                                                          \
-  } while (false);
+  } while (false);                                             \
+  /* NOLINTEND */
+
 #define ASSERT_(cond) ASSERT(cond, "%s", #cond);
 
 namespace xrt::auxiliary::tracking::slam {
@@ -75,7 +78,7 @@ class slam_tracker_ui : vis::VIOUIBase {
   }
 
   void start(const Sophus::SE3d &T_w_i_init, const Calibration<double> &calib, const VioConfig &config,
-             OpticalFlowBase::Ptr of, VioEstimatorBase::Ptr ve) {
+             const OpticalFlowBase::Ptr &of, const VioEstimatorBase::Ptr &ve) {
     opt_flow_depth_queue = &of->input_depth_queue;
     opt_flow = of;
     vio = ve;

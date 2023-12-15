@@ -37,16 +37,15 @@ EXPORT extern const int IMPLEMENTATION_VERSION_PATCH = HEADER_VERSION_PATCH;
 using std::cout;
 using std::make_shared;
 using std::make_unique;
-using std::pair;
 using std::shared_ptr;
 using std::static_pointer_cast;
 using std::string;
 using std::thread;
-using std::to_string;
 using std::unordered_set;
 using std::vector;
 using namespace basalt;
 
+// NOLINTBEGIN(cert-err58-cpp)
 static const vector<string> timing_titles{
     "frame_ts",
     "tracker_received",
@@ -63,6 +62,7 @@ static const vector<string> timing_titles{
     "tracker_consumer_pushed",
     "monado_dequeued",
 };
+// NOLINTEND(cert-err58-cpp)
 
 struct slam_tracker::implementation {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -118,9 +118,7 @@ struct slam_tracker::implementation {
   bool pose_features_enabled = false;
 
  public:
-  implementation(const slam_config &config) {
-    cam_count = config.cam_count;
-    show_gui = config.show_ui;
+  explicit implementation(const slam_config &config) : show_gui(config.show_ui), cam_count(config.cam_count) {
     cout << "Basalt with cam_count=" << cam_count << ", show_gui=" << show_gui << "\n";
 
     // Basalt in its current state does not support monocular cameras, although it
@@ -397,8 +395,8 @@ struct slam_tracker::implementation {
 
     // TODO: We could avoid this copy. Maybe by writing a custom
     // allocator for ManagedImage that ties the OpenCV allocator
-    size_t full_size = width * height;
-    for (size_t j = 0; j < full_size; j++) {
+    int full_size = width * height;
+    for (int j = 0; j < full_size; j++) {
       mimg->ptr[j] = s.img.at<uchar>(j) << 8;
     }
 

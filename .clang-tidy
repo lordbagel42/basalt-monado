@@ -12,6 +12,9 @@ Checks: >
   -cppcoreguidelines-pro-type-vararg,
   -cppcoreguidelines-virtual-class-destructor,
   -cppcoreguidelines-owning-memory,
+  -cppcoreguidelines-non-private-member-variables-in-classes,
+  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
+  -cppcoreguidelines-slicing,
   hicpp-*,
   -hicpp-braces-around-statements,
   -hicpp-no-array-decay,
@@ -24,3 +27,7 @@ Checks: >
   performance-*,
   portability-*,
   readability-*"
+
+CheckOptions:
+  - key: hicpp-signed-bitwise.IgnorePositiveIntegerLiterals
+    value: true
