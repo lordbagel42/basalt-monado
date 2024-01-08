@@ -40,6 +40,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <pangolin/gl/gldraw.h>
 #include <pangolin/gl/glfont.h>
 
+#include <basalt/utils/vis_matrices.h>
 #include <basalt/vi_estimator/vio_estimator.h>
 #include <pangolin/var/var.h>
 #include <pangolin/var/varvaluegeneric.h>
@@ -163,9 +164,6 @@ using std::shared_ptr;
 using std::string;
 using std::vector;
 using Button = Var<std::function<void(void)>>;
-using UIMAT = VioVisualizationData::UIMAT;
-using UIJacobians = VioVisualizationData::UIJacobians;
-using UIHessians = VioVisualizationData::UIHessians;
 
 extern pangolin::GlFont SMALL_FONT;
 
@@ -188,8 +186,6 @@ Selection parse_selection(const std::string& str);
 bool is_selected(const Selection& selection, size_t n);
 
 struct VIOUIBase {
-  // TODO@mateosss: remove inheritance to see what places I could unify
-  // TODO@mateosss: add and improve show_after_qr and show_Hb options
   static constexpr int UI_WIDTH_PIX = 200;
   const pangolin::Attach UI_WIDTH = pangolin::Attach::Pix(UI_WIDTH_PIX);
 

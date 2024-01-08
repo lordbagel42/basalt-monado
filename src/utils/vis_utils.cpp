@@ -43,10 +43,6 @@ extern "C" const unsigned char AnonymousPro_ttf[];
 }
 
 namespace basalt::vis {
-using UIHessians = VioVisualizationData::UIHessians;
-using UIJacobians = VioVisualizationData::UIJacobians;
-auto is_hessian = VioVisualizationData::is_hessian;
-auto is_jacobian = VioVisualizationData::is_jacobian;
 
 pangolin::GlFont SMALL_FONT(pangolin::AnonymousPro_ttf, 11);
 

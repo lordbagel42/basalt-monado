@@ -23,6 +23,7 @@
 #include <basalt/serialization/headers_serialization.h>
 #include <basalt/utils/keypoints.h>
 #include <basalt/utils/vio_config.h>
+#include <basalt/utils/vis_matrices.h>
 #include <basalt/utils/vis_utils.h>
 #include <basalt/vi_estimator/vio_estimator.h>
 
@@ -39,6 +40,8 @@
 
 namespace xrt::auxiliary::tracking::slam {
 
+using namespace basalt;
+using namespace Eigen;
 using std::cout;
 using std::make_shared;
 using std::shared_ptr;
@@ -46,9 +49,7 @@ using std::string;
 using std::thread;
 using std::to_string;
 using std::vector;
-using namespace basalt;
-using namespace Eigen;
-using UIMAT = VioVisualizationData::UIMAT;
+using vis::UIMAT;
 
 class slam_tracker_ui : vis::VIOUIBase {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW

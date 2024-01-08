@@ -38,12 +38,18 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <basalt/optical_flow/optical_flow.h>
 #include <basalt/utils/imu_types.h>
+#include <basalt/utils/vis_matrices.h>
 #include <basalt/linearization/landmark_block.hpp>
 
 namespace basalt {
 
 struct VioVisualizationData {
-  typedef std::shared_ptr<VioVisualizationData> Ptr;
+  using Ptr = std::shared_ptr<VioVisualizationData>;
+  using UIMAT = vis::UIMAT;
+  using UIJacobians = vis::UIJacobians;
+  using UIHessians = vis::UIHessians;
+  static constexpr int UIMAT_COUNT_J = vis::UIMAT_COUNT_J;
+  static constexpr int UIMAT_COUNT_H = vis::UIMAT_COUNT_H;
 
   int64_t t_ns;
 
@@ -62,40 +68,16 @@ struct VioVisualizationData {
   std::shared_ptr<std::vector<Eigen::aligned_vector<Eigen::Vector4d>>> projections;
 
   // Indices in Jr and Hb fields
-  enum class UIMAT {
-    JR,       // Jacobian J = [Jp Jl] and residual r (landmark blocks)
-    JR_QR,    // Landmark blocks after QR factorization
-    JR_M,     // Marginalized Jr
-    JR_M_QR,  // Marginalized Jr_QR
-    HB,       // Hessian H = J^T J and b = J^T r
-    HB_M,     // Marginalized Hb
-    COUNT,
-  };
-  static constexpr int UIMAT_COUNT_J = (int)UIMAT::HB;
-  static constexpr int UIMAT_COUNT_H = (int)UIMAT::COUNT - (int)UIMAT::HB;
+  UIJacobians Jr[UIMAT_COUNT_J];
+  UIHessians Hb[UIMAT_COUNT_H];
 
-  struct UIJacobians {
-    UILandmarkBlocks::Ptr Jr;                    // Landmark blocks
-    UILandmarkBlocks::Ptr Jr_h;                  // Highlighted
-    std::shared_ptr<ManagedImage<uint8_t>> img;  // Current rendered image
-  } Jr[UIMAT_COUNT_J];
-
-  struct UIHessians {
-    std::shared_ptr<Eigen::MatrixXf> H;
-    std::shared_ptr<Eigen::VectorXf> b;
-    std::shared_ptr<AbsOrderMap> aom;
-    std::shared_ptr<ManagedImage<uint8_t>> img;
-  } Hb[UIMAT_COUNT_H];
+  UIJacobians& getj(UIMAT u) { return Jr[(int)u]; };
+  UIHessians& geth(UIMAT u) { return Hb[(int)u - (int)UIMAT::HB]; };
 
   void invalidate_mat_imgs() {
     for (UIJacobians& j : Jr) j.img = nullptr;
     for (UIHessians& h : Hb) h.img = nullptr;
   }
-
-  static bool is_jacobian(UIMAT u) { return UIMAT::JR <= u && u < UIMAT::HB; }
-  static bool is_hessian(UIMAT u) { return UIMAT::HB <= u && u < UIMAT::COUNT; }
-  UIJacobians& getj(UIMAT u) { return Jr[(int)u]; };
-  UIHessians& geth(UIMAT u) { return Hb[(int)u - (int)UIMAT::HB]; };
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 };

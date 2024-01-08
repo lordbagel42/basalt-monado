@@ -40,6 +40,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/optimization/accumulator.h>
 #include <basalt/utils/assert.h>
 #include <basalt/utils/system_utils.h>
+#include <basalt/utils/vis_matrices.h>
 #include <basalt/vi_estimator/sc_ba_base.h>
 #include <basalt/utils/cast_utils.hpp>
 #include <basalt/utils/format.hpp>
@@ -58,7 +59,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace basalt {
 
-using UIMAT = VioVisualizationData::UIMAT;
+using vis::UIMAT;
 
 template <class Scalar_>
 SqrtKeypointVioEstimator<Scalar_>::SqrtKeypointVioEstimator(const Eigen::Vector3d& g_,

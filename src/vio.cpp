@@ -70,6 +70,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <basalt/utils/keypoints.h>
 #include <basalt/utils/system_utils.h>
 #include <basalt/utils/vio_config.h>
+#include <basalt/utils/vis_matrices.h>
 #include <basalt/utils/vis_utils.h>
 #include <basalt/linearization/landmark_block.hpp>
 #include <basalt/utils/format.hpp>
@@ -87,7 +88,7 @@ using std::shared_ptr;
 using std::thread;
 using std::unordered_map;
 using vis::Button;
-using UIMAT = VioVisualizationData::UIMAT;
+using UIMAT = vis::UIMAT;
 
 struct basalt_vio_ui : vis::VIOUIBase {
   unordered_map<int64_t, VioVisualizationData::Ptr> vis_map;
