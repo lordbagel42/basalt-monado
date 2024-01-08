@@ -108,6 +108,8 @@ class slam_tracker_ui : vis::VIOUIBase {
   std::vector<int64_t> vio_t_ns;
   Eigen::aligned_vector<Eigen::Vector3d> vio_t_w_i;
 
+  UIMAT get_mat_to_show() { return show_blocks ? (UIMAT)mat_to_show.Get() : UIMAT::NONE; }
+
   void log_vio_data(const PoseVelBiasState<double>::Ptr &data) {
     int64_t t_ns = data->t_ns;
     if (start_t_ns < 0) start_t_ns = t_ns;

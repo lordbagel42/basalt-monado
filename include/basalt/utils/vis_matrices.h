@@ -75,6 +75,8 @@ enum class UIMAT {
   HB,       //!< Hessian H = J^T J and b = J^T r
   HB_M,     //!< Marginalized Hb
   COUNT,
+  NONE,  //!< Special value to symbolize no UIMATs
+  ALL,   //!< Special value to symbolize all UIMATs
 };
 constexpr int UIMAT_COUNT_J = (int)UIMAT::HB;
 constexpr int UIMAT_COUNT_H = (int)UIMAT::COUNT - (int)UIMAT::HB;
