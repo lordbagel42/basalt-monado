@@ -246,7 +246,8 @@ void SqrtKeypointVioEstimator<Scalar>::addPriorKeyframe() {
       // std::cout << "[" << frame_count << "] Landmark " << lm_id << " added to window" << std::endl;
     }
     if (lm_id == 1202)
-      std::cout << "[" << frame_count << "] The number of obs of the lm " << lm_id <<" is: " << map_observations[lm_id].size() << std::endl;
+      std::cout << "[" << frame_count << "] The number of obs of the lm " << lm_id
+                << " is: " << map_observations[lm_id].size() << std::endl;
     for (auto& [tcid_target, pos] : map_observations[lm_id]) {
       // Add Obbservation
       KeypointObservation<Scalar> kobs;
@@ -254,14 +255,15 @@ void SqrtKeypointVioEstimator<Scalar>::addPriorKeyframe() {
       kobs.pos = pos;
       lmdb.addObservation(tcid_target, kobs);
       observations_count++;
-      // std::cout << "[" << frame_count << "] Observation (" << frame_idx.at(lm.host_kf_id.frame_id) << ", " << frame_idx.at(tcid_target.frame_id) << ") added for lm " << lm_id << std::endl;
+      // std::cout << "[" << frame_count << "] Observation (" << frame_idx.at(lm.host_kf_id.frame_id) << ", " <<
+      // frame_idx.at(tcid_target.frame_id) << ") added for lm " << lm_id << std::endl;
     }
   }
   get_map_points(new_landmarks, visual_data->map_points, visual_data->map_point_ids);
 
   // if (keyframes_count + landmarks_count + observations_count > 0)
-  //   std::cout << "[" << frame_count << "] Submap added to window: (" << keyframes_count << ", " << landmarks_count << ", " << observations_count << ")" << std::endl;
-
+  //   std::cout << "[" << frame_count << "] Submap added to window: (" << keyframes_count << ", " << landmarks_count <<
+  //   ", " << observations_count << ")" << std::endl;
 }
 
 template <class Scalar>
@@ -275,7 +277,8 @@ void SqrtKeypointVioEstimator<Scalar>::removePriorKeyframe() {
       frame_poses.erase(kf_id);
       frames_to_rm.emplace(kf_id);
       keyframes_count++;
-      // std::cout << "[" << frame_count << "] keyframe " << frame_idx.at(kf_id) << " removed from the window" << std::endl;
+      // std::cout << "[" << frame_count << "] keyframe " << frame_idx.at(kf_id) << " removed from the window" <<
+      // std::endl;
     }
   }
   std::set<FrameId> poses_to_marg{};
@@ -284,7 +287,8 @@ void SqrtKeypointVioEstimator<Scalar>::removePriorKeyframe() {
   covisible_keyframes.clear();
   covisible_landmarks.clear();
   map_observations.clear();
-  // if (keyframes_count > 0) std::cout << "[" << frame_count << "] Keyframes removed: " << keyframes_count << std::endl;
+  // if (keyframes_count > 0) std::cout << "[" << frame_count << "] Keyframes removed: " << keyframes_count <<
+  // std::endl;
 }
 
 template <class Scalar>
@@ -511,7 +515,6 @@ void SqrtKeypointVioEstimator<Scalar_>::initialize(const Eigen::Vector3d& bg_, c
       }
       curr_frame->input_images->addTime("imu_preintegrated");
 
-
       measure(curr_frame, meas);
       prev_frame = curr_frame;
     }
@@ -599,20 +602,19 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
   for (int i = 0; i < NUM_CAMS; i++) {
     TimeCamId tcid_target(opt_flow_meas->t_ns, i);
 
-
     for (const auto& kv_obs : opt_flow_meas->keypoints[i]) {
       int kpt_id = kv_obs.first;
 
       if (lmdb.landmarkExists(kpt_id)) {
         if (kpt_id == 1202)
-            std::cout << "[" << frame_count << "_" << i << "] Landmark " << kpt_id << " found in window" << std::endl;
+          std::cout << "[" << frame_count << "_" << i << "] Landmark " << kpt_id << " found in window" << std::endl;
         const TimeCamId& tcid_host = lmdb.getLandmark(kpt_id).host_kf_id;
 
         KeypointObservation<Scalar> kobs;
         kobs.kpt_id = kpt_id;
         kobs.pos = kv_obs.second.translation().cast<Scalar>();
 
-        ///TODO:@brunozanotti why basalt stores obs of non-keyframes?
+        /// TODO:@brunozanotti why basalt stores obs of non-keyframes?
         lmdb.addObservation(tcid_target, kobs);
         // obs[tcid_host][tcid_target].push_back(kobs);
 
@@ -626,7 +628,7 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
         /// TODO:@brunozanotti what happend if the kpt_id is in the persistent database? (recall)
         unconnected_obs[i].emplace(kpt_id);
         if (kpt_id == 1202)
-          std::cout << "[" <<frame_count << "_" << i << "] Landmark " << kpt_id << " not found" << std::endl;
+          std::cout << "[" << frame_count << "_" << i << "] Landmark " << kpt_id << " not found" << std::endl;
       }
     }
 
@@ -724,7 +726,8 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
             /// TODO:@brunozanotti getPoseStateWithLin of getPoseState??
             lmdb.addLandmark(lm_id, lm_pos);
             if (lm_id == 1202)
-              std::cout << "[" << frame_count << "_" << i << "] Landmark " << lm_id << " stored in lmdb (host " << frame_idx[tcidl.frame_id] << ")" << std::endl;
+              std::cout << "[" << frame_count << "_" << i << "] Landmark " << lm_id << " stored in lmdb (host "
+                        << frame_idx[tcidl.frame_id] << ")" << std::endl;
 
             const SE3 pos = getPoseStateWithLin(tcidl.frame_id).getPose();
             persistent_lmdb.addLandmarkWithPose(lm_id, lm_pos, tcidl.frame_id, pos);

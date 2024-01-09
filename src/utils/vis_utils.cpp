@@ -642,10 +642,10 @@ void VIOUIBase::draw_jacobian_overlay(pangolin::ImageView& blocks_view, const UI
       bool present = curr_vis_data->frame_idx.count(ts) > 0;
       // if (!keyframed && !marginalized && !present) BASALT_ASSERT(false);
 
-      size_t fid = (keyframed        ? curr_vis_data->keyframed_idx[ts]
-                    : marginalized   ? curr_vis_data->marginalized_idx[ts]
-                    : tmp_keyframes  ? curr_vis_data->tmp_keyframes_idx[ts]
-                                     : curr_vis_data->frame_idx[ts]);
+      size_t fid = (keyframed       ? curr_vis_data->keyframed_idx[ts]
+                    : marginalized  ? curr_vis_data->marginalized_idx[ts]
+                    : tmp_keyframes ? curr_vis_data->tmp_keyframes_idx[ts]
+                                    : curr_vis_data->frame_idx[ts]);
       glColor3ubv(keyframed ? GREEN : marginalized ? RED : tmp_keyframes ? BLACK : BLUE);
       auto text = pangolin::GlFont::I().Text("%lu", fid);
       try_draw_image_text(blocks_view, xoff + idx, pad / 2, text);
