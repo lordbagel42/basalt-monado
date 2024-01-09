@@ -136,11 +136,77 @@ void SqrtKeypointVioEstimator<Scalar>::takePriorKeyframe() {
 }
 
 template <class Scalar>
-void SqrtKeypointVioEstimator<Scalar>::addPriorKeyframe() {
+void SqrtKeypointVioEstimator<Scalar>::addZeroKeyframeToMargData(FrameId toadd_ts) {
+  // Update marg_data for a timestamped keyframe so that H and b add corresponding zeroed indices
 
+  size_t old_total_size = marg_data.b.rows();
+  size_t new_total_size = old_total_size + POSE_SIZE;
+  MatX Hm;
+  VecX bm;
+  Hm.setZero(new_total_size, new_total_size);
+  bm.setZero(new_total_size);
+
+  AbsOrderMap order{};
+  size_t added_idx = SIZE_MAX;
+  for (const auto& [ts, idxsize] : marg_data.order.abs_order_map) {
+    if (added_idx == SIZE_MAX && toadd_ts < ts) {
+      added_idx = order.total_size;
+      order.abs_order_map[toadd_ts] = std::make_pair(added_idx, POSE_SIZE);
+      order.total_size += POSE_SIZE;
+      order.items++;
+    }
+
+    const auto& [idx, size] = idxsize;
+    order.abs_order_map[ts] = std::make_pair(order.total_size, size);
+    order.total_size += size;
+    order.items++;
+  }
+
+  if (added_idx == SIZE_MAX) {  // In the unusual case the frame to add is in the future
+    added_idx = order.total_size;
+    order.abs_order_map[toadd_ts] = std::make_pair(added_idx, POSE_SIZE);
+    order.total_size += POSE_SIZE;
+    order.items++;
+  }
+
+  size_t bef = added_idx;                   // Side size to the left (before)
+  size_t aft = old_total_size - added_idx;  // Side size to the right (after)
+  size_t i = added_idx;                     // Index to insert at
+  size_t s = POSE_SIZE;                     // Number of inserted vars
+
+  if (i == 0) {                                                                              // If at the beginning
+    Hm.template block(i + s, i + s, aft, aft) = marg_data.H.template block(i, i, aft, aft);  // bottomright
+    bm.tail(aft) = marg_data.b.tail(aft);
+  } else if (i + s == order.total_size) {                                            // If at the end
+    Hm.template block(0, 0, bef, bef) = marg_data.H.template block(0, 0, bef, bef);  // topleft
+    bm.head(bef) = marg_data.b.head(bef);
+  } else {                                                                                   // If in the middle
+    Hm.template block(0, 0, bef, bef) = marg_data.H.template block(0, 0, bef, bef);          // topleft
+    Hm.template block(0, i + s, bef, aft) = marg_data.H.template block(0, i, bef, aft);      // topright
+    Hm.template block(i + s, 0, aft, bef) = marg_data.H.template block(i, 0, aft, bef);      // bottomleft
+    Hm.template block(i + s, i + s, aft, aft) = marg_data.H.template block(i, i, aft, aft);  // bottomright
+    bm.head(bef) = marg_data.b.head(bef);
+    bm.tail(aft) = marg_data.b.tail(aft);
+  }
+
+  marg_data.H = Hm;
+  marg_data.b = bm;
+  marg_data.order = order;
+}
+
+template <class Scalar>
+void SqrtKeypointVioEstimator<Scalar>::addPriorKeyframe() {
   int keyframes_count = 0;
   int landmarks_count = 0;
   int observations_count = 0;
+
+  if (show_uimat(UIMAT::HB_M_PRIOR_BEFORE)) {
+    visual_data->geth(UIMAT::HB_M_PRIOR_BEFORE).H =
+        std::make_shared<Eigen::MatrixXf>(marg_data.H.template cast<float>());
+    visual_data->geth(UIMAT::HB_M_PRIOR_BEFORE).b =
+        std::make_shared<Eigen::VectorXf>(marg_data.b.template cast<float>());
+    visual_data->geth(UIMAT::HB_M_PRIOR_BEFORE).aom = std::make_shared<AbsOrderMap>(marg_data.order);
+  }
 
   for (auto& tcid : covisible_keyframes) {
     int64_t kf_id = tcid.frame_id;
@@ -154,10 +220,19 @@ void SqrtKeypointVioEstimator<Scalar>::addPriorKeyframe() {
       frame_poses[kf_id] = PoseStateWithLin<Scalar>(kf_id, pose);
       frame_poses[kf_id].setLinTrue();
       visual_data->ltframes[kf_id] = pose.template cast<double>();
+      addZeroKeyframeToMargData(kf_id);
 
       keyframes_count++;
       // std::cout << "[" << frame_count << "] Keyframe " << frame_idx.at(kf_id) << " added to window" << std::endl;
     }
+  }
+
+  if (show_uimat(UIMAT::HB_M_PRIOR_BEFORE)) {
+    visual_data->geth(UIMAT::HB_M_PRIOR_AFTER).H =
+        std::make_shared<Eigen::MatrixXf>(marg_data.H.template cast<float>());
+    visual_data->geth(UIMAT::HB_M_PRIOR_AFTER).b =
+        std::make_shared<Eigen::VectorXf>(marg_data.b.template cast<float>());
+    visual_data->geth(UIMAT::HB_M_PRIOR_AFTER).aom = std::make_shared<AbsOrderMap>(marg_data.order);
   }
 
   std::map<LandmarkId, Landmark<Scalar>> new_landmarks;
@@ -512,10 +587,12 @@ bool SqrtKeypointVioEstimator<Scalar_>::measure(const OpticalFlowResult::Ptr& op
   std::vector<int> connected(NUM_CAMS, 0);
   std::map<int64_t, int> num_points_connected;
   std::vector<std::unordered_set<int>> unconnected_obs(NUM_CAMS);
-  if (true) {
+  if (take_priorkf) {
     std::set<KeypointId> kpids;
     for (const auto& kpt : opt_flow_meas->keypoints[0]) kpids.insert(kpt.first);
+    printf(">>> BEFORE covisible_keyframes.size()=%zu\n", covisible_keyframes.size());
     persistent_lmdb.getCovisibleMap(kpids, covisible_keyframes, covisible_landmarks, map_observations);
+    printf(">>> AFTER covisible_keyframes.size()=%zu\n", covisible_keyframes.size());
     addPriorKeyframe();
   }
 
@@ -1727,7 +1804,6 @@ void SqrtKeypointVioEstimator<Scalar_>::optimize_and_marg(const OpticalFlowInput
                                                           const std::unordered_set<KeypointId>& lost_landmaks) {
   optimize();
   input_images->addTime("optimized");
-  removePriorKeyframe();
   marginalize(num_points_connected, lost_landmaks);
   input_images->addTime("marginalized");
 }

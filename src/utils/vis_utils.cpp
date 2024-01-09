@@ -85,6 +85,11 @@ bool VIOUIBase::take_ltkf() {
   return true;
 }
 
+bool VIOUIBase::take_map() {
+  vio->takePriorKeyframe();
+  return true;
+}
+
 void VIOUIBase::do_show_flow(size_t cam_id) {
   const VioVisualizationData::Ptr curr_vis_data = get_curr_vis_data();
   if (curr_vis_data == nullptr) return;

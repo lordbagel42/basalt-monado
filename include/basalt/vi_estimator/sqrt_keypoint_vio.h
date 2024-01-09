@@ -117,6 +117,7 @@ class SqrtKeypointVioEstimator : public VioEstimatorBase, public SqrtBundleAdjus
   void takePriorKeyframe() override;
   void addPriorKeyframe() override;
   void removePriorKeyframe() override;
+  void addZeroKeyframeToMargData(FrameId toadd_ts);
 
   typename ImuData<Scalar>::Ptr popFromImuDataQueue();
 
