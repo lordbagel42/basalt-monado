@@ -75,7 +75,11 @@ enum class UIMAT {
   HB,                 //!< Hessian H = J^T J and b = J^T r
   HB_M_PRIOR_BEFORE,  //!< Marg prior before addZeroKeyframesToMargData
   HB_M_PRIOR_AFTER,   //!< Marg prior after addZeroKeyframeToMargData
-  HB_M,               //!< Marginalized Hb
+  HB_M0_PREV,
+  HB_M1_LINED,
+  HB_M2_HELPER,
+  HB_M3_NEW,
+  HB_M = HB_M3_NEW,  //!< Marginalized Hb
   COUNT,
   NONE,  //!< Special value to symbolize no UIMATs
   ALL,   //!< Special value to symbolize all UIMATs

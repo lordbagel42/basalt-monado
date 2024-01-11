@@ -73,47 +73,47 @@ void MargHelper<Scalar_>::marginalizeHelperSqToSq(MatX& abs_H, VecX& abs_b, cons
   abs_H.applyOnTheLeft(pt);
   abs_H.applyOnTheRight(p);
 
+  MatX H = abs_H;
+  VecX b = abs_b;
+
   // Use of fullPivLu compared to alternatives was determined experimentally. It
   // is more stable than ldlt when the matrix is numerically close ot
   // indefinite, but it is faster than the even more stable
   // fullPivHouseholderQr.
 
   //  auto H_mm_decomposition =
-  //      abs_H.bottomRightCorner(marg_size, marg_size).ldlt();
+  //      H.bottomRightCorner(marg_size, marg_size).ldlt();
 
   //  auto H_mm_decomposition =
-  //      abs_H.bottomRightCorner(marg_size, marg_size).fullPivLu();
+  //      H.bottomRightCorner(marg_size, marg_size).fullPivLu();
   //  MatX H_mm_inv = H_mm_decomposition.inverse();
 
   //  auto H_mm_decomposition =
-  //      abs_H.bottomRightCorner(marg_size, marg_size).colPivHouseholderQr();
+  //      H.bottomRightCorner(marg_size, marg_size).colPivHouseholderQr();
 
   // DO NOT USE!!!
   // Pseudoinverse with SVD. Uses iterative method and results in severe low
   // accuracy. Use the version below (COD) for pseudoinverse
   //  auto H_mm_decomposition =
-  //      abs_H.bottomRightCorner(marg_size, marg_size)
+  //      H.bottomRightCorner(marg_size, marg_size)
   //          .jacobiSvd(Eigen::ComputeThinU | Eigen::ComputeThinV);
 
   // Eigen version of pseudoinverse
-  auto H_mm_decomposition = abs_H.bottomRightCorner(marg_size, marg_size).completeOrthogonalDecomposition();
+  auto H_mm_decomposition = H.bottomRightCorner(marg_size, marg_size).completeOrthogonalDecomposition();
   MatX H_mm_inv = H_mm_decomposition.pseudoInverse();
 
   // Should be more numerially stable version of:
-  abs_H.topRightCorner(keep_size, marg_size) *= H_mm_inv;
-  //  abs_H.topRightCorner(keep_size, marg_size) =
+  H.topRightCorner(keep_size, marg_size) *= H_mm_inv;
+  //  H.topRightCorner(keep_size, marg_size) =
   //      H_mm_decomposition
-  //          .solve(abs_H.topRightCorner(keep_size, marg_size).transpose())
+  //          .solve(H.topRightCorner(keep_size, marg_size).transpose())
   //          .transpose();
 
-  marg_H = abs_H.topLeftCorner(keep_size, keep_size);
-  marg_b = abs_b.head(keep_size);
+  marg_H = H.topLeftCorner(keep_size, keep_size);
+  marg_b = b.head(keep_size);
 
-  marg_H -= abs_H.topRightCorner(keep_size, marg_size) * abs_H.bottomLeftCorner(marg_size, keep_size);
-  marg_b -= abs_H.topRightCorner(keep_size, marg_size) * abs_b.tail(marg_size);
-
-  abs_H.resize(0, 0);
-  abs_b.resize(0);
+  marg_H -= H.topRightCorner(keep_size, marg_size) * H.bottomLeftCorner(marg_size, keep_size);
+  marg_b -= H.topRightCorner(keep_size, marg_size) * b.tail(marg_size);
 }
 
 template <class Scalar_>
@@ -326,8 +326,6 @@ void MargHelper<Scalar_>::marginalizeHelperSqrtToSqrt(MatX& Q2Jp, VecX& Q2r, con
   marg_sqrt_H = Q2Jp.block(marg_rank, marg_size, keep_valid_rows, keep_size);
   marg_sqrt_b = Q2r.segment(marg_rank, keep_valid_rows);
 
-  Q2Jp.resize(0, 0);
-  Q2r.resize(0);
 }
 
 // //////////////////////////////////////////////////////////////////

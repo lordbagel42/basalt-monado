@@ -917,6 +917,12 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
   if (frame_poses.size() > ltkfs.size() + max_kfs || frame_states.size() >= max_states) {
     // Marginalize
 
+    if (show_uimat(UIMAT::HB_M0_PREV)) {
+      visual_data->geth(UIMAT::HB_M0_PREV).H = std::make_shared<Eigen::MatrixXf>(marg_data.H.template cast<float>());
+      visual_data->geth(UIMAT::HB_M0_PREV).b = std::make_shared<Eigen::VectorXf>(marg_data.b.template cast<float>());
+      visual_data->geth(UIMAT::HB_M0_PREV).aom = std::make_shared<AbsOrderMap>(marg_data.order);
+    }
+
     const int states_to_remove = frame_states.size() - max_states + 1;
 
     auto it = frame_states.cbegin();
@@ -1137,6 +1143,12 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
         lqr->get_dense_H_b(Q2Jp_or_H, Q2r_or_b);
       }
 
+      if (show_uimat(UIMAT::HB_M1_LINED)) {
+        visual_data->geth(UIMAT::HB_M1_LINED).H = std::make_shared<Eigen::MatrixXf>(Q2Jp_or_H.template cast<float>());
+        visual_data->geth(UIMAT::HB_M1_LINED).b = std::make_shared<Eigen::VectorXf>(Q2r_or_b.template cast<float>());
+        visual_data->geth(UIMAT::HB_M1_LINED).aom = std::make_shared<AbsOrderMap>(aom);
+      }
+
       stats_sums_.add("marg_linearize", t_linearize.elapsed()).format("ms");
     }
 
@@ -1281,6 +1293,12 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
       stats_sums_.add("marg_helper", t.elapsed()).format("ms");
     }
 
+    if (show_uimat(UIMAT::HB_M2_HELPER)) {
+      visual_data->geth(UIMAT::HB_M2_HELPER).H = std::make_shared<Eigen::MatrixXf>(Q2Jp_or_H.template cast<float>());
+      visual_data->geth(UIMAT::HB_M2_HELPER).b = std::make_shared<Eigen::VectorXf>(Q2r_or_b.template cast<float>());
+      visual_data->geth(UIMAT::HB_M2_HELPER).aom = std::make_shared<AbsOrderMap>(aom);
+    }
+
     {
       BASALT_ASSERT(frame_states.at(last_state_to_marg).isLinearized() == false);
       frame_states.at(last_state_to_marg).setLinTrue();
@@ -1331,15 +1349,15 @@ void SqrtKeypointVioEstimator<Scalar_>::marginalize(const std::map<int64_t, int>
       marg_order_new.items++;
     }
 
+    if (show_uimat(UIMAT::HB_M3_NEW)) {
+      visual_data->geth(UIMAT::HB_M3_NEW).H = std::make_shared<Eigen::MatrixXf>(marg_H_new.template cast<float>());
+      visual_data->geth(UIMAT::HB_M3_NEW).b = std::make_shared<Eigen::VectorXf>(marg_b_new.template cast<float>());
+      visual_data->geth(UIMAT::HB_M3_NEW).aom = std::make_shared<AbsOrderMap>(marg_order_new);
+    }
+
     marg_data.H = marg_H_new;
     marg_data.b = marg_b_new;
     marg_data.order = marg_order_new;
-
-    if (show_uimat(UIMAT::HB_M)) {
-      visual_data->geth(UIMAT::HB_M).H = std::make_shared<Eigen::MatrixXf>(marg_H_new.template cast<float>());
-      visual_data->geth(UIMAT::HB_M).b = std::make_shared<Eigen::VectorXf>(marg_b_new.template cast<float>());
-      visual_data->geth(UIMAT::HB_M).aom = std::make_shared<AbsOrderMap>(marg_order_new);
-    }
 
     BASALT_ASSERT(size_t(marg_data.H.cols()) == marg_data.order.total_size);
 
